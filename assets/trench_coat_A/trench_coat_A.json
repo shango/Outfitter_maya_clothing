@@ -1,0 +1,8 @@
+{
+  "assetName": "trench_coat_A",
+  "assetType": "coat",
+  "clothVersion": "1.0.0",
+  "genHumanCompat": "v03",
+  "author": "Snap-On Clothing (example)",
+  "notes": "Structural reference asset. Geometry is placeholder; add smooth bind + fit deformers in Maya (see examples/build_example_asset.py)."
+}

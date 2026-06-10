@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Large GenHuman source rigs at repo root — kept on disk, out of git (use git-LFS if ever needed)
+/*.ma
+
+# Local machine-specific Claude settings
+.claude/settings.local.json

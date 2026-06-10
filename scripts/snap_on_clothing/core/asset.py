@@ -1,0 +1,133 @@
+"""Asset data model + metadata validation (pure, headless-testable).
+
+An asset's identity/version metadata can come from two places:
+  1. a sidecar ``<asset>.json`` next to the ``.ma`` (fast path, browser-friendly),
+  2. the ``cloth_info`` node string attrs inside the ``.ma`` (Authoring Spec §12).
+
+The sidecar is authoritative for the browser when present; the ``.ma`` info node
+is the fallback and the ground truth at validation time. Field names below mirror
+the Authoring Spec §12 attribute names so a sidecar can be a verbatim dump of them.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from ..config import ASSET_TYPES
+
+# cloth_info attr name -> AssetMetadata field name
+_INFO_FIELD_MAP = {
+    "assetName": "asset_name",
+    "assetType": "asset_type",
+    "clothVersion": "cloth_version",
+    "genHumanCompat": "genhuman_compat",
+    "author": "author",
+    "notes": "notes",
+}
+
+
+def _split_compat(raw: str) -> tuple[str, ...]:
+    """``"v03, v04"`` -> ``("v03", "v04")``; order-preserving, de-duped, trimmed."""
+    seen: list[str] = []
+    for part in raw.replace(";", ",").split(","):
+        tok = part.strip()
+        if tok and tok not in seen:
+            seen.append(tok)
+    return tuple(seen)
+
+
+@dataclass(frozen=True)
+class AssetMetadata:
+    """Identity + version metadata for one clothing asset (Authoring Spec §12)."""
+
+    asset_name: str
+    asset_type: str
+    cloth_version: str
+    genhuman_compat: tuple[str, ...] = ()
+    author: str = ""
+    notes: str = ""
+
+    @classmethod
+    def from_mapping(cls, data: dict[str, str]) -> tuple["AssetMetadata | None", list[str]]:
+        """Build from a sidecar/info dict. Returns ``(meta_or_None, errors)``.
+
+        Accepts both spec attr names (``assetName``) and snake_case field names
+        (``asset_name``) so a hand-written JSON sidecar works either way. Never
+        raises — invalid input yields ``None`` plus human-readable error strings.
+        """
+        norm: dict[str, object] = {}
+        for key, value in data.items():
+            field_name = _INFO_FIELD_MAP.get(key, key)
+            norm[field_name] = value
+
+        errors: list[str] = []
+        asset_name = str(norm.get("asset_name", "")).strip()
+        asset_type = str(norm.get("asset_type", "")).strip()
+        cloth_version = str(norm.get("cloth_version", "")).strip()
+
+        if not asset_name:
+            errors.append("missing 'assetName'")
+        if not asset_type:
+            errors.append("missing 'assetType'")
+        elif asset_type not in ASSET_TYPES:
+            errors.append(
+                f"assetType '{asset_type}' not one of {', '.join(ASSET_TYPES)}"
+            )
+        if not cloth_version:
+            errors.append("missing 'clothVersion'")
+
+        compat_raw = norm.get("genhuman_compat", "")
+        if isinstance(compat_raw, (list, tuple)):
+            compat = tuple(str(x).strip() for x in compat_raw if str(x).strip())
+        else:
+            compat = _split_compat(str(compat_raw))
+        if not compat:
+            errors.append("missing 'genHumanCompat'")
+
+        if errors:
+            return None, errors
+
+        return (
+            cls(
+                asset_name=asset_name,
+                asset_type=asset_type,
+                cloth_version=cloth_version,
+                genhuman_compat=compat,
+                author=str(norm.get("author", "")).strip(),
+                notes=str(norm.get("notes", "")).strip(),
+            ),
+            [],
+        )
+
+    def supports(self, genhuman_version: str) -> bool:
+        return genhuman_version in self.genhuman_compat
+
+
+@dataclass(frozen=True)
+class ClothingAsset:
+    """A discovered, browsable clothing asset on disk.
+
+    ``metadata`` is ``None`` when the asset could not be identified; ``errors``
+    then explains why so the browser can show it as invalid rather than hide it.
+    """
+
+    ma_path: Path
+    metadata: AssetMetadata | None
+    thumbnail: Path | None = None
+    sidecar: Path | None = None
+    source: str = "none"  # "sidecar" | "ma_info" | "none"
+    errors: tuple[str, ...] = field(default_factory=tuple)
+
+    @property
+    def is_valid(self) -> bool:
+        return self.metadata is not None
+
+    @property
+    def display_name(self) -> str:
+        if self.metadata is not None:
+            return self.metadata.asset_name
+        return self.ma_path.stem
+
+    @property
+    def asset_type(self) -> str:
+        return self.metadata.asset_type if self.metadata else "unknown"

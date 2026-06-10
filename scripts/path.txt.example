@@ -1,0 +1,23 @@
+# Snap-On Clothing — asset library locations.
+#
+# This is the store the Setup tab reads and writes. You can also manage it by
+# hand: rename this file to "path.txt" (same folder, beside the snap_on_clothing
+# package) and set your two folders below. Blank lines and lines starting with
+# "#" are ignored. An installer upgrade never overwrites your path.txt.
+#
+#   local  = your working library. The tool scans ONLY this folder.
+#   remote = a shared master library (studio server / drive). It is never scanned;
+#            the Setup tab's "Sync from remote" button pulls new and changed
+#            assets down from here into your local folder (it never deletes).
+#
+# When "local" is unset, the tool falls back to its built-in default library.
+#
+# Examples (delete these and set your own):
+
+# Windows — local drive + shared UNC master:
+# local  = D:/clothing_library
+# remote = //studio-nas/projects/genhuman/clothing
+
+# macOS / Linux — local disk + mounted share:
+# local  = /Users/me/clothing_library
+# remote = /Volumes/clothing/assets
