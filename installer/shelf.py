@@ -11,9 +11,16 @@ SHELF_NAME = "SnapOnClothing"
 BUTTON_LABEL = "Clothing"
 BUTTON_ANNOTATION = "Snap-On Clothing — browse / attach / detach garments"
 
-# Run when the shelf button is pressed. Imports lazily so the shelf survives even
-# if the package is reinstalled, and reports clearly if it is not yet on the path.
+# Run when the shelf button is pressed. First purge every cached ``snap_on_clothing``
+# module so edits on disk (e.g. a live repo checkout on sys.path) take effect without
+# restarting Maya, then (re)import and launch — ``show()`` rebuilds the window and
+# re-scans the library, so one click = reload code + refresh assets. Imports lazily so
+# the shelf survives even if the package is moved, and reports clearly on failure.
 BUTTON_COMMAND = (
+    "import sys\n"
+    "for _name in [n for n in list(sys.modules) "
+    "if n == 'snap_on_clothing' or n.startswith('snap_on_clothing.')]:\n"
+    "    del sys.modules[_name]\n"
     "try:\n"
     "    import snap_on_clothing.launch as scl\n"
     "    scl.run()\n"

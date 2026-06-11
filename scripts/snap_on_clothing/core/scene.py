@@ -96,6 +96,15 @@ class SceneGateway(Protocol):
         """
         ...
 
+    # --- world placement ------------------------------------------------------
+    def world_matrix(self, node: str) -> list[float]:
+        """The node's world transform as a flat 16-float row-major matrix."""
+        ...
+
+    def set_world_matrix(self, node: str, matrix: list[float]) -> None:
+        """Set the node's world transform from a flat 16-float matrix."""
+        ...
+
     # --- control / fit-attr discovery + placement (M3) ------------------------
     def list_namespace_nodes(self, namespace: str) -> list[str]:
         """All node names belonging to ``namespace`` (addressable as returned)."""
@@ -207,6 +216,12 @@ class MayaScene:
 
     def selected_nodes(self) -> list[str]:
         return list(self._cmds.ls(selection=True, long=True) or [])
+
+    def world_matrix(self, node: str) -> list[float]:
+        return [float(v) for v in self._cmds.xform(node, query=True, worldSpace=True, matrix=True)]
+
+    def set_world_matrix(self, node: str, matrix: list[float]) -> None:
+        self._cmds.xform(node, worldSpace=True, matrix=list(matrix))
 
     def resolve_export_group(self, selected_node: str) -> str | None:
         from .. import config

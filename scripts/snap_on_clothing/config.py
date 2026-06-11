@@ -29,6 +29,11 @@ CONNECT_ATTRS: tuple[str, ...] = ("translate", "rotate", "scale")
 # never short name, because a rig-internal deform skeleton shares short names.
 EXPORT_SKELETON_GROUP: str = "GenHuman_Joint_GRP"  # verify-in-Maya (PRD §4 open task)
 
+# The garment's joint group (Authoring Spec §3). At attach this group is aligned to
+# the rig's EXPORT_SKELETON_GROUP world frame, because that group carries a transform
+# (GenHuman_Joint_GRP has rotate -90 X) and attach only connects LOCAL joint transforms.
+RIG_GROUP: str = "Rig_GRP"
+
 # Any of these existing in the scene identifies the GenHuman rig as present.
 # (Post-rename names; verify-in-Maya which is most stable — PRD §9 open task.)
 RIG_MARKERS: tuple[str, ...] = (

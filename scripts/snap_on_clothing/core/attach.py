@@ -157,6 +157,7 @@ class AttachEngine:
         # 3) plan + apply connections, rolling back on any failure
         applied: list[PlannedConnection] = []
         try:
+            self._align_root_group(namespace, export_group)
             body_joints = self._resolve_body_joints(export_group, report)
             plan, plan_report = plan_connections(summary, body_joints, namespace, self.scene)
             report.extend(plan_report)
@@ -186,6 +187,21 @@ class AttachEngine:
         self.registry.add(instance)
         report.info("attached", f"attached '{namespace}' with {len(applied)} connection(s)")
         return AttachResult(True, report, instance)
+
+    def _align_root_group(self, namespace: str, export_group: str) -> None:
+        """Place the garment's joint group on the rig's export-skeleton group frame.
+
+        The export skeleton sits under a transformed group (``GenHuman_Joint_GRP`` is
+        rotated -90 X to flip the FBX skeleton into Maya's Y-up). Attach connects only
+        LOCAL joint transforms, so unless the garment's ``Rig_GRP`` shares that group's
+        world frame, every connected joint is reproduced in the wrong frame and the
+        whole garment lands rotated off the body. Matching the frame once, here, makes
+        the local-transform connections reproduce the body pose exactly — and adapts to
+        wherever this particular rig instance sits in the scene.
+        """
+        rig_group = f"{namespace}:{config.RIG_GROUP}"
+        if self.scene.exists(rig_group) and self.scene.exists(export_group):
+            self.scene.set_world_matrix(rig_group, self.scene.world_matrix(export_group))
 
     def _resolve_body_joints(self, export_group: str, report: ValidationReport) -> dict[str, str]:
         try:

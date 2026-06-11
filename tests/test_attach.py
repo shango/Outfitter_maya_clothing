@@ -151,6 +151,19 @@ def test_resolve_export_group_from_selection():
     assert scene.resolve_export_group("someRandomNode") is None
 
 
+def test_attach_aligns_rig_group_to_export_frame(tmp_path):
+    # The export group carries a transform (real rig: GenHuman_Joint_GRP rotate -90 X).
+    # Attach must copy that world frame onto the garment's Rig_GRP, else the local-only
+    # joint connections reproduce the body in the wrong frame (garment on the ground).
+    scene = _scene()
+    rot90x = [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1]  # -90° about X
+    scene.matrices[GROUP] = rot90x
+    eng = AttachEngine(scene)
+    res = eng.attach(_coat(tmp_path), "coat")
+    assert res.ok, [str(i) for i in res.report.errors]
+    assert scene.world_matrix("coat:Rig_GRP") == rot90x  # frame copied onto the garment
+
+
 def test_attach_to_namespaced_rig(tmp_path):
     scene = FakeScene()
     grp = scene.build_genhuman(BODY, namespace="charB")

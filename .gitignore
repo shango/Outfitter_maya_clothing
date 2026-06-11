@@ -7,3 +7,6 @@ __pycache__/
 
 # Local machine-specific Claude settings
 .claude/settings.local.json
+
+# User's saved library locations (per-machine; path.txt.example is the tracked template)
+scripts/path.txt

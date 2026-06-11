@@ -51,6 +51,7 @@ class FakeScene:
         self.connections: set[tuple[str, str]] = set()
         self.version: str | None = None
         self.selection: list[str] = []
+        self.matrices: dict[str, list[float]] = {}
 
     # --- test construction helpers -------------------------------------------
     def add_node(self, addr: str, node_type: str = "transform", parent: str | None = None) -> None:
@@ -175,6 +176,14 @@ class FakeScene:
 
     def selected_nodes(self) -> list[str]:
         return list(self.selection)
+
+    _IDENTITY = [1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 1.0]
+
+    def world_matrix(self, node: str) -> list[float]:
+        return list(self.matrices.get(node, self._IDENTITY))
+
+    def set_world_matrix(self, node: str, matrix: list[float]) -> None:
+        self.matrices[node] = list(matrix)
 
     def resolve_export_group(self, selected_node: str) -> str | None:
         from snap_on_clothing import config
