@@ -22,11 +22,20 @@ from ..core import library
 from ..core import settings as _settings
 from ..core import sync as _sync
 from ..core.asset import ClothingAsset
+from . import style
+from .publish_panel import PublishPanel
 
 WINDOW_OBJECT_NAME = "snapOnClothingBrowser"
 WINDOW_TITLE = "Snap-On Clothing"
-_THUMB_SIZE = 96
+_THUMB_SIZE = 120
+_PREVIEW_MAX = 260
 _ALL_TYPES = "All types"
+
+# Per-type badge colour (falls back to the theme accent for anything unlisted).
+_TYPE_COLORS = {
+    "shoes": "#c0795a", "pants": "#5a8fc0", "shirt": "#5ab0a0",
+    "dress": "#b05a9a", "coat": "#9a7ac0", "hat": "#c0a85a",
+}
 
 
 def _rig_label(export_group: str) -> str:
@@ -59,7 +68,9 @@ class ClothingBrowser(QtWidgets.QMainWindow):
 
         self._roots = roots
         self._scan: library.LibraryScanResult | None = None
+        self._preview_pixmap: QtGui.QPixmap | None = None
 
+        self.setStyleSheet(style.stylesheet())
         self._build_ui()
         self.refresh()
 
@@ -68,6 +79,7 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         tabs = QtWidgets.QTabWidget(self)
         self.setCentralWidget(tabs)
         tabs.addTab(self._build_library_tab(), "Library")
+        tabs.addTab(PublishPanel(on_published=self.refresh), "Publish")
         tabs.addTab(self._build_setup_tab(), "Setup")
 
     def _build_library_tab(self) -> QtWidgets.QWidget:
@@ -109,9 +121,10 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         splitter.setStretchFactor(1, 2)
         outer.addWidget(splitter, 1)
 
-        # action bar: attach the selected asset / detach a live instance
+        # action bar: attach the selected asset (left) / detach a live instance (right).
         actions = QtWidgets.QHBoxLayout()
         self._attach_btn = QtWidgets.QPushButton("Attach ▸")
+        self._attach_btn.setProperty("positive", True)
         self._attach_btn.setToolTip("Import the selected asset and connect it to the GenHuman rig")
         self._attach_btn.clicked.connect(self._attach_selected)
         actions.addWidget(self._attach_btn)
@@ -251,30 +264,110 @@ class ClothingBrowser(QtWidgets.QMainWindow):
 
     def _build_detail_panel(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QWidget()
-        form = QtWidgets.QFormLayout(panel)
-        form.setLabelAlignment(QtCore.Qt.AlignRight)
+        v = QtWidgets.QVBoxLayout(panel)
+        v.setContentsMargins(12, 8, 8, 8)
+        v.setSpacing(8)
+
+        # --- preview image ----------------------------------------------------
+        self._preview = QtWidgets.QLabel()
+        self._preview.setObjectName("previewImage")
+        self._preview.setAlignment(QtCore.Qt.AlignCenter)
+        self._preview.setMinimumHeight(200)
+        self._preview.setMaximumHeight(_PREVIEW_MAX)
+        self._preview.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        v.addWidget(self._preview)
+
+        # --- name + type badge ------------------------------------------------
+        header = QtWidgets.QHBoxLayout()
         self._d_name = QtWidgets.QLabel("—")
-        self._d_name.setStyleSheet("font-weight: bold;")
-        self._d_type = QtWidgets.QLabel("—")
-        self._d_version = QtWidgets.QLabel("—")
-        self._d_compat = QtWidgets.QLabel("—")
-        self._d_author = QtWidgets.QLabel("—")
-        self._d_source = QtWidgets.QLabel("—")
+        self._d_name.setObjectName("assetName")
+        self._d_name.setWordWrap(True)
+        self._d_badge = QtWidgets.QLabel("")
+        self._d_badge.setObjectName("typeBadge")
+        self._d_badge.setAlignment(QtCore.Qt.AlignCenter)
+        header.addWidget(self._d_name, 1)
+        header.addWidget(self._d_badge, 0, QtCore.Qt.AlignTop)
+        v.addLayout(header)
+
+        # --- description ------------------------------------------------------
+        self._d_desc = QtWidgets.QLabel("")
+        self._d_desc.setObjectName("description")
+        self._d_desc.setWordWrap(True)
+        v.addWidget(self._d_desc)
+
+        v.addWidget(self._hline())
+
+        # --- metadata grid ----------------------------------------------------
+        form = QtWidgets.QFormLayout()
+        form.setLabelAlignment(QtCore.Qt.AlignRight)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(6)
+        self._d_version = self._value_label()
+        self._d_compat = self._value_label()
+        self._d_polys = self._value_label()
+        self._d_created = self._value_label()
+        self._d_rigver = self._value_label()
+        self._d_author = self._value_label()
+        self._d_source = self._value_label()
+        for caption, widget in (
+            ("Version", self._d_version),
+            ("GenHuman compat", self._d_compat),
+            ("Polycount", self._d_polys),
+            ("Created", self._d_created),
+            ("Rig version", self._d_rigver),
+            ("Author", self._d_author),
+            ("Source", self._d_source),
+        ):
+            form.addRow(self._field_caption(caption), widget)
+        v.addLayout(form)
+
+        # --- compact file row (elided, never widens the panel) ----------------
+        v.addWidget(self._hline())
+        path_row = QtWidgets.QHBoxLayout()
+        path_row.setSpacing(4)
         self._d_path = QtWidgets.QLabel("—")
-        self._d_path.setWordWrap(True)
-        self._d_path.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self._d_path.setObjectName("muted")
+        self._d_path.setMinimumWidth(0)
+        self._d_path.setSizePolicy(
+            QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
+        self._copy_btn = QtWidgets.QToolButton()
+        self._copy_btn.setText("Copy")
+        self._copy_btn.setToolTip("Copy the full file path")
+        self._copy_btn.clicked.connect(self._copy_path)
+        self._open_btn = QtWidgets.QToolButton()
+        self._open_btn.setText("Open ▸")
+        self._open_btn.setToolTip("Reveal the asset folder")
+        self._open_btn.clicked.connect(self._open_folder)
+        path_row.addWidget(self._d_path, 1)
+        path_row.addWidget(self._copy_btn)
+        path_row.addWidget(self._open_btn)
+        v.addLayout(path_row)
+
+        # --- issues (invalid assets) ------------------------------------------
         self._d_errors = QtWidgets.QLabel("")
         self._d_errors.setWordWrap(True)
-        self._d_errors.setStyleSheet("color: #c0392b;")
-        form.addRow("Name:", self._d_name)
-        form.addRow("Type:", self._d_type)
-        form.addRow("Version:", self._d_version)
-        form.addRow("GenHuman compat:", self._d_compat)
-        form.addRow("Author:", self._d_author)
-        form.addRow("Metadata source:", self._d_source)
-        form.addRow("File:", self._d_path)
-        form.addRow("Issues:", self._d_errors)
+        self._d_errors.setStyleSheet("color: #e06c5a;")
+        v.addWidget(self._d_errors)
+
+        v.addStretch(1)
         return panel
+
+    def _hline(self) -> QtWidgets.QFrame:
+        line = QtWidgets.QFrame()
+        line.setFrameShape(QtWidgets.QFrame.HLine)
+        line.setStyleSheet("color: #1d1d1f; background: #1d1d1f; max-height: 1px;")
+        return line
+
+    def _field_caption(self, text: str) -> QtWidgets.QLabel:
+        lbl = QtWidgets.QLabel(text)
+        lbl.setObjectName("fieldLabel")
+        return lbl
+
+    def _value_label(self) -> QtWidgets.QLabel:
+        lbl = QtWidgets.QLabel("—")
+        lbl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        return lbl
 
     # --- data -----------------------------------------------------------------
     def _effective_roots(self) -> list[Path]:
@@ -349,21 +442,110 @@ class ClothingBrowser(QtWidgets.QMainWindow):
             self._clear_detail()
             return
         asset: ClothingAsset = current.data(QtCore.Qt.UserRole)
+        self._current_asset = asset
         meta = asset.metadata
+
+        self._set_preview(asset)
         self._d_name.setText(asset.display_name)
-        self._d_type.setText(asset.asset_type)
+        self._set_badge(asset.asset_type if asset.is_valid else "invalid")
+        self._d_desc.setText((meta.notes if meta and meta.notes else ""))
+        self._d_desc.setVisible(bool(meta and meta.notes))
+
         self._d_version.setText(meta.cloth_version if meta else "—")
-        self._d_compat.setText(", ".join(meta.genhuman_compat) if meta else "—")
+        self._d_compat.setText(", ".join(meta.genhuman_compat) if meta and meta.genhuman_compat else "—")
+        self._d_polys.setText(self._poly_text(meta))
+        self._d_created.setText((meta.created or "—") if meta else "—")
+        self._d_rigver.setText((meta.rig_version or "—") if meta else "—")
         self._d_author.setText((meta.author or "—") if meta else "—")
         self._d_source.setText(asset.source)
-        self._d_path.setText(str(asset.ma_path))
+
+        self._set_path(asset.ma_path)
         self._d_errors.setText("; ".join(asset.errors))
+        self._d_errors.setVisible(bool(asset.errors))
+
+    @staticmethod
+    def _poly_text(meta) -> str:
+        if meta is None or (meta.tri_count is None and meta.vert_count is None):
+            return "—"
+        parts = []
+        if meta.tri_count is not None:
+            parts.append(f"{meta.tri_count:,} tris")
+        if meta.vert_count is not None:
+            parts.append(f"{meta.vert_count:,} verts")
+        return " · ".join(parts)
+
+    def _set_badge(self, asset_type: str) -> None:
+        self._d_badge.setText(asset_type.upper())
+        color = _TYPE_COLORS.get(asset_type, "#4a90d9")
+        self._d_badge.setStyleSheet(
+            f"background: {color}; color: #ffffff; border-radius: 9px;"
+            "padding: 2px 10px; font-size: 11px; font-weight: 600;")
+
+    def _set_preview(self, asset: ClothingAsset) -> None:
+        pm = None
+        if asset.thumbnail is not None and asset.thumbnail.is_file():
+            loaded = QtGui.QPixmap(str(asset.thumbnail))
+            if not loaded.isNull():
+                pm = loaded
+        self._preview_pixmap = pm
+        self._rescale_preview()
+
+    def _rescale_preview(self) -> None:
+        if not hasattr(self, "_preview"):  # resize() can fire before the panel exists
+            return
+        if self._preview_pixmap is None:
+            self._preview.setText("no preview")
+            self._preview.setPixmap(QtGui.QPixmap())
+            return
+        target = self._preview.size()
+        if target.width() < 2 or target.height() < 2:
+            return
+        self._preview.setPixmap(self._preview_pixmap.scaled(
+            target, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+
+    def _set_path(self, path: Path) -> None:
+        text = str(path)
+        metrics = QtGui.QFontMetrics(self._d_path.font())
+        avail = max(60, self._d_path.width() - 4)
+        self._d_path.setText(metrics.elidedText(text, QtCore.Qt.ElideMiddle, avail))
+        self._d_path.setToolTip(text)
+
+    def _copy_path(self) -> None:
+        asset = getattr(self, "_current_asset", None)
+        if asset is not None:
+            QtWidgets.QApplication.clipboard().setText(str(asset.ma_path))
+            self._status.setText(f"Copied path: {asset.ma_path}")
+
+    def _open_folder(self) -> None:
+        asset = getattr(self, "_current_asset", None)
+        if asset is None:
+            return
+        folder = Path(asset.ma_path).parent
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(folder)))
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._rescale_preview()
+        asset = getattr(self, "_current_asset", None)
+        if asset is not None and hasattr(self, "_d_path"):
+            self._set_path(asset.ma_path)
 
     def _clear_detail(self) -> None:
-        for lbl in (self._d_name, self._d_type, self._d_version, self._d_compat,
-                    self._d_author, self._d_source, self._d_path):
+        self._current_asset = None
+        self._preview_pixmap = None
+        self._rescale_preview()
+        self._d_name.setText("—")
+        self._d_badge.setText("")
+        self._d_badge.setStyleSheet("")
+        self._d_desc.setText("")
+        self._d_desc.setVisible(False)
+        for lbl in (self._d_version, self._d_compat, self._d_polys,
+                    self._d_created, self._d_rigver, self._d_author, self._d_source):
             lbl.setText("—")
+        self._d_path.setText("—")
+        self._d_path.setToolTip("")
         self._d_errors.setText("")
+        self._d_errors.setVisible(False)
 
     # --- attach / detach ------------------------------------------------------
     def _selected_asset(self) -> ClothingAsset | None:
@@ -495,16 +677,33 @@ def _ensure_engine(parent: QtWidgets.QWidget):
     return _engine_singleton
 
 
+def _delete_existing_windows() -> None:
+    """Close every prior browser instance found in the live Qt tree, by objectName.
+
+    The module-level ``_window_singleton`` is the fast path, but the shelf button purges
+    all ``snap_on_clothing`` modules on each click (to hot-reload code), which resets that
+    global to ``None`` and orphans the previous window — leaving it parented to Maya and
+    visible. Sweeping top-level widgets by :data:`WINDOW_OBJECT_NAME` survives the reload,
+    so repeated clicks replace the window instead of stacking new ones.
+    """
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return
+    for w in app.topLevelWidgets():
+        try:
+            if w.objectName() == WINDOW_OBJECT_NAME:
+                w.close()
+                w.deleteLater()
+        except RuntimeError:
+            # already-deleted C++ object — ignore
+            pass
+
+
 def show(roots: list[Path] | None = None) -> ClothingBrowser:
     """Create (or re-show) the browser. Inside Maya, parents to the main window."""
     global _window_singleton
-    if _window_singleton is not None:
-        try:
-            _window_singleton.close()
-            _window_singleton.deleteLater()
-        except RuntimeError:
-            pass
-        _window_singleton = None
+    _window_singleton = None
+    _delete_existing_windows()
 
     parent = _maya_main_window()
     _window_singleton = ClothingBrowser(roots=roots, parent=parent)

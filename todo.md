@@ -126,6 +126,187 @@ unit-tested with no Maya. **Still needs in-Maya smoke (see `[!]` below).**
 
 ---
 
+## M6 — UI modernization + asset publish/metadata
+**DONE (logic) 2026-06-11: publish core + capture + Publish tab + Library redesign. 122 headless tests (12 new).**
+Driver: riggers will author garments **by hand** going forward (the `build_example_asset.py`
+generator is now a dev fixture only), so thumbnail/polycount/metadata can only be captured
+**in Maya at publish time**; the headless browser only *reads* the sidecar.
+- [x] **Metadata model extended** (`core/asset.py`): `AssetMetadata` gains optional, non-validating
+  fields `created`, `rig_version`, `tri_count`, `vert_count` (+`_INFO_FIELD_MAP` keys
+  `created`/`rigVersion`/`triCount`/`vertCount`, lenient `_opt_int`). Old sidecars stay valid.
+- [x] **Pure publish core** (`core/publish.py`, headless-tested): `PublishSpec` (+`to_sidecar()`
+  using spec §12 attr names, `metadata()` round-trip), `destination_paths()` →
+  `<dest>/<name>/<name>.{ma,json,png}`, `sanitize_asset_name()`, `write_sidecar()`,
+  `validate_published_ma()` (reuses `validate_asset_summary` — same checks the browser uses),
+  `today_iso()`.
+- [x] **Maya capture** (`core/maya_publish.py`, lazy `cmds`, smoke-checked): `find_garment_meshes`
+  (under `Mesh_GRP`), `poly_counts` (polyEvaluate tris+verts), `capture_thumbnail` (isolate +
+  viewFit + single-frame off-screen playblast to PNG, restores viewport/selection),
+  `detect_rig_version` (best-effort `v\d+` from GenHuman namespace), `save_ma` (whole-scene ASCII).
+- [x] **Publish tab** (`ui/publish_panel.py`, wired into `window.py`): identity/version form +
+  rig-version Detect + destination folder (defaults to Setup *local* lib) + thumbnail preview/Capture
+  + Publish (poly_counts → copy/grab thumbnail → save .ma → write sidecar → re-validate → refresh
+  Library). Clean "needs Maya" guard standalone. Overwrite confirm. **Pre-save rig block:**
+  `maya_publish.scene_has_rig()` (any `GenHuman` node/namespace) → warns "Delete the rig before
+  publishing" and aborts before writing, so a forgotten rig never produces a bloated/failing `.ma`.
+- [x] **Library redesign** (`ui/window.py` + new `ui/style.py`): scoped dark QSS theme (rounded
+  buttons, accent, card grid, type badge). Inspector details panel — **big preview image** on top,
+  name + colored type badge, description, metadata grid (version/compat/**polycount**/**created**/
+  **rig version**/author/source). **The long `File:` row is gone** — replaced by an elided
+  (ElideMiddle, full path in tooltip) one-line row with **Copy** + **Open folder** buttons, so the
+  path can never widen/crowd the preview. Larger thumbnail cards.
+- [x] **Example builder** (`examples/build_example_asset.py`): after save, best-effort
+  `_publish_sidecar_and_thumbnail()` routes through the same `core.publish`/`core.maya_publish`
+  helpers, so `trench_coat_A` gets a real thumbnail + polycount + sidecar.
+- [!] **Verify in Maya 2026:** open a hand-authored garment → Publish tab → Detect/Capture →
+  Publish writes `.ma`+`.json`+`.png` into the local library → Library Refresh shows the new card
+  with preview + polycount + created + rig version; Copy/Open path buttons work; theme renders.
+
+---
+
+## M7 — Fit-rig scaffolder (lower the rigger skill bar)
+**DONE (logic) 2026-06-12: one-click fit rig so the rigger tunes extremes instead of wiring deformers. 132 headless tests (10 new).**
+Driver: hand-authoring the `cloth_fit_ctrl.fit_*` → lattice SDK wiring (frontOfChain ordering,
+neutral-relative lattice scale, driven keys) is the hardest part for a non-TD rigger. The fit
+attrs are otherwise inert (sliders appear, deform nothing). Scaffolder builds the proven
+trench-coat fit rig automatically on any open, already-skinned garment; rigger only tunes poses.
+- [x] **Pure templates** (`core/fit_templates.py`, headless-tested): `FitDriver`/`FitAttrDef`/
+  `FitTemplate` describe each type's `fit_*` attrs + how transform-level ones drive the lattice
+  (modes `scale`/`offset`/`rotate`, neutral-relative). `fit_template(type)` → bespoke `hat`/`coat`,
+  generic fallback (tightness+length). Region attrs (e.g. `fit_brim_width`) = attr only, no SDK.
+- [x] **Maya scaffolder** (`core/maya_fitrig.py`, lazy `cmds`, smoke-checked): `scaffold_fit_rig(type)`
+  creates `cloth_fit_ctrl`+attrs, a **frontOfChain** lattice over `Mesh_GRP` meshes, captures neutral
+  lattice scale, authors default SDKs for transform attrs, resets to neutral, parents under `Ctrl_GRP`.
+  Guards: refuses if `cloth_fit_ctrl` exists; errors on no mesh; **warns (not errors) on unskinned**.
+  Logic mirrors `examples/build_example_asset.py` (single source-of-truth recipe now in templates).
+- [x] **Publish-tab button** (`ui/publish_panel.py`): **"Scaffold fit rig"** uses the Type combo,
+  wait-cursor, surfaces `ScaffoldResult.summary()` (auto-keyed vs manual point-key attrs) + warnings.
+- [x] Tests: `tests/test_fit_templates.py` (16) — bespoke/generic lookup, case-insensitive, `fit_`
+  prefix, defaults-in-range, region↔driver coherence, valid channels/modes, neutral-keyed,
+  **+driver math (`_channel_value` scale/offset/rotate/unknown) + shared `author_fit_rig` via fake cmds**.
+- [x] **Review fixes + dedup (2026-06-12):** (1) **BUG** — `scaffold_fit_rig` post-SDK reset set the
+  now-driven lattice channels with `setAttr`, which Maya refuses on a connected plug (would fail the
+  scaffold); removed — the ctrl reset already drives every keyed channel to neutral through its SDK
+  curve. (2) Extracted shared `maya_fitrig.author_fit_rig(cmds, ctrl, lattice, template)` (the addAttr +
+  neutral-relative SDK authoring); **`examples/build_example_asset._build_fit_control_and_lattice` now
+  calls it from the `"coat"` template** instead of its own literal key loops, so the example and the
+  in-tool scaffolder share ONE recipe and can't drift (`_FIT_ATTRS` deleted; build adds `<repo>/scripts`
+  to `sys.path` so the core imports). Behaviour-preserving. (3) UI quick wins (exception-safe wait
+  cursor, dead import, QSS no-op props) — see M6.
+- [!] **Verify in Maya 2026:** skinned hat garment → Publish tab → **Scaffold fit rig** → confirm
+  `cloth_fit_ctrl` gets `fit_*` sliders that deform via the lattice, fit follows body on playback
+  (frontOfChain correct), neutral at 0; then point-key `fit_brim_width` by hand. **Also re-run
+  `examples/build_example_asset.build()`** (now sources the fit rig from the shared core recipe) to
+  re-confirm the coat exports identically (M5 re-verify).
+
+---
+
+## M8 — One-click cloth_* skeleton (no rig-import chore)
+**DONE (logic) 2026-06-12: persist the one canonical skeleton + rebuild it with a button. 144 headless tests (12 new).**
+Driver: there's exactly one GenHuman rig ⇒ one `cloth_*` export skeleton. Instead of
+import-rig → duplicate → rename → prune every time, ship the skeleton as data and rebuild
+it in-scene. Rigger then deletes the joints their garment won't skin to (per user: "we'll
+let the rigger delete the joints that aren't relevant"), skins, and scaffolds the fit rig.
+- [x] **Persisted data** (`scripts/snap_on_clothing/data/cloth_skeleton.json`): the canonical
+  skeleton extracted from the verified `assets/trench_coat_A/trench_coat_A.ma` — **89 body-derived
+  export joints** (full body chain + both arms incl. finger hierarchies + legs + twists + Epic
+  `ik_*`/`interaction`/`center_of_mass` virtuals). Garment helper joints (`cloth_coatTail_*`)
+  **excluded**. Per joint: local `t`/`r`/`s` (orientation is in `r` — rig has no `jointOrient`),
+  `radi`, `ssc`. `Rig_GRP` frame = `-90 X`. Ships via installer `copytree` (data/ travels with pkg).
+- [x] **Pure loader** (`core/skeleton.py`, headless-tested): `JointSpec`/`SkeletonSpec`,
+  `load_cloth_skeleton()` (lru-cached), `validate_skeleton()` (unique names, parents defined-before-
+  child = topological build order, `cloth_` prefix, root present). `skeleton_file()` = `package_dir/data`.
+- [x] **Maya rebuild** (`core/maya_skeleton.py`, lazy `cmds`, smoke-checked): `build_cloth_skeleton()`
+  creates framed `Rig_GRP` + every joint at its rest transform in hierarchy order; refuses if
+  `cloth_root` exists; validates data first. `SkeletonBuildResult.summary()`.
+- [x] **Publish-tab button**: **"Create cloth skeleton"** (above Scaffold fit rig — natural order:
+  skeleton → skin → fit rig → publish). Wait-cursor, surfaces summary / errors.
+- [x] **Regenerate from rig (UI, 2026-06-12):** **"Regenerate skeleton data from rig…"** button
+  (confirm dialog — overwrites shipped data). `core/maya_skeleton.capture_cloth_skeleton_from_rig()`
+  walks `EXPORT_SKELETON_GROUP`'s joint tree (rig-discovery mirrors `build_example._find_export_root`,
+  selection-aware, namespace-robust), records each joint's LOCAL `t/r/jo/s/radi/ssc/ro` under a
+  `cloth_<body>` identity (root parent → `Rig_GRP`, frame = export group's rotate), and writes via the
+  pure `skeleton.write_skeleton()`. Helper joints excluded naturally (absent on the rig). Refreshes the
+  canonical `cloth_skeleton.json` after a new rig gen with no hand-parsing.
+- [x] **Pure serializer** (`core/skeleton.py`): `to_json_dict()` (full transforms, no zero-omission →
+  deterministic), `write_skeleton(spec, dest=None)` (validates first, refuses invalid, clears the
+  lru cache). Symmetric inverse of `load_cloth_skeleton()`.
+- [x] Tests: `tests/test_skeleton.py` (15) — ships, 89 joints, valid, prefix, topo order, frame,
+  landmarks, helpers excluded, defaults, cache, **+serializer round-trip / refuse-invalid / cache-clear**.
+- [!] **Verify in Maya 2026:** empty scene → Publish tab → **Create cloth skeleton** → confirm
+  framed `Rig_GRP` + full `cloth_*` chain appears at correct body rest pose; delete irrelevant joints,
+  skin a mesh, Scaffold fit rig, Publish. Sanity-check joints sit on the imported GenHuman body.
+- [!] **Verify in Maya 2026:** import GenHuman rig → **Regenerate skeleton data from rig** → confirm
+  `cloth_skeleton.json` rewrites with 89 joints at the rig's pose; a subsequent **Create cloth skeleton**
+  reproduces that pose. (Round-trip: regen from a freshly-built skeleton == original.)
+
+---
+
+## M9 — One-click "Delete unused joints" (post-skin prune)
+**DONE (logic) 2026-06-15: replace the manual "delete the joints your garment won't skin to" chore
+with a safe, explicit button. 160 headless tests (8 new).**
+Driver: M8 rebuilds the full 89-joint skeleton; the rigger then hand-deletes the joints their garment
+doesn't skin to. That's tedious and error-prone. Automate it — but **only the provably safe deletions**.
+Hard invariant: attach `connectAttr`s each body joint's LOCAL `t/r/s` into the matching `cloth_*` joint,
+so the `cloth_*` hierarchy must mirror the body exactly. Reparenting an interior joint changes its
+children's local transforms and breaks that mirror — so interior joints are never touched.
+- [x] **Pure planner** (`core/skeleton.py`, headless-tested): `plan_prune(parents, influences, root_joint)`
+  → `PrunePlan(delete, kept_unweighted, survivors)`. The only sound rule: iteratively remove a joint that
+  is a **leaf AND not a skin influence AND not `cloth_root`**, repeating until stable (deleting a leaf can
+  expose its parent). Unweighted **interior** joints (skinned descendants) are reported in `kept_unweighted`
+  and never deleted. `delete` is leaf-first (children precede parents). `is_noop` for "nothing to prune".
+- [x] **Maya wrapper** (`core/maya_skeleton.py`, lazy `cmds`, smoke-checked): `plan_prune_unskinned(mesh_group)`
+  gathers in-scene `cloth_*` joints + parents (`_scene_cloth_joints`) and skinCluster influences across
+  `Mesh_GRP` meshes (`_skin_influences`, via `skinCluster -q -influence`), defers selection to the pure
+  planner. **Refuses with zero joints or zero influences** — pruning a zero-influence scene would peel the
+  whole skeleton (the foot-gun). `apply_prune(plan)` is the destructive half: deletes leaf-first, tolerates
+  already-gone nodes. `PruneResult.summary()`.
+- [x] **Publish-tab button**: **"Delete unused joints"** placed **before Scaffold fit rig** (order:
+  skeleton → skin → **prune** → fit rig → publish). Two-phase confirm dialog (mirrors `_regen_skeleton`):
+  computes the plan, shows DELETE vs KEEP (truncated previews) before any deletion, applies on Yes.
+- [x] Tests: `tests/test_skeleton.py` (+8) — leaf delete, unskinned-branch removal, cascade (leaf-first
+  order), keep-unweighted-interior, never-delete-root, zero-influence peels-to-root (documents the guard),
+  and a real-skeleton "hat keeps head+ancestors, drops limbs" end-to-end.
+- [!] **Verify in Maya 2026:** Create cloth skeleton → skin a hat mesh to `cloth_head` → **Delete unused
+  joints** → confirm the dialog lists the limb leaves for deletion and the neck/spine as kept-unweighted,
+  the head chain + `cloth_root` survive, then Scaffold fit rig + Publish succeed.
+
+---
+
+## M10 — Publish-tab log window + pre-publish sanity check
+**DONE (logic) 2026-06-15: a full-width console log on the Publish tab, and a scene preflight that
+catches the common authoring mistakes with actionable fixes. 170 headless tests (10 new).**
+Driver: the single-line status strip got overwritten and couldn't explain *why* a publish was blocked.
+A real test asset (`jacket_test.ma`, 350MB) exposed the gap: the rigger built a parallel setup and
+**skinned the garment to the rig's own deform joints, not the `cloth_*` joints**, plus left the whole
+asset inside namespaces (`jacket_A:…`) and the GenHuman rig in-scene — Publish only said "GenHuman in
+scene", not the deeper problems.
+- [x] **Full-width log** (`ui/publish_panel.py`): `QPlainTextEdit#logView` (styled in `ui/style.py`),
+  spans the tab under the form/actions. `_log(msg, level)` → timestamped, color-coded (info/step/ok/
+  warn/error), multi-line-aware, autoscrolls; `_report()` mirrors a headline to the kept status strip;
+  `_clear_log()` button. Every action handler (skeleton/regen/prune/scaffold/capture/publish) now logs
+  start + ok/warn/error instead of silently overwriting one label.
+- [x] **Pure preflight** (`core/publish.py`, headless-tested): `SceneFacts` (gathered facts),
+  `PreflightIssue(level, message, fix)`, and `assemble_preflight(facts)` → ordered issues. Checks: rig in
+  scene, namespaces present (`root_namespaces`), missing required groups, no `cloth_root`, **garment
+  skinned to non-`cloth_*` joints** (`split_influences` — the jacket_test failure), empty skinCluster,
+  missing `cloth_info`. Errors block; unskinned / no-info-node are warnings; trailing `ok` when clean.
+- [x] **Maya gatherer** (`core/maya_publish.py`): `gather_scene_facts()` (presence by short name so a
+  namespaced asset isn't double-flagged as "missing groups") + `preflight_scene()` → pure `assemble_preflight`.
+- [x] **Wiring**: new **"Check scene"** button (runs preflight, logs findings, no side effects). `_publish()`
+  runs the preflight first — replaces the lone `scene_has_rig()` check — logs every issue with its fix and
+  blocks on any error; on success/validation-failure it logs the outcome.
+- [x] Tests: `tests/test_publish.py` (+10) — `root_namespaces`/`split_influences` helpers, clean-scene
+  pass, rig flagged, namespaces flagged, **skin-on-non-cloth flagged** (+truncation), unskinned-is-warning,
+  missing groups/root, info-node-is-warning.
+- [!] **Verify in Maya 2026:** open a namespaced/rigged scene → **Check scene** → confirm the log lists
+  rig + namespaces + (if applicable) non-`cloth_*` skinning, each with a fix; clean it up → Check scene
+  passes → Publish succeeds and logs the destination.
+- [ ] **Bug fixed alongside (M-misc):** `maya_publish.capture_thumbnail` passed the panel name as the
+  `viewFit` object → "No object matches name: modelPanel4". Now `cmds.viewFit(meshes, panel=panel, …)`.
+
+---
+
 ## Backlog / future
 - [ ] Asset **validator/exporter** tool for authors (enforce Addendum at export time).
 - [ ] Body-morph propagation to attached clothing.

@@ -23,7 +23,22 @@ _INFO_FIELD_MAP = {
     "genHumanCompat": "genhuman_compat",
     "author": "author",
     "notes": "notes",
+    # informational extras (captured at publish; never affect validity)
+    "created": "created",
+    "rigVersion": "rig_version",
+    "triCount": "tri_count",
+    "vertCount": "vert_count",
 }
+
+
+def _opt_int(value: object) -> int | None:
+    """Best-effort int; ``None`` when blank/garbage so it never blocks an asset."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    try:
+        return int(float(str(value).replace(",", "").strip()))
+    except (TypeError, ValueError):
+        return None
 
 
 def _split_compat(raw: str) -> tuple[str, ...]:
@@ -46,6 +61,13 @@ class AssetMetadata:
     genhuman_compat: tuple[str, ...] = ()
     author: str = ""
     notes: str = ""
+    # Informational extras captured at publish (Maya-side: polycount, date, the
+    # exact rig version authored against). Optional — absent/garbage values default
+    # and never produce a validation error. ``notes`` doubles as the description.
+    created: str = ""
+    rig_version: str = ""
+    tri_count: int | None = None
+    vert_count: int | None = None
 
     @classmethod
     def from_mapping(cls, data: dict[str, str]) -> tuple["AssetMetadata | None", list[str]]:
@@ -95,6 +117,10 @@ class AssetMetadata:
                 genhuman_compat=compat,
                 author=str(norm.get("author", "")).strip(),
                 notes=str(norm.get("notes", "")).strip(),
+                created=str(norm.get("created", "")).strip(),
+                rig_version=str(norm.get("rig_version", "")).strip(),
+                tri_count=_opt_int(norm.get("tri_count")),
+                vert_count=_opt_int(norm.get("vert_count")),
             ),
             [],
         )

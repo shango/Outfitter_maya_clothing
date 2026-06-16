@@ -50,3 +50,33 @@ def test_compat_dedup_and_trim():
         "clothVersion": "1.0.0", "genHumanCompat": " v03 , v03 , v04 ",
     })
     assert meta is not None and meta.genhuman_compat == ("v03", "v04")
+
+
+def test_optional_publish_fields_read():
+    meta, errors = AssetMetadata.from_mapping({
+        "assetName": "coat", "assetType": "coat", "clothVersion": "1.0.0",
+        "genHumanCompat": "v03", "created": "2026-06-11", "rigVersion": "v03",
+        "triCount": "1,240", "vertCount": 820,
+    })
+    assert errors == [] and meta is not None
+    assert meta.created == "2026-06-11" and meta.rig_version == "v03"
+    assert meta.tri_count == 1240 and meta.vert_count == 820
+
+
+def test_optional_fields_default_when_absent():
+    meta, _ = AssetMetadata.from_mapping({
+        "assetName": "coat", "assetType": "coat",
+        "clothVersion": "1.0.0", "genHumanCompat": "v03",
+    })
+    assert meta is not None
+    assert meta.created == "" and meta.rig_version == ""
+    assert meta.tri_count is None and meta.vert_count is None
+
+
+def test_garbage_polycount_ignored_not_fatal():
+    meta, errors = AssetMetadata.from_mapping({
+        "assetName": "coat", "assetType": "coat", "clothVersion": "1.0.0",
+        "genHumanCompat": "v03", "triCount": "lots", "vertCount": "",
+    })
+    assert errors == [] and meta is not None
+    assert meta.tri_count is None and meta.vert_count is None

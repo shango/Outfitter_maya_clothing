@@ -1,0 +1,258 @@
+"""Publish a hand-authored garment into the library (pure, headless-testable).
+
+Riggers author garments by hand in Maya; *publish* is the step that finalizes one:
+it writes the ``.ma`` plus the ``<asset>.json`` sidecar (the published metadata
+file the browser reads) and an ``<asset>.png`` thumbnail into the library, laid out
+as ``<dest>/<name>/<name>.{ma,json,png}`` to match the scanner's expectations.
+
+This module is the **pure** half — it assembles the sidecar payload, computes the
+destination paths, sanitizes the asset name, and validates a saved ``.ma`` by reusing
+the existing file validator. Everything that needs a live Maya scene (polycount,
+playblast thumbnail, rig-version detection, saving the file) lives in
+:mod:`snap_on_clothing.core.maya_publish`. Keeping them apart lets the assembly and
+validation logic run in CI with no Maya, exactly like the rest of ``core``.
+"""
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
+
+from .. import config
+from . import ma_parse
+from .asset import AssetMetadata
+from .validate import ValidationReport, validate_asset_summary
+
+_NAME_INVALID = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def sanitize_asset_name(name: str) -> str:
+    """A filesystem- and Maya-safe asset/folder name from arbitrary text."""
+    cleaned = _NAME_INVALID.sub("_", name.strip())
+    if cleaned and cleaned[0].isdigit():
+        cleaned = "_" + cleaned
+    return cleaned or "clothing_asset"
+
+
+def today_iso() -> str:
+    """Today's date as ``YYYY-MM-DD`` (the publish/created stamp)."""
+    return date.today().isoformat()
+
+
+@dataclass(frozen=True)
+class PublishPaths:
+    """Where the three published files for one asset land on disk."""
+
+    folder: Path
+    ma: Path
+    sidecar: Path
+    thumbnail: Path
+
+
+def destination_paths(dest_root: Path | str, asset_name: str) -> PublishPaths:
+    """``<dest_root>/<name>/<name>.{ma,json,png}`` for a sanitized ``asset_name``."""
+    name = sanitize_asset_name(asset_name)
+    folder = Path(dest_root) / name
+    return PublishPaths(
+        folder=folder,
+        ma=folder / f"{name}.ma",
+        sidecar=folder / f"{name}.json",
+        thumbnail=folder / f"{name}.png",
+    )
+
+
+@dataclass
+class PublishSpec:
+    """The metadata a rigger supplies (plus values captured from the live scene)."""
+
+    asset_name: str
+    asset_type: str
+    cloth_version: str
+    genhuman_compat: tuple[str, ...] = ()
+    author: str = ""
+    description: str = ""
+    rig_version: str = ""
+    created: str = ""
+    tri_count: int | None = None
+    vert_count: int | None = None
+
+    def to_sidecar(self) -> dict[str, object]:
+        """Serialize to a sidecar dict using the Authoring Spec §12 attr names.
+
+        Mirrors the keys :meth:`AssetMetadata.from_mapping` reads, so a published
+        sidecar round-trips back into the same metadata the browser shows. Optional
+        numeric fields are omitted when unknown rather than written as null.
+        """
+        data: dict[str, object] = {
+            "assetName": self.asset_name,
+            "assetType": self.asset_type,
+            "clothVersion": self.cloth_version,
+            "genHumanCompat": ", ".join(self.genhuman_compat),
+            "author": self.author,
+            "notes": self.description,
+            "created": self.created or today_iso(),
+            "rigVersion": self.rig_version,
+        }
+        if self.tri_count is not None:
+            data["triCount"] = self.tri_count
+        if self.vert_count is not None:
+            data["vertCount"] = self.vert_count
+        return data
+
+    def metadata(self) -> tuple[AssetMetadata | None, list[str]]:
+        """Validate the supplied fields the same way the loader does."""
+        return AssetMetadata.from_mapping(self.to_sidecar())
+
+
+def write_sidecar(paths: PublishPaths, spec: PublishSpec) -> Path:
+    """Write the sidecar ``.json`` (creating the asset folder); returns its path."""
+    paths.folder.mkdir(parents=True, exist_ok=True)
+    paths.sidecar.write_text(
+        json.dumps(spec.to_sidecar(), indent=2) + "\n", encoding="utf-8")
+    return paths.sidecar
+
+
+# --------------------------------------------------------------------------- #
+# Pre-publish scene sanity check (pure decision logic)
+# --------------------------------------------------------------------------- #
+# The published .ma is validated *after* it's written (validate_published_ma), but by
+# then a bad scene has already cost a save. The preflight catches the common authoring
+# mistakes up front, in-scene, with an actionable fix for each — the live-Maya half
+# (core.maya_publish.gather_scene_facts) gathers the facts, this pure half decides.
+
+@dataclass(frozen=True)
+class PreflightIssue:
+    """One finding from the pre-publish scene check."""
+
+    level: str  # "error" (blocks publish) | "warn" | "info" | "ok"
+    message: str
+    fix: str = ""
+
+    @property
+    def is_error(self) -> bool:
+        return self.level == "error"
+
+
+@dataclass(frozen=True)
+class SceneFacts:
+    """Everything the preflight needs to know about the open scene (gathered in Maya)."""
+
+    has_rig: bool
+    namespaces: tuple[str, ...]
+    present_groups: tuple[str, ...]
+    has_cloth_root: bool
+    has_info_node: bool
+    has_skincluster: bool
+    skin_influences: tuple[str, ...]
+    cloth_joint_names: tuple[str, ...]
+    has_fit_ctrl: bool
+
+
+def root_namespaces(namespaces, ignore=("UI", "shared")) -> list[str]:
+    """Distinct top-level namespace tokens, minus Maya's built-ins. Order-preserving."""
+    roots: list[str] = []
+    for ns in namespaces:
+        root = ns.lstrip(":").split(":", 1)[0]
+        if root and root not in ignore and root not in roots:
+            roots.append(root)
+    return roots
+
+
+def split_influences(influences, cloth_prefix: str) -> tuple[list[str], list[str]]:
+    """``(cloth_* influences, other influences)`` by short name.
+
+    "Other" means the garment is skinned to joints outside the cloth skeleton (typically
+    the rig's own deform joints) — those vanish when the rig is deleted and break attach,
+    so they're the single most important thing the preflight flags.
+    """
+    cloth: list[str] = []
+    other: list[str] = []
+    for inf in influences:
+        short = inf.rsplit("|", 1)[-1].rsplit(":", 1)[-1]
+        (cloth if short.startswith(cloth_prefix) else other).append(short)
+    return cloth, other
+
+
+def assemble_preflight(
+    facts: SceneFacts,
+    required_groups=config.REQUIRED_GROUPS,
+    cloth_prefix: str = config.CLOTH_PREFIX,
+    info_node: str = config.INFO_NODE,
+    root_joint: str = config.ROOT_JOINT,
+) -> list[PreflightIssue]:
+    """Turn gathered :class:`SceneFacts` into an ordered list of :class:`PreflightIssue`.
+
+    Pure and fully unit-testable. Any ``error``-level issue means publish should be
+    blocked; ``warn`` is advisory; a trailing ``ok`` is appended when nothing blocks.
+    """
+    issues: list[PreflightIssue] = []
+
+    if facts.has_rig:
+        issues.append(PreflightIssue(
+            "error", "A GenHuman rig is still in the scene.",
+            "Delete the rig and remove its namespace so the asset contains only the "
+            "garment (no rig, namespaces, or references)."))
+
+    roots = root_namespaces(facts.namespaces)
+    if roots:
+        issues.append(PreflightIssue(
+            "error", f"Asset is inside namespace(s): {', '.join(roots)}.",
+            "Remove all namespaces (Window ▸ Namespace Editor) so node names are bare — "
+            "e.g. 'Mesh_GRP', not 'jacket_A:Mesh_GRP'."))
+
+    missing = [g for g in required_groups if g not in facts.present_groups]
+    if missing:
+        issues.append(PreflightIssue(
+            "error", f"Missing required group(s): {', '.join(missing)}.",
+            "The asset needs Mesh_GRP, Rig_GRP and Ctrl_GRP at the scene root."))
+
+    if not facts.has_cloth_root:
+        issues.append(PreflightIssue(
+            "error", f"No '{root_joint}' joint in the scene.",
+            "Run 'Create cloth skeleton' and skin to those joints before publishing."))
+
+    if not facts.has_skincluster:
+        issues.append(PreflightIssue(
+            "warn", "No skinCluster found on the garment.",
+            "Skin the mesh to the cloth_* joints, or the garment won't follow the body."))
+    else:
+        cloth_infl, other = split_influences(facts.skin_influences, cloth_prefix)
+        uniq_other = sorted(set(other))
+        if uniq_other:
+            sample = ", ".join(uniq_other[:6])
+            more = "" if len(uniq_other) <= 6 else f" (+{len(uniq_other) - 6} more)"
+            issues.append(PreflightIssue(
+                "error",
+                f"Garment is skinned to {len(uniq_other)} non-{cloth_prefix}* "
+                f"joint(s): {sample}{more}.",
+                f"Re-skin the garment to the {cloth_prefix}* joints. Influences outside "
+                "the cloth skeleton are deleted with the rig and break attach."))
+        elif not cloth_infl:
+            issues.append(PreflightIssue(
+                "error", "The garment skinCluster has no influences.",
+                f"Bind the mesh to the {cloth_prefix}* joints."))
+
+    if not facts.has_info_node:
+        issues.append(PreflightIssue(
+            "warn", f"No '{info_node}' node in the scene.",
+            "Publish writes metadata from the form, but add the info node if your "
+            "pipeline expects it embedded in the .ma."))
+
+    if not any(i.is_error for i in issues):
+        issues.append(PreflightIssue("ok", "Scene looks publish-ready.", ""))
+
+    return issues
+
+
+def validate_published_ma(ma_path: Path | str) -> ValidationReport:
+    """Re-validate a saved asset ``.ma`` with the same file checks the browser uses.
+
+    Run after the scene is saved so publish enforces the structure contract
+    (info node, required groups, cloth_root, clean of refs/namespaces/forbidden
+    nodes). Reuses :func:`validate_asset_summary` — no publish-specific rules.
+    """
+    summary = ma_parse.summarize_file(ma_path)
+    meta, _ = AssetMetadata.from_mapping(summary.info_attrs)
+    return validate_asset_summary(summary, meta)

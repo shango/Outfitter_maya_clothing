@@ -4,5 +4,5 @@
   "clothVersion": "1.0.0",
   "genHumanCompat": "v03",
   "author": "Snap-On Clothing (example)",
-  "notes": "Structural reference asset. Geometry is placeholder; add smooth bind + fit deformers in Maya (see examples/build_example_asset.py)."
+  "notes": "Example trench coat: a skinned structural reference garment with a front-of-chain fit lattice."
 }
