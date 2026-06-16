@@ -78,6 +78,10 @@ class PublishPanel(QtWidgets.QWidget):
         self._name.setPlaceholderText("e.g. trench_coat_A")
         self._type = QtWidgets.QComboBox()
         self._type.addItems(list(config.ASSET_TYPES))
+        # Start unset on purpose: the type drives scaffold/skin-set/publish, so make the
+        # rigger choose it rather than silently defaulting to the first type.
+        self._type.setCurrentIndex(-1)
+        self._type.setPlaceholderText("— set clothing type —")
         self._version = QtWidgets.QLineEdit("1.0.0")
         self._compat = QtWidgets.QLineEdit("v03")
         self._compat.setPlaceholderText("comma-separated, e.g. v03, v04")
@@ -131,6 +135,16 @@ class PublishPanel(QtWidgets.QWidget):
             "mesh to the survivors.")
         self._skeleton_btn.clicked.connect(self._create_skeleton)
         right.addWidget(self._skeleton_btn)
+
+        # authoring helper: answer "which joints do I skin to?" — fill cloth_skin_SET with
+        # the recommended joints for the chosen Type, highlight them, and select them.
+        self._skin_set_btn = QtWidgets.QPushButton("Select skin joints")
+        self._skin_set_btn.setToolTip(
+            "For the chosen Type: select + highlight (green) the cloth_* joints you should "
+            "bind to, and gather them into 'cloth_skin_SET'. Skips fingers / IK helpers; "
+            "keeps the twist joints that drive limb silhouette. Then Skin > Bind Skin.")
+        self._skin_set_btn.clicked.connect(self._select_skin_joints)
+        right.addWidget(self._skin_set_btn)
 
         # maintenance: re-capture the canonical skeleton data from the rig in-scene
         # (e.g. after a new rig generation). Overwrites the shipped cloth_skeleton.json.
@@ -314,6 +328,18 @@ class PublishPanel(QtWidgets.QWidget):
             "polycount from the open garment scene.")
         return False
 
+    def _require_type(self) -> str | None:
+        """Return the chosen asset Type, or warn and return None if it's still unset."""
+        asset_type = self._type.currentText().strip()
+        if asset_type:
+            return asset_type
+        self._report("Set the clothing Type first (the dropdown in the form).", "warn")
+        QtWidgets.QMessageBox.warning(
+            self, "Set clothing type",
+            "Choose the garment Type in the form before this step — it decides which "
+            "joints and fit rig get built.")
+        return None
+
     # --- actions --------------------------------------------------------------
     def _detect_rig(self) -> None:
         if not self._require_maya():
@@ -339,6 +365,30 @@ class PublishPanel(QtWidgets.QWidget):
             QtWidgets.QMessageBox.critical(self, "Create cloth skeleton failed", str(exc))
             return
         self._report(result.summary(), "ok")
+        self._log(
+            "Next: set Type above, then 'Select skin joints' to highlight which joints "
+            "to bind to (the full body skeleton has many joints no garment skins to).",
+            "info")
+
+    def _select_skin_joints(self) -> None:
+        if not self._require_maya():
+            return
+        asset_type = self._require_type()
+        if asset_type is None:
+            return
+        from ..core import maya_skeleton
+        self._log(f"Select skin joints ({asset_type})…", "step")
+        try:
+            with _wait_cursor():
+                result = maya_skeleton.build_skin_set(asset_type)
+        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+            self._report(f"Select skin joints failed: {exc}", "error")
+            QtWidgets.QMessageBox.critical(self, "Select skin joints failed", str(exc))
+            return
+        self._report(result.summary(), "ok")
+        if result.missing:
+            self._log(
+                "Not in this skeleton (skip): " + ", ".join(result.missing), "info")
 
     def _regen_skeleton(self) -> None:
         if not self._require_maya():
@@ -429,8 +479,10 @@ class PublishPanel(QtWidgets.QWidget):
     def _scaffold(self) -> None:
         if not self._require_maya():
             return
+        asset_type = self._require_type()
+        if asset_type is None:
+            return
         from ..core import maya_fitrig
-        asset_type = self._type.currentText()
         self._log(f"Scaffold fit rig ({asset_type})…", "step")
         try:
             with _wait_cursor():
@@ -499,12 +551,15 @@ class PublishPanel(QtWidgets.QWidget):
         if not name:
             self._report("Enter an asset name first.", "warn")
             return None
+        asset_type = self._require_type()
+        if asset_type is None:
+            return None
         compat = tuple(
             t.strip() for t in self._compat.text().replace(";", ",").split(",")
             if t.strip())
         return _publish.PublishSpec(
             asset_name=name,
-            asset_type=self._type.currentText(),
+            asset_type=asset_type,
             cloth_version=self._version.text().strip() or "1.0.0",
             genhuman_compat=compat,
             author=self._author.text().strip(),

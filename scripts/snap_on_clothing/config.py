@@ -20,6 +20,11 @@ CLOTH_PREFIX: str = "cloth_"
 FIT_CTRL: str = "cloth_fit_ctrl"
 FIT_ATTR_PREFIX: str = "fit_"
 
+# Selection set the authoring tool fills with a garment's recommended skin joints, so the
+# rigger selects it and binds instead of guessing which of the ~89 body joints to skin to.
+# A *set* (+ outliner colour), never a rename — attach matches cloth_ joints by name.
+SKIN_SET: str = "cloth_skin_SET"
+
 # --- connection contract (PRD §4 / Authoring Spec §15, LOCKED 2026-06-04) ------
 # Transform compounds connected body-joint -> cloth_ joint at attach time.
 # jointOrient and visibility are deliberately NOT connected.

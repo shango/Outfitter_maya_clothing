@@ -307,6 +307,28 @@ scene", not the deeper problems.
 
 ---
 
+## M11 — Recommended skin-joint sets ("which joints do I bind to?")
+Rigger feedback (2026-06-16): the full 89-joint body skeleton gives no signal which joints a garment
+skins to — ~40 are fingers, plus `cloth_ik_*`/`cloth_interaction`/`cloth_center_of_mass`, and the
+`*_twist_*` silhouette joints look skippable but aren't. Renaming joints to mark them is off the table
+(attach matches `cloth_` by name). Solution: per-type recommended set + outliner colour, names untouched.
+- [x] **Pure data** (`core/skin_sets.py`, headless-tested): `_RECOMMENDED` per asset type built from
+  `_arm`/`_leg`/`_foot`/`_shoe` region helpers (twist joints **in** on purpose; fingers/IK/com **out**).
+  `recommended_joints(type)`, `plan_skin_set(type, present_joints)` → `SkinSetPlan(include, missing)`
+  intersecting recommendation with scene joints (graceful on a pruned/revised skeleton).
+- [x] **Maya builder** (`core/maya_skeleton.build_skin_set`): resolves the plan against scene joints,
+  rebuilds `cloth_skin_SET`, clears prior highlight off all `cloth_*` joints + paints the set green
+  (override colour 14), leaves them selected for Bind Skin. Refuses if no skeleton / none recommended present.
+- [x] **Wiring**: new **"Select skin joints"** button (uses the Type combo); Create-skeleton success now
+  points the rigger to it. **Type combo starts unset** (placeholder, `currentIndex == -1`); Scaffold /
+  Select-skin-joints / Publish all route through `_require_type()` and warn if the Type is still unset.
+- [x] Tests: `tests/test_skin_sets.py` (+11) — every type non-empty, names all exist in the canonical
+  skeleton (typo guard), twists included, fingers/IK excluded, foot upper-case match, order preserved,
+  empty/missing handling, full-skeleton completeness.
+- [!] **Verify in Maya 2026:** Create cloth skeleton → set Type → **Select skin joints** → confirm the
+  recommended joints go green + into `cloth_skin_SET` + are selected; re-run with a different Type and
+  confirm the old highlight clears; on a pruned skeleton confirm "not in scene" joints are logged, not errored.
+
 ## Backlog / future
 - [ ] Asset **validator/exporter** tool for authors (enforce Addendum at export time).
 - [ ] Body-morph propagation to attached clothing.

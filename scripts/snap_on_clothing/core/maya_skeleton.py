@@ -17,6 +17,11 @@ from dataclasses import dataclass
 from .. import config
 from . import maya_publish
 from . import skeleton as _skeleton
+from . import skin_sets as _skin_sets
+
+# Maya draw-override colour index for highlighted skin joints — a clear green that reads as
+# "bind to these" against the default joint colour.
+_SKIN_JOINT_COLOR = 14
 
 
 def _cmds():
@@ -278,3 +283,95 @@ def apply_prune(plan: _skeleton.PrunePlan) -> PruneResult:
         kept_unweighted=list(plan.kept_unweighted),
         survivors=[s for s in plan.survivors if cmds.objExists(s)],
     )
+
+
+@dataclass
+class SkinSetResult:
+    set_name: str
+    asset_type: str
+    joints: list[str]
+    missing: list[str]
+
+    def summary(self) -> str:
+        n = len(self.joints)
+        msg = (
+            f"{self.set_name}: {n} recommended skin joint{'' if n == 1 else 's'} for a "
+            f"{self.asset_type} selected and highlighted green.")
+        if self.missing:
+            k = len(self.missing)
+            msg += (
+                f" {k} recommended joint{'' if k == 1 else 's'} not in this skeleton "
+                "(already pruned, or a different skeleton revision).")
+        return msg + " Bind your mesh to the selection (Skin > Bind Skin)."
+
+
+def _resolve_joint(cmds, short: str) -> str | None:
+    """Map a short ``cloth_*`` joint name to its full DAG path in the scene (or None).
+
+    Tries the bare name first, then any namespace, mirroring how the skeleton is normally
+    built in the root namespace but tolerating an imported/namespaced one.
+    """
+    for pattern in (short, f"*:{short}"):
+        matches = cmds.ls(pattern, type="joint", long=True) or []
+        if matches:
+            return matches[0]
+    return None
+
+
+def _set_skin_highlight(cmds, joint: str, on: bool) -> None:
+    """Enable/disable the green draw override on one joint (best-effort)."""
+    try:
+        cmds.setAttr(f"{joint}.overrideEnabled", 1 if on else 0)
+        if on:
+            cmds.setAttr(f"{joint}.overrideColor", _SKIN_JOINT_COLOR)
+    except Exception:  # noqa: BLE001 — a locked/connected override attr must not abort
+        pass
+
+
+def build_skin_set(asset_type: str) -> SkinSetResult:
+    """Build (or rebuild) ``cloth_skin_SET`` with the recommended skin joints for a type.
+
+    Answers the rigger's "which of these ~89 joints do I bind to?": resolves the per-type
+    recommendation (:mod:`core.skin_sets`) against the joints actually in the scene, drops
+    them into a Maya selection set, clears any prior highlight off every ``cloth_*`` joint
+    and paints the recommended ones green, then leaves them selected so the next action is
+    Bind Skin. Non-destructive — the set + colour never touch joint names, so attach is
+    unaffected, and the rigger can still add/remove influences by hand.
+
+    Raises if no skeleton is present, or if none of the type's recommended joints exist
+    (e.g. a hat skeleton asked for a coat's set) — nothing to select would only confuse.
+    """
+    cmds = _cmds()
+    parents = _scene_cloth_joints(cmds)
+    if not parents:
+        raise RuntimeError(
+            "No cloth_* joints in the scene. Run 'Create cloth skeleton' first.")
+
+    plan = _skin_sets.plan_skin_set(asset_type, set(parents))
+    if plan.is_empty:
+        raise RuntimeError(
+            f"None of the recommended skin joints for a {asset_type!r} are in this "
+            "skeleton. Check the Type, or rebuild the skeleton before selecting.")
+
+    nodes = [n for n in (_resolve_joint(cmds, j) for j in plan.include) if n]
+    if not nodes:
+        raise RuntimeError(
+            f"Recommended joints for {asset_type!r} resolved to nothing in the scene.")
+
+    # Clear any previous highlight off the whole cloth_ skeleton so re-running for a
+    # different Type doesn't leave stale-green joints behind, then paint this set.
+    for short in parents:
+        node = _resolve_joint(cmds, short)
+        if node:
+            _set_skin_highlight(cmds, node, on=False)
+    for node in nodes:
+        _set_skin_highlight(cmds, node, on=True)
+
+    if cmds.objExists(plan.set_name):
+        cmds.delete(plan.set_name)
+    cmds.sets(nodes, name=plan.set_name)
+    cmds.select(nodes, replace=True)
+
+    return SkinSetResult(
+        set_name=plan.set_name, asset_type=asset_type,
+        joints=[_short(n) for n in nodes], missing=list(plan.missing))
