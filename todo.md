@@ -329,6 +329,78 @@ skins to — ~40 are fingers, plus `cloth_ik_*`/`cloth_interaction`/`cloth_cente
   recommended joints go green + into `cloth_skin_SET` + are selected; re-run with a different Type and
   confirm the old highlight clears; on a pruned skeleton confirm "not in scene" joints are logged, not errored.
 
+## M12 — Male/female variants; retire the fit rig
+**PLAN 2026-06-16.** New direction (user): production uses only **two fixed body states — pure male and
+pure female** (`GH_Body_morph` is only ever 0 or 1; no intermediate blends, no other morph axes). So the
+runtime *fit* layer (M3 fit controls + M7 lattice scaffolder) is pure overhead — there's no shape variation
+to compensate for. Instead the **modeler hand-fits each garment once** on the male body and once on the
+female body; those two `.ma`s are the raw assets. The closet gets **Male / Female tabs**. Attach (pose) and
+skinning are unchanged. The proper long-term answer to shape variation remains **body-morph propagation**
+(backlog) — dropping the lattice rig doesn't burn that bridge. Taxonomy: **male / female only** (no unisex).
+
+> **Two facts confirmed by the user (2026-06-16) that shape this milestone:**
+> 1. **`GH_Body_morph` moves only the body MESH, not the joints.** ⇒ the `cloth_*` skeleton rest pose is
+>    identical for male and female — **one skeleton serves both; no per-gender skeleton (Phase C dropped).**
+>    This also *justifies* the two-mesh model: because joints don't move, a single garment skinned to them
+>    can't follow the male↔female mesh difference, so two pre-fit garment meshes are the only thing that works.
+> 2. **Tool unreleased, no complete assets exist yet.** ⇒ no asset migration; `gender` can be a clean
+>    **required** field with zero legacy tolerance — only the dev fixture (`trench_coat_A`) needs tagging.
+
+### Phase A — remove the fit rig (retires M3 + M7)
+- [ ] Delete pure modules: `core/fit_templates.py`, `core/maya_fitrig.py`, `core/controls.py`,
+  `core/placement.py`, `core/presets.py`.
+- [ ] Delete UI: `ui/controls_panel.py`; remove its import/wiring from `ui/window.py`.
+- [ ] Delete tests: `tests/test_fit_templates.py`, `test_controls.py`, `test_placement.py`, `test_presets.py`.
+- [ ] `ui/publish_panel.py`: remove the **"Scaffold fit rig"** button + `_scaffold` handler (keep Create-
+  skeleton / Select-skin-joints / Delete-unused / Check-scene / Publish).
+- [ ] `config.py`: remove `FIT_CTRL`, `FIT_ATTR_PREFIX` (grep for residual refs first).
+- [ ] **Audit-then-trim `core/scene.py` + `tests/_fake_scene.py`:** the M3-only gateway methods
+  (`AttrSpec`, `list_keyable_user_attrs`, `attr_spec`, `get_vector`/`set_vector`, etc.) — remove only those
+  with no remaining caller after the deletes above; keep anything attach/publish still use.
+- [ ] `examples/build_example_asset.py`: strip the fit-lattice / `cloth_fit_ctrl` generation (it sourced the
+  recipe from `maya_fitrig.author_fit_rig`, now gone). Builder stays a skinned-asset fixture only.
+- [ ] **Decision:** should `validate_asset_summary` now *warn* on a residual `cloth_fit_ctrl`/lattice in a
+  published garment (legacy assets), or stay silent? (lean: silent — harmless, not worth a false alarm).
+- [ ] Docs: drop the fit-control + Scaffold-fit-rig workflow from `Snap-On Clothing — User Guide.md` and
+  `Clothing Asset Authoring Spec.md` (§8 fit-control convention); note the male/female two-variant model.
+
+### Phase B — gender as a first-class asset dimension
+- [ ] `config.py`: `GENDERS: tuple[str, ...] = ("male", "female")`.
+- [ ] `core/asset.py`: add **required, validated** `gender` field to `AssetMetadata` (must be in `GENDERS`);
+  `_INFO_FIELD_MAP["gender"] = "gender"`; sidecar/`cloth_info` key `gender`. Old sidecars w/o gender → invalid
+  with a clear error (acceptable — every asset must declare it). `supports()`/extras unchanged.
+- [ ] `core/publish.py`: `PublishSpec` carries `gender`; `to_sidecar()`/`metadata()` round-trip it.
+- [ ] `core/library.py`: `by_gender(gender)` + include gender in the sort key (`(gender, type, name)`).
+- [ ] `ui/publish_panel.py`: **Gender combo** (unset default + placeholder, `_require_gender()` mirroring
+  `_require_type()`); `_gather_spec` requires it; logged in publish summary.
+- [ ] `ui/window.py`: **Male / Female tabs** (or a gender filter beside the type filter) over the grid;
+  scan once, filter by `by_gender`.
+- [ ] Tag the dev fixture: add `gender` to `assets/trench_coat_A/trench_coat_A.json`; update
+  `tests/test_asset.py` / `test_example_asset.py` fixtures + sidecars for the new required field. (No real
+  assets to migrate — tool is unreleased.)
+- [ ] **Decision:** library layout for a pair — two sibling assets sharing `assetName`+`assetType`
+  (`trench_coat_A` male + female, distinct files/sidecars). No scanner change; tabs do the split. Confirm
+  naming (e.g. `trench_coat_A_m` / `_f`, or same name in gendered subfolders).
+
+### Phase C — skeleton stays gender-agnostic  *(no work — see fact #1)*
+- `GH_Body_morph` doesn't move joints, so the single shipped `cloth_skeleton.json` already serves both
+  male and female. M8 (`build_cloth_skeleton`) and M11 (`skin_sets`, identical joint *names* incl. the
+  `cloth_GM_foot_*` upper-case quirk) need **no change**. Add one guard test asserting the skin-set joint
+  names are gender-independent, and move on.
+
+### Phase D — tests, suite, docs
+- [ ] New headless tests: gender-required validation (+ bad-gender rejected), `by_gender`, gender survives
+  publish sidecar round-trip; skin-set names gender-independent (Phase C guard).
+- [ ] Update every test that imported a removed module; **full suite green**; `py_compile` the Maya-boundary
+  modules.
+- [ ] Sync `prd.md` + `Snap-On Clothing Rig System.md` (remove fit-deformer requirement, add two-variant
+  model); update memory (`recommended-skin-joint-sets`, `publish-tab-authoring-helpers`,
+  `prune-unskinned-joints-plan` workflow slots — Scaffold step is gone).
+- [!] **Verify in Maya 2026 (end-to-end):** with the single shared skeleton, author one garment's male
+  variant (Create skeleton → Select skin joints → bind → prune → Publish[gender=male]) on the male body and
+  its female variant on the female body; confirm both attach + follow playback on the matching body, and the
+  browser shows them under the right tab.
+
 ## Backlog / future
 - [ ] Asset **validator/exporter** tool for authors (enforce Addendum at export time).
 - [ ] Body-morph propagation to attached clothing.
