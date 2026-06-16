@@ -17,7 +17,7 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from .. import config
+from .. import __version__, config
 from ..core import library
 from ..core import settings as _settings
 from ..core import sync as _sync
@@ -63,7 +63,7 @@ class ClothingBrowser(QtWidgets.QMainWindow):
     def __init__(self, roots: list[Path] | None = None, parent: QtWidgets.QWidget | None = None):
         super().__init__(parent)
         self.setObjectName(WINDOW_OBJECT_NAME)
-        self.setWindowTitle(WINDOW_TITLE)
+        self.setWindowTitle(f"{WINDOW_TITLE}  v{__version__}")
         self.resize(820, 560)
 
         self._roots = roots
@@ -76,11 +76,40 @@ class ClothingBrowser(QtWidgets.QMainWindow):
 
     # --- construction ---------------------------------------------------------
     def _build_ui(self) -> None:
-        tabs = QtWidgets.QTabWidget(self)
-        self.setCentralWidget(tabs)
+        central = QtWidgets.QWidget()
+        root = QtWidgets.QVBoxLayout(central)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addWidget(self._build_header())
+
+        tabs = QtWidgets.QTabWidget()
         tabs.addTab(self._build_library_tab(), "Library")
         tabs.addTab(PublishPanel(on_published=self.refresh), "Publish")
         tabs.addTab(self._build_setup_tab(), "Setup")
+        root.addWidget(tabs, 1)
+        self.setCentralWidget(central)
+
+    def _build_header(self) -> QtWidgets.QWidget:
+        """Branded header bar: 'Outfitter' wordmark with the version beside it."""
+        bar = QtWidgets.QWidget()
+        bar.setObjectName("appHeader")
+        h = QtWidgets.QHBoxLayout(bar)
+        h.setContentsMargins(16, 14, 16, 14)
+        h.setSpacing(10)
+
+        # Size/family/weight are set in QSS (#appName); a programmatic QFont here would
+        # be overridden by the stylesheet's global "QWidget { font-size }" rule.
+        name = QtWidgets.QLabel("Outfitter")
+        name.setObjectName("appName")
+
+        version = QtWidgets.QLabel(f"v{__version__}")
+        version.setObjectName("appVersion")
+        version.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom)
+
+        h.addWidget(name)
+        h.addWidget(version)
+        h.addStretch(1)
+        return bar
 
     def _build_library_tab(self) -> QtWidgets.QWidget:
         central = QtWidgets.QWidget()

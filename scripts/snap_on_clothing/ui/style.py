@@ -32,6 +32,23 @@ def stylesheet(accent: str = "#4a90d9") -> str:
         font-size: 12px;
     }}
     QLabel {{ background: transparent; }}
+
+    /* Branded app header: 'Outfitter' wordmark + version (font set in code) */
+    QWidget#appHeader {{
+        background: {_SURFACE};
+        border-bottom: 1px solid {_BORDER};
+    }}
+    QLabel#appName {{
+        color: #ff6d7a;  /* salmon — matches the shirt body in the shelf icon */
+        font-family: "Segoe UI", "SF Pro Display", "Helvetica Neue", "Roboto", Arial;
+        font-size: 32px;
+        font-weight: 900;
+    }}
+    QLabel#appVersion {{
+        color: #fff0a6;  /* yellow — matches the flowers in the shelf icon */
+        font-size: 13px; font-weight: 600; padding-bottom: 6px;
+    }}
+
     QLabel#assetName {{ font-size: 17px; font-weight: 600; color: #ffffff; }}
     /* Section headings: pass the caption already upper-cased — Qt's QSS engine
        implements neither text-transform nor letter-spacing, so they're set in code. */

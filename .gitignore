@@ -10,3 +10,12 @@ __pycache__/
 
 # User's saved library locations (per-machine; path.txt.example is the tracked template)
 scripts/path.txt
+
+# Packaged artist deliverable bundles (build artifacts, not source)
+/Outfitter_*.zip
+
+# Loose source icon drops at repo root — the canonical copy lives in the package
+/shirt*.png
+
+# WSL "downloaded from the internet" alternate-stream junk
+*:Zone.Identifier

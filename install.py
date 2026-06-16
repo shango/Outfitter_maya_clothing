@@ -6,7 +6,7 @@ Drop this file into a Maya 2026 viewport to install. Maya calls
   1. copies the ``snap_on_clothing`` package into your Maya user script dir,
   2. merges the bundled starter assets into your clothing library
      (never overwriting assets you already have),
-  3. creates/refreshes a "Clothing" shelf button that launches the browser.
+  3. adds/refreshes an "Outfitter" shelf button on your active shelf.
 
 Re-dropping a newer build upgrades in place. All real work lives in
 ``installer/installer_core.py`` (pure, headless-tested) and ``installer/shelf.py``;
@@ -46,6 +46,13 @@ def _do_install(drop_dir: Path) -> None:
         if p not in sys.path:
             sys.path.insert(0, p)
 
+    # A previous drop in this Maya session leaves installer/* and snap_on_clothing/*
+    # cached in sys.modules; purge them so THIS drop runs the freshly-dropped code.
+    # Without this, re-dropping silently reuses the stale shelf/icon/active-shelf logic.
+    for _name in [n for n in list(sys.modules)
+                  if n.split(".", 1)[0] in ("installer", "snap_on_clothing")]:
+        del sys.modules[_name]
+
     from installer import installer_core
     from snap_on_clothing import config
 
@@ -74,13 +81,15 @@ def _do_install(drop_dir: Path) -> None:
                 sys.path.insert(0, sd)
             from installer import shelf
 
-            btn = shelf.install_button()
+            # point the button at the icon that just shipped inside the package
+            icon = result.package_dest / "ui" / "icons" / "outfitter.png"
+            btn = shelf.install_button(icon=str(icon))
             lines.append(f"  • shelf button -> {btn}")
         except Exception as exc:  # noqa: BLE001 — install still succeeded
             lines.append(f"  ! shelf button skipped: {exc}")
 
     if result.ok:
-        lines += ["", "Done. Click the 'Clothing' shelf button to launch."]
+        lines += ["", "Done. Click the 'Outfitter' shelf button to launch."]
     _report(lines, ok=result.ok)
 
 
