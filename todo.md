@@ -328,6 +328,17 @@ skins to — ~40 are fingers, plus `cloth_ik_*`/`cloth_interaction`/`cloth_cente
 - [!] **Verify in Maya 2026:** Create cloth skeleton → set Type → **Select skin joints** → confirm the
   recommended joints go green + into `cloth_skin_SET` + are selected; re-run with a different Type and
   confirm the old highlight clears; on a pruned skeleton confirm "not in scene" joints are logged, not errored.
+- [ ] **BUG — green highlight bleeds onto non-members (`_set_skin_highlight`, `core/maya_skeleton.py:321`).**
+  Verified 2026-06-17 against `m_ski_jacket_geo_skel.ma` (coat): the set + colour data are *correct* (exactly
+  the 36 coat joints painted, none extra), but the **whole skeleton appears green in the viewport.** Cause:
+  Maya draw-override colour **inherits down the DAG**, and the "clear" path sets `overrideEnabled = 0`, which
+  makes a non-member *inherit its parent's* green instead of reverting to default. So non-member children of
+  members go green: `cloth_head` (under green `cloth_neck_02`), all fingers (under green `cloth_hand_*`),
+  feet/toes (under green `cloth_calf_*`). The `cloth_ik_*` branch is the one exception — it hangs off
+  `cloth_root` (no override), so it correctly stays default-coloured and is *not* in the set.
+  **Fix (Option A, minimal):** in `_set_skin_highlight`, on clear keep `overrideEnabled = 1` and set
+  `overrideColor = 0` (default) instead of disabling the override — breaks the inheritance so non-members
+  read as default. Boundary module = `py_compile`-only; verify the green-only display live in Maya.
 
 ## M12 — Male/female variants; retire the fit rig
 **PLAN 2026-06-16.** New direction (user): production uses only **two fixed body states — pure male and
