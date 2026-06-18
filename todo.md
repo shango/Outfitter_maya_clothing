@@ -412,6 +412,54 @@ skinning are unchanged. The proper long-term answer to shape variation remains *
   its female variant on the female body; confirm both attach + follow playback on the matching body, and the
   browser shows them under the right tab.
 
+## M13 — In-scene skinning test + Create-skeleton consolidation
+**PLAN 2026-06-17.** Two coupled changes to the authoring workflow. (a) Drop the standalone "Select skin
+joints" button — fold the skin set into "Create cloth skeleton" so one click (after the Type is chosen)
+builds the skeleton *and* the recommended `cloth_skin_SET`. (b) New **skinning test**: let the rigger drive
+the `cloth_*` skeleton from the GenHuman body already in the authoring scene so they can pose the rig and
+confirm the garment deforms before publishing. This is authoring-time `attach()` — same `connectAttr`
+body→`cloth_*` plugs as production, minus the import.
+
+> **Decisions locked (user, 2026-06-17):** body is **already in the authoring scene** → connect the existing
+> `GenHuman_Joint_GRP` export skeleton, **no import / no namespace management**. **Body only** — no canned
+> range-of-motion clip.
+
+### Phase A — fold skin set into Create-skeleton (adjusts M11)
+- [ ] `publish_panel._create_skeleton`: add the `_require_type()` guard up front, then after
+  `build_cloth_skeleton()` also call `maya_skeleton.build_skin_set(asset_type)` in the same click; report
+  both results (skeleton built + N skin joints highlighted). Update the "Next:" log to point at Bind Skin.
+- [ ] Remove the `_skin_set_btn` widget + `_select_skin_joints` handler; retitle the Create-skeleton tooltip
+  ("…builds the skeleton and selects the joints to bind to"). `core.maya_skeleton.build_skin_set` stays — it's
+  just no longer a separate user step (still covered by `tests/test_skin_sets.py`).
+- [ ] Fix the green-highlight inheritance bug here (the M11 entry above): in `_set_skin_highlight`, on clear
+  keep `overrideEnabled = 1` + `overrideColor = 0` instead of disabling the override.
+
+### Phase B — skinning test (connect/disconnect in-scene body)
+- [ ] New Maya-boundary module (`core/maya_testfit.py`, or extend `maya_skeleton.py`): `connect_test_body()`
+  — locate `GenHuman_Joint_GRP` via the existing `_find_export_root`; align cloth `Rig_GRP` to its world
+  frame (the `attach._align_root_group` logic); `connectAttr` body→`cloth_*` `{translate,rotate,scale}`
+  (`config.CONNECT_ATTRS`) for every joint whose base name matches (same matching as
+  `attach.plan_connections`). Skip locked / already-driven plugs with clear messaging. Returns a count +
+  any skips.
+- [ ] `disconnect_test_body()` — break exactly those connections so the `cloth_*` joints go static and
+  publish-safe again. Idempotent / tolerant of already-broken edges.
+- [ ] Two buttons on the authoring tab ("Connect test body" / "Disconnect test body"), wired like the other
+  helpers (`_require_maya`, wait cursor, log + status, message box on error). Connect refuses clearly if no
+  cloth skeleton or no GenHuman in scene; points the rigger to pose the body's controls and watch the garment.
+- [ ] Preflight guard: add a check to `maya_publish.preflight_scene()` for `cloth_*` joints with **incoming
+  connections** → warn ("disconnect the test body before publishing"). The existing `scene_has_rig()` blocker
+  already catches a leftover body; this catches the connection specifically.
+
+### Phase C — tests + docs
+- [ ] Headless: the connect/disconnect planning/matching is pure-able — unit-test the name-matching + the
+  skip-locked/already-connected rules against a fake scene (mirror `tests/_fake_scene.py`); `py_compile` the
+  boundary module.
+- [ ] Update docs (User Guide authoring workflow: Create skeleton → bind → **test on body** → prune →
+  publish) and memory (`recommended-skin-joint-sets` — button folded in; `publish-tab-authoring-helpers`).
+- [!] **Verify in Maya 2026:** with a GenHuman + a skinned garment in scene, Connect test body → pose the
+  body → confirm the garment deforms; Disconnect → confirm cloth joints static again and Publish no longer
+  blocks on the connection.
+
 ## Backlog / future
 - [ ] Asset **validator/exporter** tool for authors (enforce Addendum at export time).
 - [ ] Body-morph propagation to attached clothing.
