@@ -194,3 +194,25 @@ def test_preflight_info_node_is_only_a_warning():
     issues = P.assemble_preflight(_clean_facts(has_info_node=False))
     assert any("cloth_info" in i.message and i.level == "warn" for i in issues)
     assert not _levels(issues, "error")
+
+
+def test_preflight_warns_when_test_body_still_connected():
+    # the skinning-test foot-gun: cloth_* joints left driven by the body at publish time
+    issues = P.assemble_preflight(_clean_facts(
+        driven_cloth_joints=("cloth_spine_01", "cloth_head")))
+    warn = next(i for i in issues if i.level == "warn" and "test body" in i.message)
+    assert "2 cloth_* joint(s)" in warn.message
+    assert "Disconnect test body" in warn.fix
+    assert not _levels(issues, "error")  # advisory — the rig error is the hard blocker
+
+
+def test_preflight_test_body_warning_truncates_long_lists():
+    issues = P.assemble_preflight(_clean_facts(
+        driven_cloth_joints=tuple(f"cloth_j{i:02d}" for i in range(10))))
+    msg = next(i.message for i in issues if "test body" in i.message)
+    assert "10 cloth_*" in msg and "+4 more" in msg
+
+
+def test_preflight_clean_scene_has_no_test_body_warning():
+    issues = P.assemble_preflight(_clean_facts())  # driven_cloth_joints defaults to ()
+    assert not any("test body" in i.message for i in issues)

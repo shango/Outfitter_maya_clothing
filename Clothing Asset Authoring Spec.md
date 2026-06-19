@@ -342,13 +342,26 @@ Before exporting, confirm:
 
 ## 17. Authoring workflow (recommended order)
 
+The Publish tab automates the skeleton/skin/prune chores — the order below is the
+button sequence, not a manual one.
+
 1. Build garment geometry (UVs, under `Mesh_GRP`, `cloth_<part>_mesh`).
-2. Duplicate required GenHuman joints + parent chain → rename to `cloth_*` → `cloth_root` under `Rig_GRP`.
-3. Add helper joints for secondary motion.
-4. Smooth-bind geometry to the joints.
-5. Build control rig + fit deformers; expose `cloth_fit_ctrl` `fit_*` attrs (§8); put controls in `Ctrl_GRP`.
-6. Add and populate `cloth_info`.
-7. Clean the scene; freeze transforms; delete history.
-8. Run the §16 checklist.
-9. Export Maya ASCII → hand to the Snap-On Clothing System browser.
+2. Set the **Type**, then **Create cloth skeleton** — rebuilds the canonical `cloth_*`
+   skeleton under `Rig_GRP` *and* selects + highlights (green) the recommended skin
+   joints for the Type, gathered into `cloth_skin_SET`. (Replaces the manual duplicate /
+   rename / pick-influences chore.)
+3. Add helper joints for secondary motion (optional).
+4. Smooth-bind geometry to the selected (green) joints — Skin ▸ Bind Skin.
+5. **Connect test body** — drive the `cloth_*` skeleton from the GenHuman body already
+   in the scene; pose the body's controls and confirm the garment deforms. Then
+   **Disconnect test body** so the joints go static and the asset is publish-safe.
+6. **Delete unused joints** — prune the `cloth_*` joints the garment doesn't skin to
+   (safe leaf-only; unweighted interior joints with skinned children are kept).
+7. Build control rig + fit deformers; expose `cloth_fit_ctrl` `fit_*` attrs (§8); put
+   controls in `Ctrl_GRP`.
+8. Add and populate `cloth_info`.
+9. Clean the scene; freeze transforms; delete history. Confirm the test body is
+   disconnected (Check scene warns if any `cloth_*` joint is still driven).
+10. Run the §16 checklist.
+11. **Publish ▸** — writes the `.ma` + sidecar + thumbnail into the library.
 ```

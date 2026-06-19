@@ -328,7 +328,9 @@ skins to — ~40 are fingers, plus `cloth_ik_*`/`cloth_interaction`/`cloth_cente
 - [!] **Verify in Maya 2026:** Create cloth skeleton → set Type → **Select skin joints** → confirm the
   recommended joints go green + into `cloth_skin_SET` + are selected; re-run with a different Type and
   confirm the old highlight clears; on a pruned skeleton confirm "not in scene" joints are logged, not errored.
-- [ ] **BUG — green highlight bleeds onto non-members (`_set_skin_highlight`, `core/maya_skeleton.py:321`).**
+- [x] **BUG — green highlight bleeds onto non-members (`_set_skin_highlight`, `core/maya_skeleton.py:321`).**
+  FIXED 2026-06-18 (Option A) — clear now holds `overrideEnabled = 1` + `overrideColor = 0`. Live-in-Maya
+  green-only display still to confirm (`[!]` in M13 Phase C).
   Verified 2026-06-17 against `m_ski_jacket_geo_skel.ma` (coat): the set + colour data are *correct* (exactly
   the 36 coat joints painted, none extra), but the **whole skeleton appears green in the viewport.** Cause:
   Maya draw-override colour **inherits down the DAG**, and the "clear" path sets `overrideEnabled = 0`, which
@@ -425,36 +427,36 @@ body→`cloth_*` plugs as production, minus the import.
 > range-of-motion clip.
 
 ### Phase A — fold skin set into Create-skeleton (adjusts M11)
-- [ ] `publish_panel._create_skeleton`: add the `_require_type()` guard up front, then after
+- [x] `publish_panel._create_skeleton`: add the `_require_type()` guard up front, then after
   `build_cloth_skeleton()` also call `maya_skeleton.build_skin_set(asset_type)` in the same click; report
   both results (skeleton built + N skin joints highlighted). Update the "Next:" log to point at Bind Skin.
-- [ ] Remove the `_skin_set_btn` widget + `_select_skin_joints` handler; retitle the Create-skeleton tooltip
+- [x] Remove the `_skin_set_btn` widget + `_select_skin_joints` handler; retitle the Create-skeleton tooltip
   ("…builds the skeleton and selects the joints to bind to"). `core.maya_skeleton.build_skin_set` stays — it's
   just no longer a separate user step (still covered by `tests/test_skin_sets.py`).
-- [ ] Fix the green-highlight inheritance bug here (the M11 entry above): in `_set_skin_highlight`, on clear
+- [x] Fix the green-highlight inheritance bug here (the M11 entry above): in `_set_skin_highlight`, on clear
   keep `overrideEnabled = 1` + `overrideColor = 0` instead of disabling the override.
 
 ### Phase B — skinning test (connect/disconnect in-scene body)
-- [ ] New Maya-boundary module (`core/maya_testfit.py`, or extend `maya_skeleton.py`): `connect_test_body()`
+- [x] New Maya-boundary module (`core/maya_testfit.py`, or extend `maya_skeleton.py`): `connect_test_body()`
   — locate `GenHuman_Joint_GRP` via the existing `_find_export_root`; align cloth `Rig_GRP` to its world
   frame (the `attach._align_root_group` logic); `connectAttr` body→`cloth_*` `{translate,rotate,scale}`
   (`config.CONNECT_ATTRS`) for every joint whose base name matches (same matching as
   `attach.plan_connections`). Skip locked / already-driven plugs with clear messaging. Returns a count +
   any skips.
-- [ ] `disconnect_test_body()` — break exactly those connections so the `cloth_*` joints go static and
+- [x] `disconnect_test_body()` — break exactly those connections so the `cloth_*` joints go static and
   publish-safe again. Idempotent / tolerant of already-broken edges.
-- [ ] Two buttons on the authoring tab ("Connect test body" / "Disconnect test body"), wired like the other
+- [x] Two buttons on the authoring tab ("Connect test body" / "Disconnect test body"), wired like the other
   helpers (`_require_maya`, wait cursor, log + status, message box on error). Connect refuses clearly if no
   cloth skeleton or no GenHuman in scene; points the rigger to pose the body's controls and watch the garment.
-- [ ] Preflight guard: add a check to `maya_publish.preflight_scene()` for `cloth_*` joints with **incoming
+- [x] Preflight guard: add a check to `maya_publish.preflight_scene()` for `cloth_*` joints with **incoming
   connections** → warn ("disconnect the test body before publishing"). The existing `scene_has_rig()` blocker
   already catches a leftover body; this catches the connection specifically.
 
 ### Phase C — tests + docs
-- [ ] Headless: the connect/disconnect planning/matching is pure-able — unit-test the name-matching + the
+- [x] Headless: the connect/disconnect planning/matching is pure-able — unit-test the name-matching + the
   skip-locked/already-connected rules against a fake scene (mirror `tests/_fake_scene.py`); `py_compile` the
   boundary module.
-- [ ] Update docs (User Guide authoring workflow: Create skeleton → bind → **test on body** → prune →
+- [x] Update docs (User Guide authoring workflow: Create skeleton → bind → **test on body** → prune →
   publish) and memory (`recommended-skin-joint-sets` — button folded in; `publish-tab-authoring-helpers`).
 - [!] **Verify in Maya 2026:** with a GenHuman + a skinned garment in scene, Connect test body → pose the
   body → confirm the garment deforms; Disconnect → confirm cloth joints static again and Publish no longer

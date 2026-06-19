@@ -319,11 +319,19 @@ def _resolve_joint(cmds, short: str) -> str | None:
 
 
 def _set_skin_highlight(cmds, joint: str, on: bool) -> None:
-    """Enable/disable the green draw override on one joint (best-effort)."""
+    """Enable/disable the green draw override on one joint (best-effort).
+
+    Clearing must keep ``overrideEnabled = 1`` (colour back to the default index 0), NOT
+    disable the override: Maya inherits draw-override colour *down* the DAG, so a joint
+    with ``overrideEnabled = 0`` shows its parent's colour rather than the default. With
+    the override left disabled, every non-member under a green member (head under neck,
+    fingers under hand, feet under calf) bled green — the whole skeleton looked selected.
+    Holding the override on with colour 0 breaks that inheritance so non-members read as
+    default-coloured.
+    """
     try:
-        cmds.setAttr(f"{joint}.overrideEnabled", 1 if on else 0)
-        if on:
-            cmds.setAttr(f"{joint}.overrideColor", _SKIN_JOINT_COLOR)
+        cmds.setAttr(f"{joint}.overrideEnabled", 1)
+        cmds.setAttr(f"{joint}.overrideColor", _SKIN_JOINT_COLOR if on else 0)
     except Exception:  # noqa: BLE001 — a locked/connected override attr must not abort
         pass
 

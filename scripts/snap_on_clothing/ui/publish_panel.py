@@ -126,25 +126,37 @@ class PublishPanel(QtWidgets.QWidget):
         right = QtWidgets.QVBoxLayout()
         right.setSpacing(8)
 
-        # authoring helper: rebuild the canonical cloth_* skeleton in-scene so the
-        # rigger skips the import-rig / duplicate / rename chore.
+        # authoring helper: rebuild the canonical cloth_* skeleton in-scene (skipping the
+        # import-rig / duplicate / rename chore) AND, in the same click, gather the
+        # recommended skin joints for the chosen Type into cloth_skin_SET. One button.
         self._skeleton_btn = QtWidgets.QPushButton("Create cloth skeleton")
         self._skeleton_btn.setToolTip(
             "Rebuild the canonical GenHuman cloth_* skeleton in the scene (no rig "
-            "import needed). Delete the joints your garment won't use, then skin the "
-            "mesh to the survivors.")
+            "import needed) and select + highlight (green) the joints to bind to for the "
+            "chosen Type, gathered into 'cloth_skin_SET'. Set the Type first. Then skin "
+            "the mesh to the selection (Skin > Bind Skin).")
         self._skeleton_btn.clicked.connect(self._create_skeleton)
         right.addWidget(self._skeleton_btn)
 
-        # authoring helper: answer "which joints do I skin to?" — fill cloth_skin_SET with
-        # the recommended joints for the chosen Type, highlight them, and select them.
-        self._skin_set_btn = QtWidgets.QPushButton("Select skin joints")
-        self._skin_set_btn.setToolTip(
-            "For the chosen Type: select + highlight (green) the cloth_* joints you should "
-            "bind to, and gather them into 'cloth_skin_SET'. Skips fingers / IK helpers; "
-            "keeps the twist joints that drive limb silhouette. Then Skin > Bind Skin.")
-        self._skin_set_btn.clicked.connect(self._select_skin_joints)
-        right.addWidget(self._skin_set_btn)
+        # skinning test: drive the cloth_* skeleton from the GenHuman body already in the
+        # scene so the rigger can pose the rig and confirm the garment deforms, then break
+        # the connections again so the asset is publish-safe. Authoring-time attach().
+        test_row = QtWidgets.QHBoxLayout()
+        test_row.setContentsMargins(0, 0, 0, 0)
+        self._connect_btn = QtWidgets.QPushButton("Connect test body")
+        self._connect_btn.setToolTip(
+            "After binding: drive the cloth_* skeleton from the GenHuman body in the "
+            "scene. Pose the body's controls and watch the garment deform to verify the "
+            "skinning. Disconnect before publishing.")
+        self._connect_btn.clicked.connect(self._connect_test_body)
+        self._disconnect_btn = QtWidgets.QPushButton("Disconnect test body")
+        self._disconnect_btn.setToolTip(
+            "Break the test-body connections so the cloth_* joints go static again and "
+            "the asset is publish-safe. Run before Publish.")
+        self._disconnect_btn.clicked.connect(self._disconnect_test_body)
+        test_row.addWidget(self._connect_btn)
+        test_row.addWidget(self._disconnect_btn)
+        right.addWidget(self._wrap(test_row))
 
         # maintenance: re-capture the canonical skeleton data from the rig in-scene
         # (e.g. after a new rig generation). Overwrites the shipped cloth_skeleton.json.
@@ -353,42 +365,66 @@ class PublishPanel(QtWidgets.QWidget):
             self._report("Could not detect a rig version — enter it manually.", "warn")
 
     def _create_skeleton(self) -> None:
-        if not self._require_maya():
-            return
-        from ..core import maya_skeleton
-        self._log("Create cloth skeleton…", "step")
-        try:
-            with _wait_cursor():
-                result = maya_skeleton.build_cloth_skeleton()
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
-            self._report(f"Create cloth skeleton failed: {exc}", "error")
-            QtWidgets.QMessageBox.critical(self, "Create cloth skeleton failed", str(exc))
-            return
-        self._report(result.summary(), "ok")
-        self._log(
-            "Next: set Type above, then 'Select skin joints' to highlight which joints "
-            "to bind to (the full body skeleton has many joints no garment skins to).",
-            "info")
+        """Rebuild the cloth_* skeleton and, in the same click, select the skin joints.
 
-    def _select_skin_joints(self) -> None:
+        The Type drives the skin-set, so it's required up front. The skeleton is built
+        first, then the recommended cloth_skin_SET for the Type is gathered, highlighted
+        and left selected, ready for Bind Skin.
+        """
         if not self._require_maya():
             return
         asset_type = self._require_type()
         if asset_type is None:
             return
         from ..core import maya_skeleton
-        self._log(f"Select skin joints ({asset_type})…", "step")
+        self._log(f"Create cloth skeleton ({asset_type})…", "step")
         try:
             with _wait_cursor():
-                result = maya_skeleton.build_skin_set(asset_type)
+                skel = maya_skeleton.build_cloth_skeleton()
+                self._log(skel.summary(), "ok")
+                skin = maya_skeleton.build_skin_set(asset_type)
         except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
-            self._report(f"Select skin joints failed: {exc}", "error")
-            QtWidgets.QMessageBox.critical(self, "Select skin joints failed", str(exc))
+            self._report(f"Create cloth skeleton failed: {exc}", "error")
+            QtWidgets.QMessageBox.critical(self, "Create cloth skeleton failed", str(exc))
+            return
+        self._report(skin.summary(), "ok")
+        if skin.missing:
+            self._log(
+                "Not in this skeleton (skip): " + ", ".join(skin.missing), "info")
+        self._log(
+            "Next: bind the mesh to the selected (green) joints — Skin > Bind Skin.",
+            "info")
+
+    def _connect_test_body(self) -> None:
+        if not self._require_maya():
+            return
+        from ..core import maya_testfit
+        self._log("Connect test body…", "step")
+        try:
+            with _wait_cursor():
+                result = maya_testfit.connect_test_body()
+        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+            self._report(f"Connect test body failed: {exc}", "error")
+            QtWidgets.QMessageBox.critical(self, "Connect test body failed", str(exc))
             return
         self._report(result.summary(), "ok")
-        if result.missing:
-            self._log(
-                "Not in this skeleton (skip): " + ", ".join(result.missing), "info")
+        self._log(
+            "Pose the body's controls and watch the garment deform. "
+            "Disconnect test body before publishing.", "info")
+
+    def _disconnect_test_body(self) -> None:
+        if not self._require_maya():
+            return
+        from ..core import maya_testfit
+        self._log("Disconnect test body…", "step")
+        try:
+            with _wait_cursor():
+                result = maya_testfit.disconnect_test_body()
+        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+            self._report(f"Disconnect test body failed: {exc}", "error")
+            QtWidgets.QMessageBox.critical(self, "Disconnect test body failed", str(exc))
+            return
+        self._report(result.summary(), "ok")
 
     def _regen_skeleton(self) -> None:
         if not self._require_maya():

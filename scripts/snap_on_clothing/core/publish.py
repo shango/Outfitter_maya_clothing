@@ -148,6 +148,7 @@ class SceneFacts:
     skin_influences: tuple[str, ...]
     cloth_joint_names: tuple[str, ...]
     has_fit_ctrl: bool
+    driven_cloth_joints: tuple[str, ...] = ()
 
 
 def root_namespaces(namespaces, ignore=("UI", "shared")) -> list[str]:
@@ -233,6 +234,17 @@ def assemble_preflight(
             issues.append(PreflightIssue(
                 "error", "The garment skinCluster has no influences.",
                 f"Bind the mesh to the {cloth_prefix}* joints."))
+
+    if facts.driven_cloth_joints:
+        n = len(facts.driven_cloth_joints)
+        sample = ", ".join(sorted(facts.driven_cloth_joints)[:6])
+        more = "" if n <= 6 else f" (+{n - 6} more)"
+        issues.append(PreflightIssue(
+            "warn",
+            f"{n} {cloth_prefix}* joint(s) are still driven by the test body: "
+            f"{sample}{more}.",
+            "Click 'Disconnect test body' so the joints go static before publishing — "
+            "the connections (and the body that drives them) must not ship in the asset."))
 
     if not facts.has_info_node:
         issues.append(PreflightIssue(

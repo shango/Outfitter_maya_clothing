@@ -140,9 +140,13 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
         if ns not in ("UI", "shared")
     ]
 
-    cloth_joint_names = tuple(sorted({
-        _short(j) for j in (cmds.ls(
-            f"{config.CLOTH_PREFIX}*", type="joint", long=True) or [])}))
+    cloth_joints = cmds.ls(
+        f"{config.CLOTH_PREFIX}*", type="joint", long=True) or []
+    cloth_joint_names = tuple(sorted({_short(j) for j in cloth_joints}))
+    driven_cloth_joints = tuple(sorted({
+        _short(j) for j in cloth_joints
+        if any(cmds.connectionInfo(f"{j}.{attr}", isDestination=True)
+               for attr in config.CONNECT_ATTRS)}))
 
     meshes = find_garment_meshes(mesh_group)
     influences, has_skin = _skin_influences(cmds, meshes)
@@ -157,6 +161,7 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
         skin_influences=tuple(influences),
         cloth_joint_names=cloth_joint_names,
         has_fit_ctrl=config.FIT_CTRL in shorts,
+        driven_cloth_joints=driven_cloth_joints,
     )
 
 
