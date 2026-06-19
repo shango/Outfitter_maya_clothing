@@ -232,6 +232,7 @@ Each asset must contain a metadata node so the browser and validator can identif
 |---|---|---|
 | `assetName` | `"trench_coat_A"` | unique asset name |
 | `assetType` | `"coat"` | one of: `shoes` `pants` `shirt` `dress` `coat` `hat` |
+| `gender` | `"male"` | **required** — body variant the garment is pre-fit to: `male` or `female` (§8) |
 | `clothVersion` | `"1.0.0"` | this asset's own version |
 | `genHumanCompat` | `"v03"` | supported GenHuman rig version(s); comma-separated if multiple |
 | `author` | `"Jane R."` | optional |
@@ -314,7 +315,7 @@ Before exporting, confirm:
 **Scene & file**
 - [ ] No references, namespaces, unknown nodes, anim curves, display layers.
 - [ ] Scale frozen (=1), clean transforms.
-- [ ] `cloth_info` populated (assetName / assetType / clothVersion / genHumanCompat).
+- [ ] `cloth_info` populated (assetName / assetType / gender / clothVersion / genHumanCompat).
 - [ ] Delivered as Maya ASCII (`.ma`).
 
 ---

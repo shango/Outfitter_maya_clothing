@@ -13,12 +13,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..config import ASSET_TYPES
+from ..config import ASSET_TYPES, GENDERS
 
 # cloth_info attr name -> AssetMetadata field name
 _INFO_FIELD_MAP = {
     "assetName": "asset_name",
     "assetType": "asset_type",
+    "gender": "gender",
     "clothVersion": "cloth_version",
     "genHumanCompat": "genhuman_compat",
     "author": "author",
@@ -57,6 +58,7 @@ class AssetMetadata:
 
     asset_name: str
     asset_type: str
+    gender: str
     cloth_version: str
     genhuman_compat: tuple[str, ...] = ()
     author: str = ""
@@ -85,6 +87,7 @@ class AssetMetadata:
         errors: list[str] = []
         asset_name = str(norm.get("asset_name", "")).strip()
         asset_type = str(norm.get("asset_type", "")).strip()
+        gender = str(norm.get("gender", "")).strip().lower()
         cloth_version = str(norm.get("cloth_version", "")).strip()
 
         if not asset_name:
@@ -94,6 +97,12 @@ class AssetMetadata:
         elif asset_type not in ASSET_TYPES:
             errors.append(
                 f"assetType '{asset_type}' not one of {', '.join(ASSET_TYPES)}"
+            )
+        if not gender:
+            errors.append("missing 'gender'")
+        elif gender not in GENDERS:
+            errors.append(
+                f"gender '{gender}' not one of {', '.join(GENDERS)}"
             )
         if not cloth_version:
             errors.append("missing 'clothVersion'")
@@ -113,6 +122,7 @@ class AssetMetadata:
             cls(
                 asset_name=asset_name,
                 asset_type=asset_type,
+                gender=gender,
                 cloth_version=cloth_version,
                 genhuman_compat=compat,
                 author=str(norm.get("author", "")).strip(),
@@ -157,3 +167,7 @@ class ClothingAsset:
     @property
     def asset_type(self) -> str:
         return self.metadata.asset_type if self.metadata else "unknown"
+
+    @property
+    def gender(self) -> str:
+        return self.metadata.gender if self.metadata else "unknown"

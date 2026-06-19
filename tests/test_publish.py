@@ -25,7 +25,7 @@ def test_destination_paths_layout(tmp_path):
 # --- sidecar assembly + round-trip -------------------------------------------
 def test_spec_to_sidecar_keys():
     spec = P.PublishSpec(
-        asset_name="coat_a", asset_type="coat", cloth_version="1.0.0",
+        asset_name="coat_a", asset_type="coat", gender="male", cloth_version="1.0.0",
         genhuman_compat=("v03", "v04"), author="me", description="a coat",
         rig_version="v03", created="2026-06-11", tri_count=1240, vert_count=820)
     data = spec.to_sidecar()
@@ -38,8 +38,8 @@ def test_spec_to_sidecar_keys():
 
 
 def test_sidecar_omits_unknown_polycount():
-    spec = P.PublishSpec(asset_name="x", asset_type="hat", cloth_version="1.0.0",
-                         genhuman_compat=("v03",))
+    spec = P.PublishSpec(asset_name="x", asset_type="hat", gender="female",
+                         cloth_version="1.0.0", genhuman_compat=("v03",))
     data = spec.to_sidecar()
     assert "triCount" not in data and "vertCount" not in data
     assert data["created"]  # defaults to today when not supplied
@@ -47,7 +47,7 @@ def test_sidecar_omits_unknown_polycount():
 
 def test_spec_metadata_round_trip():
     spec = P.PublishSpec(
-        asset_name="coat_a", asset_type="coat", cloth_version="2.0.0",
+        asset_name="coat_a", asset_type="coat", gender="male", cloth_version="2.0.0",
         genhuman_compat=("v03",), rig_version="v03", created="2026-06-11",
         tri_count=999, vert_count=500, description="desc")
     meta, errors = spec.metadata()
@@ -57,9 +57,18 @@ def test_spec_metadata_round_trip():
     assert meta.notes == "desc"
 
 
+def test_gender_survives_sidecar_round_trip():
+    spec = P.PublishSpec(
+        asset_name="coat_a", asset_type="coat", gender="female",
+        cloth_version="1.0.0", genhuman_compat=("v03",))
+    assert spec.to_sidecar()["gender"] == "female"
+    meta, errors = spec.metadata()
+    assert errors == [] and meta is not None and meta.gender == "female"
+
+
 def test_spec_metadata_reports_bad_type():
-    spec = P.PublishSpec(asset_name="x", asset_type="cape", cloth_version="1.0.0",
-                         genhuman_compat=("v03",))
+    spec = P.PublishSpec(asset_name="x", asset_type="cape", gender="male",
+                         cloth_version="1.0.0", genhuman_compat=("v03",))
     meta, errors = spec.metadata()
     assert meta is None and any("cape" in e for e in errors)
 
@@ -72,7 +81,7 @@ def test_write_sidecar_read_by_library(tmp_path):
     _assets.write_asset_ma(
         paths.ma, joints=["cloth_root", "cloth_spine_01"], asset_name="coat_a")
     spec = P.PublishSpec(
-        asset_name="coat_a", asset_type="coat", cloth_version="1.0.0",
+        asset_name="coat_a", asset_type="coat", gender="male", cloth_version="1.0.0",
         genhuman_compat=("v03",), rig_version="v03", created="2026-06-11",
         tri_count=1240, vert_count=820, description="published coat")
     P.write_sidecar(paths, spec)

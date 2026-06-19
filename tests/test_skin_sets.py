@@ -101,3 +101,18 @@ def test_full_skeleton_includes_all_recommended():
         plan = skin_sets.plan_skin_set(t, present)
         assert plan.missing == ()
         assert plan.include == skin_sets.recommended_joints(t)
+
+
+def test_skin_set_joints_are_gender_independent():
+    """M12 Phase C: one shared cloth_skeleton serves both male and female, so the
+    recommended skin-joint names must not depend on gender. skin_sets has no gender
+    axis at all — this guards against a per-gender fork sneaking in (and documents the
+    intent of the single shared skeleton)."""
+    import inspect
+
+    for fn in (skin_sets.recommended_joints, skin_sets.plan_skin_set):
+        params = inspect.signature(fn).parameters
+        assert "gender" not in params, f"{fn.__name__} must stay gender-agnostic"
+    # The names are a stable function of asset type alone.
+    for t in config.ASSET_TYPES:
+        assert skin_sets.recommended_joints(t) == skin_sets.recommended_joints(t)

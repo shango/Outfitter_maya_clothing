@@ -37,6 +37,7 @@ def test_example_metadata_fields():
     assert meta.asset_name == "trench_coat_A"
     assert meta.asset_type == "coat"
     assert meta.asset_type in config.ASSET_TYPES
+    assert meta.gender == "male" and meta.gender in config.GENDERS
     assert "v03" in meta.genhuman_compat
 
 

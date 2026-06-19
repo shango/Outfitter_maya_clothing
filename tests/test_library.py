@@ -6,13 +6,14 @@ import _bootstrap  # noqa: F401
 from snap_on_clothing.core import library
 
 
-def _write_ma(path, info_node=True):
+def _write_ma(path, info_node=True, name="x", gender="male"):
     lines = ['//Maya ASCII 2026 scene', 'createNode transform -n "cloth_x";']
     if info_node:
         lines += [
             'createNode network -n "cloth_info";',
-            'setAttr ".assetName" -type "string" "x";',
+            f'setAttr ".assetName" -type "string" "{name}";',
             'setAttr ".assetType" -type "string" "pants";',
+            f'setAttr ".gender" -type "string" "{gender}";',
             'setAttr ".clothVersion" -type "string" "1.0.0";',
             'setAttr ".genHumanCompat" -type "string" "v03";',
         ]
@@ -40,7 +41,7 @@ def test_sidecar_wins_over_ma(tmp_path):
     ma = tmp_path / "thing.ma"
     _write_ma(ma)
     (tmp_path / "thing.json").write_text(json.dumps({
-        "assetName": "sidecar_name", "assetType": "coat",
+        "assetName": "sidecar_name", "assetType": "coat", "gender": "male",
         "clothVersion": "9.9.9", "genHumanCompat": "v03",
     }))
     res = library.scan_library([tmp_path])
@@ -73,6 +74,16 @@ def test_by_type_filter(tmp_path):
     res = library.scan_library([tmp_path])
     assert len(res.by_type("pants")) == 1
     assert res.by_type("coat") == []
+
+
+def test_by_gender_filter(tmp_path):
+    _write_ma(tmp_path / "m.ma", name="m_a", gender="male")
+    _write_ma(tmp_path / "f.ma", name="f_a", gender="female")
+    res = library.scan_library([tmp_path])
+    assert {a.display_name for a in res.by_gender("male")} == {"m_a"}
+    assert {a.display_name for a in res.by_gender("female")} == {"f_a"}
+    # sort key is (gender, type, name): female sorts before male
+    assert [a.gender for a in res.valid] == ["female", "male"]
 
 
 def test_fixture_asset_loads():

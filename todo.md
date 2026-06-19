@@ -343,7 +343,8 @@ skins to — ~40 are fingers, plus `cloth_ik_*`/`cloth_interaction`/`cloth_cente
   read as default. Boundary module = `py_compile`-only; verify the green-only display live in Maya.
 
 ## M12 — Male/female variants; retire the fit rig
-**PLAN 2026-06-16.** New direction (user): production uses only **two fixed body states — pure male and
+**PLAN 2026-06-16; BUILT (logic) 2026-06-19 — Phases A–D done, 162 headless tests passing; in-Maya
+verify (`[!]` below) still pending.** New direction (user): production uses only **two fixed body states — pure male and
 pure female** (`GH_Body_morph` is only ever 0 or 1; no intermediate blends, no other morph axes). So the
 runtime *fit* layer (M3 fit controls + M7 lattice scaffolder) is pure overhead — there's no shape variation
 to compensate for. Instead the **modeler hand-fits each garment once** on the male body and once on the
@@ -386,38 +387,39 @@ skinning are unchanged. The proper long-term answer to shape variation remains *
   intro TL;DR / Ctrl_GRP tree / §15 note / §16 checklist / §17 workflow updated). Noted the male/female
   model throughout. `__init__.py` docstring de-fit-ed.
 
-### Phase B — gender as a first-class asset dimension
-- [ ] `config.py`: `GENDERS: tuple[str, ...] = ("male", "female")`.
-- [ ] `core/asset.py`: add **required, validated** `gender` field to `AssetMetadata` (must be in `GENDERS`);
-  `_INFO_FIELD_MAP["gender"] = "gender"`; sidecar/`cloth_info` key `gender`. Old sidecars w/o gender → invalid
-  with a clear error (acceptable — every asset must declare it). `supports()`/extras unchanged.
-- [ ] `core/publish.py`: `PublishSpec` carries `gender`; `to_sidecar()`/`metadata()` round-trip it.
-- [ ] `core/library.py`: `by_gender(gender)` + include gender in the sort key (`(gender, type, name)`).
-- [ ] `ui/publish_panel.py`: **Gender combo** (unset default + placeholder, `_require_gender()` mirroring
-  `_require_type()`); `_gather_spec` requires it; logged in publish summary.
-- [ ] `ui/window.py`: **Male / Female tabs** (or a gender filter beside the type filter) over the grid;
-  scan once, filter by `by_gender`.
-- [ ] Tag the dev fixture: add `gender` to `assets/trench_coat_A/trench_coat_A.json`; update
-  `tests/test_asset.py` / `test_example_asset.py` fixtures + sidecars for the new required field. (No real
-  assets to migrate — tool is unreleased.)
-- [ ] **Decision:** library layout for a pair — two sibling assets sharing `assetName`+`assetType`
-  (`trench_coat_A` male + female, distinct files/sidecars). No scanner change; tabs do the split. Confirm
-  naming (e.g. `trench_coat_A_m` / `_f`, or same name in gendered subfolders).
+### Phase B — gender as a first-class asset dimension   *(DONE 2026-06-19)*
+- [x] `config.py`: `GENDERS: tuple[str, ...] = ("male", "female")`.
+- [x] `core/asset.py`: **required, validated** `gender` field on `AssetMetadata` (must be in `GENDERS`,
+  case-normalized to lower); `_INFO_FIELD_MAP["gender"]`; `ClothingAsset.gender` property. Sidecars/cloth_info
+  without gender → invalid with "missing 'gender'"; bad value → "gender 'x' not one of …".
+- [x] `core/publish.py`: `PublishSpec` carries `gender`; `to_sidecar()`/`metadata()` round-trip it.
+- [x] `core/library.py`: `by_gender(gender)` + gender first in the sort key (`(gender, type, name)`).
+- [x] `ui/publish_panel.py`: **Gender combo** (unset default + placeholder, `_require_gender()` mirroring
+  `_require_type()`); `_gather_spec` requires it; publish summary logs `(<gender> <type>)`.
+- [x] `ui/window.py`: **Gender filter combo** beside the Type filter ("All genders" + male/female);
+  `_apply_filter` honours it; gender shown in the inspector detail grid.
+- [x] Tagged the dev fixture: `gender` added to `assets/trench_coat_A/{trench_coat_A.json,trench_coat_A.ma}`,
+  the static `tests/fixtures/sample_coat.ma`, the `_assets.write_asset_ma` builder, and example builder
+  (`_build_info_node` + publish spec). All test fixtures updated for the required field.
+- [x] **Decision (user 2026-06-19):** library layout for a pair = two sibling folders sharing
+  `assetName`+`assetType`, **prefix-named `m_<name>` / `f_<name>`** (e.g. `m_trench_coat_A` /
+  `f_trench_coat_A`), distinct files/sidecars. No scanner change; the gender tabs do the split.
 
-### Phase C — skeleton stays gender-agnostic  *(no work — see fact #1)*
-- `GH_Body_morph` doesn't move joints, so the single shipped `cloth_skeleton.json` already serves both
-  male and female. M8 (`build_cloth_skeleton`) and M11 (`skin_sets`, identical joint *names* incl. the
-  `cloth_GM_foot_*` upper-case quirk) need **no change**. Add one guard test asserting the skin-set joint
-  names are gender-independent, and move on.
+### Phase C — skeleton stays gender-agnostic  *(DONE 2026-06-19 — guard test only)*
+- [x] `GH_Body_morph` doesn't move joints, so the single shipped `cloth_skeleton.json` serves both
+  genders; M8/M11 unchanged. Added `test_skin_set_joints_are_gender_independent` (asserts `recommended_joints`
+  / `plan_skin_set` take no `gender` param and are stable per type).
 
-### Phase D — tests, suite, docs
-- [ ] New headless tests: gender-required validation (+ bad-gender rejected), `by_gender`, gender survives
-  publish sidecar round-trip; skin-set names gender-independent (Phase C guard).
-- [ ] Update every test that imported a removed module; **full suite green**; `py_compile` the Maya-boundary
-  modules.
-- [ ] Sync `prd.md` + `Snap-On Clothing Rig System.md` (remove fit-deformer requirement, add two-variant
-  model); update memory (`recommended-skin-joint-sets`, `publish-tab-authoring-helpers`,
-  `prune-unskinned-joints-plan` workflow slots — Scaffold step is gone).
+### Phase D — tests, suite, docs   *(DONE 2026-06-19)*
+- [x] New headless tests: gender-required + bad-gender + case-normalize (`test_asset.py`), `by_gender` +
+  sort-order (`test_library.py`), gender survives publish sidecar round-trip (`test_publish.py`), Phase C
+  guard (`test_skin_sets.py`). **162 headless tests passing.**
+- [x] Updated all fixtures for the required field; `py_compile` clean on the Maya-boundary modules
+  (`publish_panel`, `window`, `maya_publish`, builder).
+- [x] Synced `prd.md` (M12 amendment banner superseding FR-4/FR-7/§7 + controls/placement/presets) +
+  `Snap-On Clothing Rig System.md` (two-variant note); Authoring Spec §12 + validator hint + User Guide
+  validation row now list `gender`. Memory updated (`m12-…`, `publish-tab-authoring-helpers`,
+  `recommended-skin-joint-sets`).
 - [!] **Verify in Maya 2026 (end-to-end):** with the single shared skeleton, author one garment's male
   variant (Create skeleton → Select skin joints → bind → prune → Publish[gender=male]) on the male body and
   its female variant on the female body; confirm both attach + follow playback on the matching body, and the

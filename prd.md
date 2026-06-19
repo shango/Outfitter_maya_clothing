@@ -14,8 +14,16 @@
 ## 1. Goal
 
 A Maya Python tool that lets an artist **browse local clothing assets, snap a chosen asset onto the
-animated GenHuman rig, adjust its fit/placement, and detach it cleanly** — with no simulation, no
-constraints on the connection, and full Genie-export compatibility.
+animated GenHuman rig, and detach it cleanly** — with no simulation, no constraints on the connection,
+and full Genie-export compatibility.
+
+> **M12 AMENDMENT (2026-06-19): runtime fit/placement retired.** Production uses two fixed body states
+> (pure male / pure female; `GH_Body_morph` only ever 0 or 1). There is no shape variation for a runtime
+> fit layer to compensate, so the fit-control surfacing, placement offset, and preset features (FR-4,
+> FR-7, §7, and modules `controls.py` / `placement.py` / `presets.py` below) were **removed**. Instead
+> each garment ships as a **pre-fit male variant and female variant**; `gender` is a required metadata
+> field and the browser filters by it. Sections describing fit/placement/presets are superseded by this
+> note. The long-term answer to shape variation remains **body-morph propagation** (backlog).
 
 ---
 

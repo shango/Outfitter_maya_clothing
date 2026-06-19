@@ -36,6 +36,9 @@ class LibraryScanResult:
     def by_type(self, asset_type: str) -> list[ClothingAsset]:
         return [a for a in self.valid if a.asset_type == asset_type]
 
+    def by_gender(self, gender: str) -> list[ClothingAsset]:
+        return [a for a in self.valid if a.gender == gender]
+
 
 def _find_thumbnail(ma_path: Path) -> Path | None:
     for ext in config.THUMB_EXTS:
@@ -103,5 +106,5 @@ def scan_library(roots: list[Path] | None = None) -> LibraryScanResult:
             seen.add(resolved)
             result.assets.append(load_asset(ma_path))
 
-    result.assets.sort(key=lambda a: (a.asset_type, a.display_name.lower()))
+    result.assets.sort(key=lambda a: (a.gender, a.asset_type, a.display_name.lower()))
     return result

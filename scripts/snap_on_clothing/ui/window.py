@@ -29,6 +29,7 @@ WINDOW_TITLE = "Snap-On Clothing"
 _THUMB_SIZE = 120
 _PREVIEW_MAX = 260
 _ALL_TYPES = "All types"
+_ALL_GENDERS = "All genders"
 
 # Per-type badge colour (falls back to the theme accent for anything unlisted).
 _TYPE_COLORS = {
@@ -115,8 +116,12 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         outer = QtWidgets.QVBoxLayout(central)
         outer.setContentsMargins(8, 8, 8, 8)
 
-        # top bar: type filter + search + refresh
+        # top bar: gender filter + type filter + search + refresh
         top = QtWidgets.QHBoxLayout()
+        self._gender_combo = QtWidgets.QComboBox()
+        self._gender_combo.addItem(_ALL_GENDERS)
+        self._gender_combo.addItems(list(config.GENDERS))
+        self._gender_combo.currentIndexChanged.connect(self._apply_filter)
         self._type_combo = QtWidgets.QComboBox()
         self._type_combo.addItem(_ALL_TYPES)
         self._type_combo.addItems(list(config.ASSET_TYPES))
@@ -127,6 +132,8 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._search.textChanged.connect(self._apply_filter)
         self._refresh_btn = QtWidgets.QPushButton("Refresh")
         self._refresh_btn.clicked.connect(self.refresh)
+        top.addWidget(QtWidgets.QLabel("Gender:"))
+        top.addWidget(self._gender_combo)
         top.addWidget(QtWidgets.QLabel("Type:"))
         top.addWidget(self._type_combo)
         top.addWidget(self._search, 1)
@@ -331,6 +338,7 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         form.setLabelAlignment(QtCore.Qt.AlignRight)
         form.setHorizontalSpacing(12)
         form.setVerticalSpacing(6)
+        self._d_gender = self._value_label()
         self._d_version = self._value_label()
         self._d_compat = self._value_label()
         self._d_polys = self._value_label()
@@ -339,6 +347,7 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._d_author = self._value_label()
         self._d_source = self._value_label()
         for caption, widget in (
+            ("Gender", self._d_gender),
             ("Version", self._d_version),
             ("GenHuman compat", self._d_compat),
             ("Polycount", self._d_polys),
@@ -412,12 +421,15 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         if self._scan is None:
             return
         wanted_type = self._type_combo.currentText()
+        wanted_gender = self._gender_combo.currentText()
         query = self._search.text().strip().lower()
 
         self._grid.blockSignals(True)
         self._grid.clear()
         shown = 0
         for asset in self._scan.assets:
+            if wanted_gender != _ALL_GENDERS and asset.gender != wanted_gender:
+                continue
             if wanted_type != _ALL_TYPES and asset.asset_type != wanted_type:
                 continue
             if query and query not in asset.display_name.lower():
@@ -479,6 +491,7 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._d_desc.setText((meta.notes if meta and meta.notes else ""))
         self._d_desc.setVisible(bool(meta and meta.notes))
 
+        self._d_gender.setText((meta.gender or "—") if meta else "—")
         self._d_version.setText(meta.cloth_version if meta else "—")
         self._d_compat.setText(", ".join(meta.genhuman_compat) if meta and meta.genhuman_compat else "—")
         self._d_polys.setText(self._poly_text(meta))
@@ -567,7 +580,7 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._d_badge.setStyleSheet("")
         self._d_desc.setText("")
         self._d_desc.setVisible(False)
-        for lbl in (self._d_version, self._d_compat, self._d_polys,
+        for lbl in (self._d_gender, self._d_version, self._d_compat, self._d_polys,
                     self._d_created, self._d_rigver, self._d_author, self._d_source):
             lbl.setText("—")
         self._d_path.setText("—")

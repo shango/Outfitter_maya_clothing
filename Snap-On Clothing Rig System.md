@@ -198,6 +198,10 @@ All clothing assets must conform to these requirements in order to:
 ## **Base Pose Alignment**
 
 * All clothing assets must be authored against the GenHuman bind pose male/female version.  
+* Each garment ships as **two pre-fit variants — a male variant and a female variant** (M12, 2026-06-19):
+  the body morph moves only the mesh, not the joints, so one garment can't follow the male↔female mesh
+  difference; the modeler hand-fits each on the matching body. `gender` (`male`/`female`) is a required
+  metadata field. There is **no runtime fit rig** (the lattice/`cloth_fit_ctrl` fit layer was retired).
 * Clothing geometry and joints must align spatially with the GenHuman bind pose skeleton.  
 * Clothing assets must not be authored in arbitrary poses.
 

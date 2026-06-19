@@ -282,6 +282,7 @@ def _build_info_node() -> str:
     strings = {
         "assetName": ASSET_NAME,
         "assetType": "coat",
+        "gender": "male",
         "clothVersion": "1.0.0",
         "genHumanCompat": "v03",
         "author": "Snap-On Clothing (example)",
@@ -430,7 +431,7 @@ def _publish_sidecar_and_thumbnail(out_path: str) -> None:
     except Exception as exc:  # noqa: BLE001 — no model panel in batch, etc.
         print(f"[build_example_asset] thumbnail capture skipped: {exc}")
     spec = _pub.PublishSpec(
-        asset_name=ASSET_NAME, asset_type="coat", cloth_version="1.0.0",
+        asset_name=ASSET_NAME, asset_type="coat", gender="male", cloth_version="1.0.0",
         genhuman_compat=("v03",), author="Snap-On Clothing (example)",
         description=_EXAMPLE_DESCRIPTION,
         rig_version="v03", created=_pub.today_iso(), tri_count=tris, vert_count=verts)

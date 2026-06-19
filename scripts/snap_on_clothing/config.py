@@ -12,6 +12,10 @@ from pathlib import Path
 # --- asset taxonomy (Authoring Spec §12: assetType) ---------------------------
 ASSET_TYPES: tuple[str, ...] = ("shoes", "pants", "shirt", "dress", "coat", "hat")
 
+# Body variant each garment is pre-fit to (M12: two fixed body states, no unisex).
+# Each garment ships as a male and a female asset; gender is a required metadata field.
+GENDERS: tuple[str, ...] = ("male", "female")
+
 # --- asset structure contract (Authoring Spec §3) -----------------------------
 REQUIRED_GROUPS: tuple[str, ...] = ("Mesh_GRP", "Rig_GRP", "Ctrl_GRP")
 INFO_NODE: str = "cloth_info"

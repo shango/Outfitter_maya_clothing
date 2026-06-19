@@ -92,7 +92,7 @@ def validate_asset_summary(summary: MaSummary, metadata: AssetMetadata | None) -
             "no_metadata",
             "asset has no readable metadata (cloth_info or sidecar)",
             node=config.INFO_NODE,
-            fix="add a cloth_info node with assetName/assetType/clothVersion/genHumanCompat",
+            fix="add a cloth_info node with assetName/assetType/gender/clothVersion/genHumanCompat",
         )
     if not summary.has_node(config.INFO_NODE):
         report.error("no_info_node", "missing info node", node=config.INFO_NODE,

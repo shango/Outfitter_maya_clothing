@@ -1,8 +1,9 @@
 {
   "assetName": "trench_coat_A",
   "assetType": "coat",
+  "gender": "male",
   "clothVersion": "1.0.0",
   "genHumanCompat": "v03",
   "author": "Snap-On Clothing (example)",
-  "notes": "Example trench coat: a skinned structural reference garment with a front-of-chain fit lattice."
+  "notes": "Example trench coat: a skinned structural reference garment."
 }

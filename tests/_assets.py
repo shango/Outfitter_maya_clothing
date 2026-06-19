@@ -16,6 +16,7 @@ def write_asset_ma(
     helper_joints: list[str] = (),
     asset_name: str = "test_asset",
     asset_type: str = "coat",
+    gender: str = "male",
     compat: str = "v03",
     groups: list[str] = ("Mesh_GRP", "Rig_GRP", "Ctrl_GRP"),
     info: bool = True,
@@ -33,6 +34,7 @@ def write_asset_ma(
             'createNode network -n "cloth_info";',
             f'setAttr ".assetName" -type "string" "{asset_name}";',
             f'setAttr ".assetType" -type "string" "{asset_type}";',
+            f'setAttr ".gender" -type "string" "{gender}";',
             'setAttr ".clothVersion" -type "string" "1.0.0";',
             f'setAttr ".genHumanCompat" -type "string" "{compat}";',
         ]

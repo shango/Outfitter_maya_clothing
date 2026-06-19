@@ -82,6 +82,12 @@ class PublishPanel(QtWidgets.QWidget):
         # rigger choose it rather than silently defaulting to the first type.
         self._type.setCurrentIndex(-1)
         self._type.setPlaceholderText("— set clothing type —")
+        self._gender = QtWidgets.QComboBox()
+        self._gender.addItems(list(config.GENDERS))
+        # Unset by default like Type — gender is a required field (the garment is pre-fit
+        # to one body), so make the rigger pick the variant rather than defaulting it.
+        self._gender.setCurrentIndex(-1)
+        self._gender.setPlaceholderText("— set body variant —")
         self._version = QtWidgets.QLineEdit("1.0.0")
         self._compat = QtWidgets.QLineEdit("v03")
         self._compat.setPlaceholderText("comma-separated, e.g. v03, v04")
@@ -103,6 +109,7 @@ class PublishPanel(QtWidgets.QWidget):
 
         form.addRow("Asset name", self._name)
         form.addRow("Type", self._type)
+        form.addRow("Gender", self._gender)
         form.addRow("Version", self._version)
         form.addRow("GenHuman compat", self._compat)
         form.addRow("Rig version built-for", self._wrap(rig_row))
@@ -342,6 +349,18 @@ class PublishPanel(QtWidgets.QWidget):
             "skin joints get highlighted.")
         return None
 
+    def _require_gender(self) -> str | None:
+        """Return the chosen gender variant, or warn and return None if still unset."""
+        gender = self._gender.currentText().strip()
+        if gender:
+            return gender
+        self._report("Set the Gender first (the dropdown in the form).", "warn")
+        QtWidgets.QMessageBox.warning(
+            self, "Set gender",
+            "Choose the body variant (male / female) the garment is pre-fit to before "
+            "publishing — every asset must declare its gender.")
+        return None
+
     # --- actions --------------------------------------------------------------
     def _detect_rig(self) -> None:
         if not self._require_maya():
@@ -557,12 +576,16 @@ class PublishPanel(QtWidgets.QWidget):
         asset_type = self._require_type()
         if asset_type is None:
             return None
+        gender = self._require_gender()
+        if gender is None:
+            return None
         compat = tuple(
             t.strip() for t in self._compat.text().replace(";", ",").split(",")
             if t.strip())
         return _publish.PublishSpec(
             asset_name=name,
             asset_type=asset_type,
+            gender=gender,
             cloth_version=self._version.text().strip() or "1.0.0",
             genhuman_compat=compat,
             author=self._author.text().strip(),
@@ -644,8 +667,8 @@ class PublishPanel(QtWidgets.QWidget):
 
         if report.ok:
             self._report(
-                f"Published {spec.asset_name} → {paths.folder} "
-                f"({spec.tri_count:,} tris). {report.summary_line()}.", "ok")
+                f"Published {spec.asset_name} ({spec.gender} {spec.asset_type}) → "
+                f"{paths.folder} ({spec.tri_count:,} tris). {report.summary_line()}.", "ok")
         else:
             for issue in report.errors:
                 self._log(str(issue), "error")

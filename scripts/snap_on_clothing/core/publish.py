@@ -69,6 +69,7 @@ class PublishSpec:
 
     asset_name: str
     asset_type: str
+    gender: str
     cloth_version: str
     genhuman_compat: tuple[str, ...] = ()
     author: str = ""
@@ -88,6 +89,7 @@ class PublishSpec:
         data: dict[str, object] = {
             "assetName": self.asset_name,
             "assetType": self.asset_type,
+            "gender": self.gender,
             "clothVersion": self.cloth_version,
             "genHumanCompat": ", ".join(self.genhuman_compat),
             "author": self.author,

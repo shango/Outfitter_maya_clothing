@@ -130,7 +130,7 @@ a fix hint.
 
 | Code | Meaning | Fix |
 |---|---|---|
-| `no_metadata` | No readable `cloth_info` or sidecar `.json`. | Add a `cloth_info` node with `assetName` / `assetType` / `clothVersion` / `genHumanCompat`. |
+| `no_metadata` | No readable `cloth_info` or sidecar `.json`, or a required field (incl. `gender`) is missing/invalid. | Add a `cloth_info` node with `assetName` / `assetType` / `gender` (`male`/`female`) / `clothVersion` / `genHumanCompat`. |
 | `no_info_node` | The `cloth_info` node is missing. | Add a `cloth_info` network node. |
 | `missing_group` | A required group (`Mesh_GRP` / `Rig_GRP` / `Ctrl_GRP`) is absent. | Create the missing group under the asset top group. |
 | `no_root_joint` | No `cloth_root` joint. | Duplicate body `root`, rename to `cloth_root`, parent under `Rig_GRP`. |

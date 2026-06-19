@@ -77,7 +77,8 @@ def test_no_cloth_joints_error(tmp_path):
 # --- scene preconditions ------------------------------------------------------
 def _meta(compat="v03"):
     m, _ = AssetMetadata.from_mapping({
-        "assetName": "x", "assetType": "coat", "clothVersion": "1.0.0", "genHumanCompat": compat,
+        "assetName": "x", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "genHumanCompat": compat,
     })
     return m
 
