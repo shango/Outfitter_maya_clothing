@@ -145,22 +145,23 @@ class PublishPanel(QtWidgets.QWidget):
         self._skeleton_btn.clicked.connect(self._create_skeleton)
         right.addWidget(self._skeleton_btn)
 
-        # skinning test: drive the cloth_* skeleton from the GenHuman body already in the
-        # scene so the rigger can pose the rig and confirm the garment deforms, then break
-        # the connections again so the asset is publish-safe. Authoring-time attach().
+        # skinning test (M14): the tool imports its bundled GenHuman, flips GH_Body_morph
+        # to the chosen Gender (male = base, female = morph), and drives the cloth_*
+        # skeleton from it so the rigger poses the body and confirms the garment deforms.
+        # Remove deletes the body so the asset is publish-safe. Authoring-time attach().
         test_row = QtWidgets.QHBoxLayout()
         test_row.setContentsMargins(0, 0, 0, 0)
-        self._connect_btn = QtWidgets.QPushButton("Connect test body")
+        self._connect_btn = QtWidgets.QPushButton("Load test body")
         self._connect_btn.setToolTip(
-            "After binding: drive the cloth_* skeleton from the GenHuman body in the "
-            "scene. Pose the body's controls and watch the garment deform to verify the "
-            "skinning. Disconnect before publishing.")
-        self._connect_btn.clicked.connect(self._connect_test_body)
-        self._disconnect_btn = QtWidgets.QPushButton("Disconnect test body")
+            "After binding: import the GenHuman body for the selected Gender (the tool "
+            "flips GH_Body_morph to match), connected to the cloth_* skeleton. Pose the "
+            "body's controls and watch the garment deform. Remove it before publishing.")
+        self._connect_btn.clicked.connect(self._load_test_body)
+        self._disconnect_btn = QtWidgets.QPushButton("Remove test body")
         self._disconnect_btn.setToolTip(
-            "Break the test-body connections so the cloth_* joints go static again and "
-            "the asset is publish-safe. Run before Publish.")
-        self._disconnect_btn.clicked.connect(self._disconnect_test_body)
+            "Disconnect and delete the GenHuman test body so the cloth_* joints go static "
+            "again and the asset is publish-safe. Run before Publish.")
+        self._disconnect_btn.clicked.connect(self._remove_test_body)
         test_row.addWidget(self._connect_btn)
         test_row.addWidget(self._disconnect_btn)
         right.addWidget(self._wrap(test_row))
@@ -404,34 +405,39 @@ class PublishPanel(QtWidgets.QWidget):
             "Next: bind the mesh to the selected (green) joints — Skin > Bind Skin.",
             "info")
 
-    def _connect_test_body(self) -> None:
+    def _load_test_body(self) -> None:
         if not self._require_maya():
             return
+        gender = self._require_gender()
+        if gender is None:
+            return
         from ..core import maya_testfit
-        self._log("Connect test body…", "step")
+        self._log(f"Load test body ({gender})…", "step")
         try:
             with _wait_cursor():
-                result = maya_testfit.connect_test_body()
+                result = maya_testfit.load_test_body(gender)
         except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
-            self._report(f"Connect test body failed: {exc}", "error")
-            QtWidgets.QMessageBox.critical(self, "Connect test body failed", str(exc))
+            self._report(f"Load test body failed: {exc}", "error")
+            QtWidgets.QMessageBox.critical(self, "Load test body failed", str(exc))
             return
         self._report(result.summary(), "ok")
+        for j in result.connect.unmatched:
+            self._log(f"helper joint not driven (no body match): {j}", "info")
         self._log(
             "Pose the body's controls and watch the garment deform. "
-            "Disconnect test body before publishing.", "info")
+            "Remove test body before publishing.", "info")
 
-    def _disconnect_test_body(self) -> None:
+    def _remove_test_body(self) -> None:
         if not self._require_maya():
             return
         from ..core import maya_testfit
-        self._log("Disconnect test body…", "step")
+        self._log("Remove test body…", "step")
         try:
             with _wait_cursor():
-                result = maya_testfit.disconnect_test_body()
+                result = maya_testfit.remove_test_body()
         except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
-            self._report(f"Disconnect test body failed: {exc}", "error")
-            QtWidgets.QMessageBox.critical(self, "Disconnect test body failed", str(exc))
+            self._report(f"Remove test body failed: {exc}", "error")
+            QtWidgets.QMessageBox.critical(self, "Remove test body failed", str(exc))
             return
         self._report(result.summary(), "ok")
 

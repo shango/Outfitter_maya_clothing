@@ -5,6 +5,11 @@ __pycache__/
 # Large GenHuman source rigs at repo root — kept on disk, out of git (use git-LFS if ever needed)
 /*.ma
 
+# Bundled gendered GenHuman test body (M14) — large rig, kept out of git like the root
+# rigs; dropped in for local dev and included at package/release time. The dir's README
+# (tracked) documents the expected filename.
+scripts/snap_on_clothing/data/genhuman/*.ma
+
 # Local machine-specific Claude settings
 .claude/settings.local.json
 

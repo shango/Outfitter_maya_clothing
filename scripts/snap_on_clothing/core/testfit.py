@@ -19,6 +19,21 @@ from dataclasses import dataclass
 from .. import config
 
 
+def body_morph_value(gender: str) -> float:
+    """The ``GH_Body_morph`` value that puts the GenHuman body into ``gender`` (M14).
+
+    The tool ships one rig and flips this switch (male = base, female = full morph), so
+    the loaded test body matches the garment variant being authored. Raises ``ValueError``
+    on an unknown gender so the caller surfaces it rather than silently loading the base.
+    """
+    key = gender.strip().lower()
+    try:
+        return config.GENDER_BODY_MORPH[key]
+    except KeyError:
+        valid = ", ".join(config.GENDER_BODY_MORPH)
+        raise ValueError(f"unknown gender '{gender}' — expected one of: {valid}") from None
+
+
 @dataclass(frozen=True)
 class TestFitConnection:
     """One planned edge: a body joint plug drives a cloth joint plug."""

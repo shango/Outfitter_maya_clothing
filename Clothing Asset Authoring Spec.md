@@ -326,23 +326,25 @@ The Publish tab automates the skeleton/skin/prune chores — the order below is 
 button sequence, not a manual one.
 
 1. Build garment geometry (UVs, under `Mesh_GRP`, `cloth_<part>_mesh`).
-2. Set the **Type**, then **Create cloth skeleton** — rebuilds the canonical `cloth_*`
-   skeleton under `Rig_GRP` *and* selects + highlights (green) the recommended skin
-   joints for the Type, gathered into `cloth_skin_SET`. (Replaces the manual duplicate /
-   rename / pick-influences chore.)
+2. Set the **Type** and **Gender**, then **Create cloth skeleton** — rebuilds the
+   canonical `cloth_*` skeleton under `Rig_GRP` *and* selects + highlights (green) the
+   recommended skin joints for the Type, gathered into `cloth_skin_SET`. (Replaces the
+   manual duplicate / rename / pick-influences chore.)
 3. Add helper joints for secondary motion (optional).
 4. Smooth-bind geometry to the selected (green) joints — Skin ▸ Bind Skin.
-5. **Connect test body** — drive the `cloth_*` skeleton from the GenHuman body already
-   in the scene; pose the body's controls and confirm the garment deforms. Then
-   **Disconnect test body** so the joints go static and the asset is publish-safe.
+5. **Load test body** — the tool imports its bundled GenHuman, flips `GH_Body_morph` to
+   match the chosen **Gender** (so you fit against the right body), and drives the
+   `cloth_*` skeleton from it; pose the body's controls and confirm the garment deforms.
+   Then **Remove test body** to delete it so the joints go static and the asset is
+   publish-safe.
 6. **Delete unused joints** — prune the `cloth_*` joints the garment doesn't skin to
    (safe leaf-only; unweighted interior joints with skinned children are kept).
 7. Add any secondary-motion controls (`cloth_<name>_ctrl`) under `Ctrl_GRP` (optional).
-   Repeat the build on the other body so each garment ships as a male **and** female
-   variant, pre-fit to each (§8) — there is no runtime fit rig.
+   Repeat the build with the **other Gender** so each garment ships as a male **and**
+   female variant, pre-fit to each (§8) — there is no runtime fit rig.
 8. Add and populate `cloth_info` (including the `gender` field).
 9. Clean the scene; freeze transforms; delete history. Confirm the test body is
-   disconnected (Check scene warns if any `cloth_*` joint is still driven).
+   removed (Check scene blocks on a leftover rig / warns if a `cloth_*` joint is driven).
 10. Run the §16 checklist.
 11. **Publish ▸** — writes the `.ma` + sidecar + thumbnail into the library.
 ```

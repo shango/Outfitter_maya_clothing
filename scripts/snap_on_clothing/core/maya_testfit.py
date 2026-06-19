@@ -1,11 +1,13 @@
 """In-scene skinning test — drive the ``cloth_*`` skeleton from the body (Maya-side).
 
-The rigger hits **Connect test body**: this finds the GenHuman body already in the
-authoring scene, aligns the garment's ``Rig_GRP`` to the rig's export frame, and
-``connectAttr``s each body joint's ``{translate,rotate,scale}`` onto the matching
-``cloth_*`` joint — exactly production attach, in-scene, no import. They pose the
-body's controls, confirm the mesh follows, then hit **Disconnect test body** to
-break those edges so the joints go static and the asset is publish-safe again.
+The rigger hits **Load test body** (M14): the tool imports its bundled GenHuman, flips
+``GH_Body_morph`` to match the garment's chosen gender (male = base, female = morph),
+aligns the garment's ``Rig_GRP`` to the rig's export frame, and ``connectAttr``s each
+body joint's ``{translate,rotate,scale}`` onto the matching ``cloth_*`` joint — exactly
+production attach, in-scene. They pose the body's controls, confirm the mesh follows,
+then hit **Remove test body** to disconnect and delete the rig so the joints go static
+and the asset is publish-safe again. (``connect_test_body`` / ``disconnect_test_body``
+are the connect/disconnect halves, also usable on a body the rigger placed themselves.)
 
 Lazy ``maya.cmds``; runs only inside Maya. The pure plan (matching + skip rules)
 lives in :mod:`core.testfit` and is headless-tested; this module gathers the live
@@ -59,6 +61,29 @@ class DisconnectResult:
             f"Test body disconnected: broke {self.broken} connection(s) on {n} "
             f"cloth_* joint{'' if n == 1 else 's'}. The joints are static again and "
             "the asset is publish-safe.")
+
+
+@dataclass
+class LoadBodyResult:
+    gender: str
+    morph: float
+    connect: ConnectResult
+
+    def summary(self) -> str:
+        return (
+            f"Loaded the {self.gender} GenHuman body (GH_Body_morph = {self.morph:g}). "
+            + self.connect.summary())
+
+
+@dataclass
+class RemoveBodyResult:
+    deleted: int
+    disconnect: DisconnectResult
+
+    def summary(self) -> str:
+        return (
+            self.disconnect.summary()
+            + f" Removed the GenHuman test body ({self.deleted} node group(s) deleted).")
 
 
 def _scene_cloth_nodes(cmds) -> dict[str, str]:
@@ -193,3 +218,106 @@ def disconnect_test_body() -> DisconnectResult:
             touched.append(short)
     cmds.select(clear=True)
     return DisconnectResult(broken=broken, joints=touched)
+
+
+def _genhuman_present(cmds) -> bool:
+    """True if a GenHuman rig (any marker node) is already in the scene."""
+    for marker in config.RIG_MARKERS:
+        if cmds.objExists(marker) or (cmds.ls(f"*:{marker}") or cmds.ls(f"*{marker}*")):
+            return True
+    return False
+
+
+def _set_body_morph(cmds, gender: str) -> float:
+    """Drive ``GH_Body_morph`` to the value for ``gender``; tolerate an absent attr."""
+    value = _testfit.body_morph_value(gender)
+    # Resolve the godnode whether imported at root or under a namespace.
+    node = config.BODY_MORPH_NODE
+    if not cmds.objExists(node):
+        matches = cmds.ls(f"*:{config.BODY_MORPH_NODE}") or []
+        node = matches[0] if matches else node
+    plug = f"{node}.{config.BODY_MORPH_ATTR}"
+    try:
+        cmds.setAttr(plug, value)
+    except Exception:  # noqa: BLE001 — surface as a warning at the UI, don't abort load
+        pass
+    return value
+
+
+def load_test_body(gender: str, mesh_group: str = "Mesh_GRP") -> LoadBodyResult:
+    """Import the bundled GenHuman, flip it to ``gender``, and connect it for a skin test.
+
+    The tool ships one GenHuman and sets ``GH_Body_morph`` to match the chosen gender
+    (male = base, female = full morph), so the rigger skins/poses the garment against the
+    correct body without hand-importing one. Refuses if a GenHuman is already in the scene
+    (avoid a double body), if there's no cloth skeleton to drive, or if the bundled rig
+    file isn't installed. After import it sets the morph then runs :func:`connect_test_body`.
+    """
+    cmds = _cmds()
+
+    if not _scene_cloth_nodes(cmds):
+        raise RuntimeError(
+            "No cloth_* joints in the scene. Run 'Create cloth skeleton' first.")
+    if _genhuman_present(cmds):
+        raise RuntimeError(
+            "A GenHuman rig is already in the scene. Use 'Remove test body' (or delete it) "
+            "before loading a fresh gendered body.")
+
+    body_file = config.bundled_genhuman_path()
+    if not body_file.is_file():
+        raise RuntimeError(
+            f"Bundled GenHuman body not found at {body_file}. It ships with the tool's "
+            "data/genhuman/ folder; reinstall or place the rig file there.")
+
+    # Import at the root namespace so the cloth_<base> -> body <base> name match (and the
+    # godnode/morph attr path) resolve exactly as connect_test_body expects.
+    cmds.file(str(body_file), i=True, preserveReferences=False)
+    morph = _set_body_morph(cmds, gender)
+    connect = connect_test_body(mesh_group)
+    return LoadBodyResult(gender=gender.strip().lower(), morph=morph, connect=connect)
+
+
+def _delete_genhuman(cmds) -> int:
+    """Robustly delete the imported GenHuman rig; returns how many top nodes were removed.
+
+    The rig is ~thousands of DG 'guts' nodes plus DAG roots. Delete the DAG roots first
+    (cascades to children), then sweep any leftover GenHuman-named DG nodes, tolerating
+    failures throughout (a stubborn node must never block the rest). Finally drop any now
+    -empty namespaces the import created.
+    """
+    deleted = 0
+    # DAG roots whose short name marks the rig (the export group, godnode, GenHuman_*).
+    roots: list[str] = []
+    for marker in config.RIG_MARKERS:
+        roots += cmds.ls(marker, long=True) or []
+        roots += cmds.ls(f"*{marker}*", long=True, type="transform") or []
+    for node in sorted(set(roots), key=len, reverse=True):
+        if not cmds.objExists(node):
+            continue
+        try:
+            cmds.delete(node)
+            deleted += 1
+        except Exception:  # noqa: BLE001 — keep deleting the rest
+            pass
+    # Sweep stray GenHuman-named DG nodes left behind (materials/utility/etc.).
+    for node in cmds.ls("*GenHuman*", "*GH_*", "god_m_*") or []:
+        if cmds.objExists(node):
+            try:
+                cmds.delete(node)
+            except Exception:  # noqa: BLE001
+                pass
+    return deleted
+
+
+def remove_test_body() -> RemoveBodyResult:
+    """Disconnect the test body and delete the imported GenHuman so publish isn't blocked.
+
+    Pairs with :func:`load_test_body`: first breaks the body->cloth connections
+    (:func:`disconnect_test_body`), then deletes the GenHuman rig. Idempotent — safe to
+    run with nothing loaded (it just reports zero).
+    """
+    cmds = _cmds()
+    disc = disconnect_test_body()
+    deleted = _delete_genhuman(cmds)
+    cmds.select(clear=True)
+    return RemoveBodyResult(deleted=deleted, disconnect=disc)

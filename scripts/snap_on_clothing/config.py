@@ -49,6 +49,21 @@ RIG_MARKERS: tuple[str, ...] = (
     "GenHuman",
 )
 
+# --- gendered test body (M14) -------------------------------------------------
+# The tool ships ONE GenHuman and flips the male/female switch to match the chosen
+# gender, because the two genders are the SAME rig differing only by this morph value
+# (it moves the body MESH, not the joints — hence one shared cloth_* skeleton).
+# The switch is `GH_Body_morph` (0-1) on the godnode (M0 finding). male = base (0),
+# female = full morph (1).  *** Morph VALUES are verify-in-Maya. ***
+BODY_MORPH_NODE: str = "god_m_godnode_anim"
+BODY_MORPH_ATTR: str = "GH_Body_morph"
+GENDER_BODY_MORPH: dict[str, float] = {"male": 0.0, "female": 1.0}
+
+# The bundled GenHuman the "Load test body" action imports. Lives under the package's
+# data/genhuman/ dir so the installer copytree ships it; kept OUT of git (large rig,
+# like the root *.ma files) and dropped in at package/release time.
+BUNDLED_GENHUMAN_FILE: str = "GenHuman_rig_v03.ma"
+
 # Genie export may require specific node names present (PRD §9 open task — TBD).
 # Empty = check is a no-op until the export team supplies the list.
 GENIE_REQUIRED_NODES: tuple[str, ...] = ()
@@ -94,6 +109,16 @@ def path_file() -> Path:
 def bundled_asset_dir() -> Path:
     """The starter library shipped in the repo / installer bundle."""
     return _repo_root() / "assets"
+
+
+def bundled_genhuman_path() -> Path:
+    """The GenHuman rig the 'Load test body' action imports (under the package data dir).
+
+    Shipped via the installer's ``data/`` copytree but kept out of git (large rig). May
+    not exist in a fresh checkout until the file is dropped in / the bundle is built;
+    callers must handle absence with a clear message.
+    """
+    return package_dir() / "data" / "genhuman" / BUNDLED_GENHUMAN_FILE
 
 
 def user_config_dir() -> Path:

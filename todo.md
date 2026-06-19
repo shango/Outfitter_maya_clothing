@@ -473,6 +473,34 @@ body→`cloth_*` plugs as production, minus the import.
   body → confirm the garment deforms; Disconnect → confirm cloth joints static again and Publish no longer
   blocks on the connection.
 
+## M14 — Tool-provided gendered test body (load the matching GenHuman)
+**BUILT (logic) 2026-06-19.** Direction (user): the tool should *provide* the correct-gender body for
+skinning/test-fit, not assume the rigger placed one. Since male/female are the **same rig** differing only
+by `GH_Body_morph` (0 = male base, 1 = female morph; the morph moves the MESH, not the joints), the tool
+ships **one** GenHuman and flips the switch to match the garment's chosen Gender. Supersedes the M13
+"body already in scene, no import" assumption (Connect/Disconnect remain as the connect/disconnect halves).
+- [x] **Config** (`config.py`): `BODY_MORPH_NODE`/`BODY_MORPH_ATTR` (`god_m_godnode_anim.GH_Body_morph`),
+  `GENDER_BODY_MORPH = {"male":0.0,"female":1.0}` (**values verify-in-Maya**), `BUNDLED_GENHUMAN_FILE`,
+  `bundled_genhuman_path()` → `data/genhuman/<file>` (ships via installer copytree).
+- [x] **Pure** (`core/testfit.py`): `body_morph_value(gender)` (case-insensitive, raises on unknown) —
+  headless-tested.
+- [x] **Maya** (`core/maya_testfit.py`): `load_test_body(gender)` — refuses if a GenHuman is already in
+  scene / no cloth skeleton / bundled file missing; imports the rig at root, sets the morph, then runs the
+  existing `connect_test_body`. `remove_test_body()` = `disconnect_test_body` + robust `_delete_genhuman`.
+  `LoadBodyResult`/`RemoveBodyResult` summaries. (`_genhuman_present`, `_set_body_morph` helpers.)
+- [x] **UI** (`ui/publish_panel.py`): the two M13 buttons become **"Load test body"** (`_require_gender`
+  → `load_test_body`) / **"Remove test body"** (`remove_test_body`); tooltips explain the morph flip.
+- [x] **Bundle**: `data/genhuman/` with a tracked `README.md`; the rig `.ma` is **gitignored** (large, like
+  the root rigs) — copied in for local dev, included at package/release time. No installer change (data/
+  already copytree'd).
+- [x] Tests: `tests/test_testfit.py` (+4) — per-gender morph value, case-insensitive, rejects unknown,
+  every `config.GENDERS` maps. **166 headless tests passing.** Docs: Authoring Spec §17 workflow (Load/Remove
+  + set Gender) updated.
+- [!] **Verify in Maya 2026:** pick Gender=female → **Load test body** → confirm the bundled GenHuman
+  imports, `GH_Body_morph` reads 1 (female), the body drives the `cloth_*` skeleton; **confirm 0=male /
+  1=female is correct** (flip `GENDER_BODY_MORPH` if reversed); **Remove test body** → rig gone, joints
+  static, Publish unblocked. Confirm the bundled `data/genhuman/GenHuman_rig_v03.ma` is present in the build.
+
 ## Backlog / future
 - [ ] Asset **validator/exporter** tool for authors (enforce Addendum at export time).
 - [ ] Body-morph propagation to attached clothing.

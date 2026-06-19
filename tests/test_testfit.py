@@ -88,3 +88,28 @@ def test_non_cloth_nodes_are_ignored():
         _body("spine_01"))
     assert plan.matched_joints == ("cloth_spine_01",)
     assert plan.unmatched_joints == ()
+
+
+# --- gendered test body (M14) -----------------------------------------------
+def test_body_morph_value_per_gender():
+    # The tool ships ONE rig and flips GH_Body_morph: male = base (0), female = morph (1).
+    assert T.body_morph_value("male") == config.GENDER_BODY_MORPH["male"]
+    assert T.body_morph_value("female") == config.GENDER_BODY_MORPH["female"]
+    assert T.body_morph_value("male") != T.body_morph_value("female")
+
+
+def test_body_morph_value_case_insensitive():
+    assert T.body_morph_value("Female") == T.body_morph_value("female")
+
+
+def test_body_morph_value_rejects_unknown_gender():
+    import pytest
+
+    with pytest.raises(ValueError):
+        T.body_morph_value("unisex")
+
+
+def test_every_gender_has_a_morph_value():
+    for g in config.GENDERS:
+        # each declared gender must map to a concrete switch value
+        assert isinstance(T.body_morph_value(g), float)
