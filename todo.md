@@ -60,8 +60,17 @@ Run tests: `cd tests && python -m pytest -q`. Dev preview: `PYTHONPATH=scripts p
 - [!] **Verify in Maya 2026:** Setup tab — set a Local folder, confirm it writes `path.txt`, persists across relaunch, and its assets appear in the grid; `QFileDialog` folder picker works parented to Maya. *(Needs Maya.)*
 - [x] **Local + Remote locations + Sync (2026-06-09):** Setup tab now sets **two** folders — `local` (the only folder scanned/worked from) and `remote` (shared master, never scanned). `path.txt` is now a keyed store (`local = …` / `remote = …`; legacy bare-line files still read, first folder → local). New pure `core/sync.py` `sync_remote_to_local(remote, local)`: one-way, additive (copies new + size/mtime-changed files, `copy2` preserves mtime so re-syncs skip unchanged), **never deletes**, won't clobber a locally-newer file; returns `SyncResult` (added/updated/skipped/errors + `.summary()`). `core/settings.py` rewritten to `Locations`/`read_locations`/`write_locations`/`set_local`/`set_remote`; `effective_library_roots()` → `[local]` else defaults (remote excluded). Setup tab: Local/Remote rows (Browse/Clear) + **Sync from remote ↓** button (wait cursor → summary → auto-refresh). Docs: User Guide §3 + `path.txt.example` updated. Tests: `test_settings.py` rewritten + new `test_sync.py` (9) — **105 headless tests passing.**
 - [!] **Verify in Maya 2026:** Setup tab — set Local + Remote, press Sync; confirm new/changed assets land in Local, local-only assets survive, summary is accurate, grid refreshes; check sync of a real network/UNC remote. *(Needs Maya + a real remote share.)*
-- [ ] (deferred) Run Sync on a worker thread so a large first pull over a slow network doesn't block Maya's UI; show progress. Synchronous wait-cursor is fine for now.
-- [ ] (deferred) Scan cache for large libraries — premature now; revisit if scans get slow.
+- [x] **Threaded Sync + progress (2026-06-19):** the *Sync from remote* button now runs the pull on a
+  worker `QThread` (`ui/window.py::_SyncWorker`) so a large first pull over a slow network share no longer
+  freezes Maya's UI. Pure `core/sync.sync_remote_to_local` gained an optional `progress` callback emitting
+  `SyncProgress(phase=scanning|copying|done, done, total, current)` — headless-tested (`test_sync.py` +3).
+  The Setup tab shows a `QProgressBar` (indeterminate during the remote walk, determinate `done/total` during
+  the copy), disables the button while running, and re-enables + surfaces the summary on the main thread when
+  finished. Worker throttles per-file `copying` updates to ~1/percent so a many-file library doesn't flood the
+  event loop. Replaces the old synchronous wait-cursor. **169 headless tests passing.** *(In-Maya: confirm the
+  bar animates and the UI stays responsive during a real network sync.)*
+- [ ] (deferred) Scan cache for large libraries — still premature; revisit if scans get slow. A stale cache
+  would risk hiding freshly-synced assets, so not worth it without a real perf problem.
 - [!] **Verify in Maya 2026:** confirm `window.show()` parents/launches cleanly and `cmds`-free core imports under Maya's Python. *(Needs Maya.)*
 
 ---

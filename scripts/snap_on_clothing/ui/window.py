@@ -57,6 +57,44 @@ def _maya_main_window() -> QtWidgets.QWidget | None:
     return wrapInstance(int(ptr), QtWidgets.QWidget)
 
 
+class _SyncWorker(QtCore.QObject):
+    """Runs :func:`sync.sync_remote_to_local` off the UI thread.
+
+    Lives on a worker ``QThread`` so a large first pull over a slow network share
+    doesn't freeze Maya. Progress arrives on the pure sync's callback (worker
+    thread) and is re-emitted as a queued Qt signal, so the slots run on the main
+    thread. Per-file ``copying`` updates are throttled to ~one per percent so a
+    library with thousands of files doesn't flood the event loop.
+    """
+
+    progressed = QtCore.Signal(object)   # core.sync.SyncProgress
+    finished = QtCore.Signal(object)     # core.sync.SyncResult
+
+    def __init__(self, remote, local):
+        super().__init__()
+        self._remote = remote
+        self._local = local
+        self._last_emitted = -1
+
+    def _on_progress(self, p) -> None:
+        if p.phase == "copying" and p.total > 0:
+            step = max(1, p.total // 100)
+            if p.done != p.total and p.done - self._last_emitted < step:
+                return  # throttle mid-run; always let the final file through
+            self._last_emitted = p.done
+        self.progressed.emit(p)
+
+    def run(self) -> None:
+        try:
+            result = _sync.sync_remote_to_local(
+                self._remote, self._local, progress=self._on_progress)
+        except Exception as exc:  # never let the worker die silently
+            result = _sync.SyncResult()
+            result.ok = False
+            result.errors.append(str(exc))
+        self.finished.emit(result)
+
+
 class ClothingBrowser(QtWidgets.QMainWindow):
     """Read-only library browser: grid of assets + detail panel."""
 
@@ -211,6 +249,14 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         sync_row.addWidget(self._sync_status, 1)
         v.addLayout(sync_row)
 
+        self._sync_progress = QtWidgets.QProgressBar()
+        self._sync_progress.setTextVisible(True)
+        self._sync_progress.hide()  # shown only while a sync runs
+        v.addWidget(self._sync_progress)
+        # Worker thread handles for an in-flight sync (None when idle).
+        self._sync_thread: QtCore.QThread | None = None
+        self._sync_worker: _SyncWorker | None = None
+
         v.addStretch(1)
         note = QtWidgets.QLabel(
             "Sync copies new and changed assets from the remote into the local "
@@ -244,7 +290,10 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         loc = _settings.read_locations()
         self._set_field_path(self._local_field, loc.local)
         self._set_field_path(self._remote_field, loc.remote)
-        self._sync_btn.setEnabled(loc.local is not None and loc.remote is not None)
+        # Stay disabled while a sync is in flight (re-enabled in _on_sync_finished).
+        syncing = self._sync_thread is not None
+        self._sync_btn.setEnabled(
+            not syncing and loc.local is not None and loc.remote is not None)
 
     def _set_field_path(self, field: QtWidgets.QLabel, path: Path | None) -> None:
         if path is None:
@@ -281,16 +330,52 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._reload_setup_fields()  # remote isn't scanned — no library refresh needed
 
     def _sync_now(self) -> None:
+        if self._sync_thread is not None:
+            return  # a sync is already running
         loc = _settings.read_locations()
         if loc.local is None or loc.remote is None:
             self._sync_status.setText("Set both a local and a remote folder first.")
             return
-        self._sync_status.setText("Syncing…")
-        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-        try:
-            result = _sync.sync_remote_to_local(loc.remote, loc.local)
-        finally:
-            QtWidgets.QApplication.restoreOverrideCursor()
+
+        self._sync_btn.setEnabled(False)
+        self._sync_status.setText("Scanning remote…")
+        self._sync_status.setStyleSheet("color: gray;")
+        self._sync_progress.setRange(0, 0)  # indeterminate until the scan finishes
+        self._sync_progress.setFormat("")
+        self._sync_progress.show()
+
+        self._sync_thread = QtCore.QThread(self)
+        self._sync_worker = _SyncWorker(loc.remote, loc.local)
+        self._sync_worker.moveToThread(self._sync_thread)
+        self._sync_thread.started.connect(self._sync_worker.run)
+        self._sync_worker.progressed.connect(self._on_sync_progress)
+        self._sync_worker.finished.connect(self._on_sync_finished)
+        self._sync_thread.start()
+
+    def _on_sync_progress(self, progress) -> None:
+        if progress.phase == "scanning":
+            self._sync_progress.setRange(0, 0)  # busy/indeterminate
+            self._sync_status.setText("Scanning remote…")
+        elif progress.phase == "copying" and progress.total > 0:
+            self._sync_progress.setRange(0, progress.total)
+            self._sync_progress.setValue(progress.done)
+            self._sync_progress.setFormat(f"%v / %m  (%p%)")
+            self._sync_status.setText(f"Copying {progress.done} of {progress.total}…")
+
+    def _on_sync_finished(self, result) -> None:
+        thread = self._sync_thread
+        if thread is not None:
+            thread.quit()
+            thread.wait()
+        if self._sync_worker is not None:
+            self._sync_worker.deleteLater()
+        if thread is not None:
+            thread.deleteLater()
+        self._sync_thread = None
+        self._sync_worker = None
+
+        self._sync_progress.hide()
+        self._sync_btn.setEnabled(True)
         self._sync_status.setText(result.summary())
         self._sync_status.setStyleSheet("color: #c0392b;" if not result.ok or result.errors
                                         else "color: gray;")

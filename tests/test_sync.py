@@ -108,3 +108,43 @@ def test_summary_counts(tmp_path):
 
     assert len(result.added) == 1 and len(result.updated) == 1 and result.skipped == 1
     assert "1 added" in result.summary() and "1 updated" in result.summary()
+
+
+def test_progress_reports_scan_then_each_file_then_done(tmp_path):
+    remote, local = tmp_path / "remote", tmp_path / "local"
+    _write(remote / "a.ma", "a")
+    _write(remote / "b.ma", "b")
+    _write(remote / "c.ma", "c")
+    local.mkdir()
+
+    events = []
+    result = sync.sync_remote_to_local(remote, local, progress=events.append)
+
+    assert result.ok
+    assert events[0].phase == "scanning"
+    assert events[-1].phase == "done"
+    copying = [e for e in events if e.phase == "copying"]
+    assert len(copying) == 3
+    # total is known once scanning is over; done counts up to total
+    assert all(e.total == 3 for e in copying)
+    assert [e.done for e in copying] == [1, 2, 3]
+    assert {str(e.current) for e in copying} == {"a.ma", "b.ma", "c.ma"}
+    assert events[-1].done == 3 and events[-1].total == 3
+
+
+def test_progress_emits_done_even_on_error_exit(tmp_path):
+    # A missing remote fails before any scan, but progress still terminates.
+    events = []
+    result = sync.sync_remote_to_local(tmp_path / "nope", tmp_path / "local",
+                                       progress=events.append)
+    assert result.ok is False
+    assert events and events[-1].phase == "done"
+
+
+def test_sync_works_without_progress_callback(tmp_path):
+    remote, local = tmp_path / "remote", tmp_path / "local"
+    _write(remote / "a.ma", "a")
+    local.mkdir()
+    # Default (no callback) path must stay identical.
+    result = sync.sync_remote_to_local(remote, local)
+    assert result.ok and len(result.added) == 1
