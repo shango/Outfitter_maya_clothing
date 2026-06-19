@@ -17,8 +17,6 @@ REQUIRED_GROUPS: tuple[str, ...] = ("Mesh_GRP", "Rig_GRP", "Ctrl_GRP")
 INFO_NODE: str = "cloth_info"
 ROOT_JOINT: str = "cloth_root"
 CLOTH_PREFIX: str = "cloth_"
-FIT_CTRL: str = "cloth_fit_ctrl"
-FIT_ATTR_PREFIX: str = "fit_"
 
 # Selection set the authoring tool fills with a garment's recommended skin joints, so the
 # rigger selects it and binds instead of guessing which of the ~89 body joints to skin to.

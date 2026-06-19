@@ -359,23 +359,32 @@ skinning are unchanged. The proper long-term answer to shape variation remains *
 > 2. **Tool unreleased, no complete assets exist yet.** ⇒ no asset migration; `gender` can be a clean
 >    **required** field with zero legacy tolerance — only the dev fixture (`trench_coat_A`) needs tagging.
 
-### Phase A — remove the fit rig (retires M3 + M7)
-- [ ] Delete pure modules: `core/fit_templates.py`, `core/maya_fitrig.py`, `core/controls.py`,
+### Phase A — remove the fit rig (retires M3 + M7)   *(DONE 2026-06-19; 156 headless tests passing)*
+- [x] Delete pure modules: `core/fit_templates.py`, `core/maya_fitrig.py`, `core/controls.py`,
   `core/placement.py`, `core/presets.py`.
-- [ ] Delete UI: `ui/controls_panel.py`; remove its import/wiring from `ui/window.py`.
-- [ ] Delete tests: `tests/test_fit_templates.py`, `test_controls.py`, `test_placement.py`, `test_presets.py`.
-- [ ] `ui/publish_panel.py`: remove the **"Scaffold fit rig"** button + `_scaffold` handler (keep Create-
-  skeleton / Select-skin-joints / Delete-unused / Check-scene / Publish).
-- [ ] `config.py`: remove `FIT_CTRL`, `FIT_ATTR_PREFIX` (grep for residual refs first).
-- [ ] **Audit-then-trim `core/scene.py` + `tests/_fake_scene.py`:** the M3-only gateway methods
-  (`AttrSpec`, `list_keyable_user_attrs`, `attr_spec`, `get_vector`/`set_vector`, etc.) — remove only those
-  with no remaining caller after the deletes above; keep anything attach/publish still use.
-- [ ] `examples/build_example_asset.py`: strip the fit-lattice / `cloth_fit_ctrl` generation (it sourced the
-  recipe from `maya_fitrig.author_fit_rig`, now gone). Builder stays a skinned-asset fixture only.
-- [ ] **Decision:** should `validate_asset_summary` now *warn* on a residual `cloth_fit_ctrl`/lattice in a
-  published garment (legacy assets), or stay silent? (lean: silent — harmless, not worth a false alarm).
-- [ ] Docs: drop the fit-control + Scaffold-fit-rig workflow from `Snap-On Clothing — User Guide.md` and
-  `Clothing Asset Authoring Spec.md` (§8 fit-control convention); note the male/female two-variant model.
+- [x] Delete UI: `ui/controls_panel.py`. (It was never wired into `ui/window.py` — only a stale docstring
+  line, now removed.)
+- [x] Delete tests: `tests/test_fit_templates.py`, `test_controls.py`, `test_placement.py`, `test_presets.py`.
+- [x] `ui/publish_panel.py`: removed the **"Scaffold fit rig"** button + `_scaffold` handler (kept Create-
+  skeleton / Delete-unused / Connect/Disconnect-test-body / Check-scene / Publish). Trimmed stale
+  "before Scaffold fit rig" / "joints and fit rig" tooltips.
+- [x] `config.py`: removed `FIT_CTRL`, `FIT_ATTR_PREFIX` (grep-confirmed no residual refs).
+- [x] **Trimmed `core/scene.py` + `tests/_fake_scene.py`:** removed the M3-only gateway methods
+  (`AttrSpec` dataclass, `list_namespace_nodes`, `list_keyable_user_attrs`, `attr_spec`, `set_attr`,
+  `get_vector`/`set_vector`) — all had zero callers after the deletes. Kept `is_locked` (attach) +
+  `world_matrix`/`set_world_matrix` (attach align). Also dropped the fake's `define_attr`/`_CustomAttr`/
+  `custom`/`vectors` plumbing.
+- [x] `examples/build_example_asset.py`: stripped the fit-lattice / `cloth_fit_ctrl` generation
+  (`_build_fit_control_and_lattice` → `_build_controls`, keeps only the `cloth_coatTail_ctrl` secondary
+  control). Builder stays a skinned-asset fixture only.
+- [x] **Decision RESOLVED — stay silent.** `validate_asset_summary` is unchanged; further, the dead
+  `SceneFacts.has_fit_ctrl` field (set in `maya_publish`, never read by `assemble_preflight`) was removed.
+  The shipped `trench_coat_A.ma` still contains a `cloth_fit_ctrl` (regenerable only in Maya) and stays
+  valid; the `test_example_asset` assertion that required it was dropped.
+- [x] Docs: dropped the fit-control + Scaffold workflow from `Snap-On Clothing — User Guide.md` (§5 is now
+  "Male / female variants") and `Clothing Asset Authoring Spec.md` (§8 rewritten to the two-variant model;
+  intro TL;DR / Ctrl_GRP tree / §15 note / §16 checklist / §17 workflow updated). Noted the male/female
+  model throughout. `__init__.py` docstring de-fit-ed.
 
 ### Phase B — gender as a first-class asset dimension
 - [ ] `config.py`: `GENDERS: tuple[str, ...] = ("male", "female")`.

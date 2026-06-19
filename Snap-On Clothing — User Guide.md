@@ -16,9 +16,9 @@ constraints, utility nodes, matrix nodes, expressions, or driven keys are ever c
 on the body↔clothing link, and **the rig itself is never modified** — so the dressed
 scene exports to Genie (`.ma` / USD / FBX / Alembic) exactly as the bare rig would.
 
-You can attach several garments at once, fit each independently, and detach any of them
-cleanly — detach breaks only the connections the tool made and removes that garment's
-namespace, leaving everything else untouched.
+You can attach several garments at once and detach any of them cleanly — detach breaks
+only the connections the tool made and removes that garment's namespace, leaving
+everything else untouched.
 
 ---
 
@@ -105,19 +105,18 @@ a while — Maya will show a wait cursor until it finishes.
 
 ---
 
-## 5. Fit & placement
+## 5. Male / female variants
 
-After attaching, the fit panel surfaces the garment's authored fit controls as sliders.
-The tool reads each `fit_*` attribute's min / max / default from the asset and only
-**writes values** — the deformers that respond were built into the asset by its author.
+There is **no runtime fit step**. Production uses only two fixed body states — pure
+**male** and pure **female** (`GH_Body_morph` is only ever 0 or 1, no intermediate
+blends). The body morph moves only the body *mesh*, not the joints, so a single garment
+skinned to the shared `cloth_*` skeleton can't follow the male↔female mesh difference on
+its own. The answer is two pre-fit garment meshes: the modeler hand-fits each garment
+once on the male body and once on the female body, and those two `.ma`s are the assets.
 
-- **Fit sliders** (`fit_tightness`, `fit_thickness`, `fit_length`, and any per-region
-  variants like `fit_hem_length`): drag to adjust; **Reset** returns to the authored
-  neutral default.
-- **Placement**: nudge the whole garment's translate / rotate / scale offset to seat it.
-- **Presets**: save a fit + placement combination to a JSON sidecar and re-apply it
-  later — presets are stored relative to the garment so they reproduce on a re-attached
-  instance.
+Pick the variant that matches the body you're dressing, then attach it. Attach (the
+`connectAttr` pose link) and detach are identical for both variants — there are no fit
+sliders, placement offsets, or presets to manage.
 
 ---
 
@@ -203,4 +202,4 @@ rather than blocking attach.
 | A folder shows **(missing)** | The drive / server isn't mounted; reconnect it, or set a reachable folder. |
 | **Sync** button is greyed out | Set both a **Local** and a **Remote** folder on Setup (§3). |
 | Sync reports failures | The remote path isn't reachable (server/drive offline) or some files are locked/permission-denied; the summary names the count, and any files it could copy still came down. |
-| Fit sliders are empty | The asset exposes no `fit_*` attrs on a `*_ctrl` node — fit must be authored into the asset (see the Authoring Spec §8). |
+| Garment fits the wrong body | Each garment ships as a **male** and a **female** variant pre-fit to that body (§5); attach the variant that matches the body you're dressing. |

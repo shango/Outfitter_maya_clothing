@@ -14,7 +14,6 @@ from pathlib import Path
 import _bootstrap  # noqa: F401
 
 from snap_on_clothing.core import ma_parse
-from snap_on_clothing.core.scene import AttrSpec
 
 _TRANSFORM_TYPES = {"joint", "transform"}
 _DEFAULT_ATTRS = {"translate", "rotate", "scale"}
@@ -25,23 +24,11 @@ def _short(addr: str) -> str:
 
 
 @dataclass
-class _CustomAttr:
-    type: str = "double"
-    keyable: bool = True
-    min: float | None = None
-    max: float | None = None
-    default: float = 0.0
-    value: float = 0.0
-
-
-@dataclass
 class _Node:
     node_type: str
     parent: str | None = None
     attrs: set[str] = field(default_factory=set)
     locked: set[str] = field(default_factory=set)
-    custom: dict[str, "_CustomAttr"] = field(default_factory=dict)
-    vectors: dict[str, tuple[float, float, float]] = field(default_factory=dict)
 
 
 class FakeScene:
@@ -88,18 +75,6 @@ class FakeScene:
     def lock(self, node: str, attr: str) -> None:
         self.nodes[node].locked.add(attr)
 
-    def define_attr(
-        self, node: str, attr: str, *,
-        type: str = "double", keyable: bool = True,
-        min: float | None = None, max: float | None = None,
-        default: float = 0.0, value: float | None = None,
-    ) -> None:
-        """Author a user-defined attr on a node (models an imported fit attr)."""
-        self.nodes[node].custom[attr] = _CustomAttr(
-            type=type, keyable=keyable, min=min, max=max,
-            default=default, value=default if value is None else value,
-        )
-
     # --- SceneGateway ---------------------------------------------------------
     def exists(self, name: str) -> bool:
         return name in self.nodes
@@ -129,8 +104,7 @@ class FakeScene:
     def attr_exists(self, node: str, attr: str) -> bool:
         if node not in self.nodes:
             return False
-        n = self.nodes[node]
-        return attr in n.attrs or attr in n.custom
+        return attr in self.nodes[node].attrs
 
     def is_locked(self, node: str, attr: str) -> bool:
         return attr in self.nodes[node].locked
@@ -199,34 +173,3 @@ class FakeScene:
             if addr_ns == top_ns:
                 return addr
         return None
-
-    # --- control / fit-attr discovery + placement (M3) ------------------------
-    def list_namespace_nodes(self, namespace: str) -> list[str]:
-        prefix = f"{namespace}:"
-        return [a for a in self.nodes if a.startswith(prefix)]
-
-    def list_keyable_user_attrs(self, node: str) -> list[str]:
-        if node not in self.nodes:
-            return []
-        return [a for a, c in self.nodes[node].custom.items() if c.keyable]
-
-    def attr_spec(self, node: str, attr: str) -> AttrSpec:
-        c = self.nodes[node].custom.get(attr)
-        if c is None:
-            # built-in scalar fallback (e.g. a translateX-style component)
-            return AttrSpec(attr, "double", True, None, None, 0.0, 0.0)
-        return AttrSpec(attr, c.type, c.keyable, c.min, c.max, c.default, c.value)
-
-    def set_attr(self, node: str, attr: str, value: float) -> None:
-        c = self.nodes[node].custom.get(attr)
-        if c is None:
-            self.nodes[node].custom[attr] = _CustomAttr(value=value)
-        else:
-            c.value = value
-
-    def get_vector(self, node: str, attr: str) -> tuple[float, float, float]:
-        default = (1.0, 1.0, 1.0) if attr == "scale" else (0.0, 0.0, 0.0)
-        return self.nodes[node].vectors.get(attr, default)
-
-    def set_vector(self, node: str, attr: str, value: tuple[float, float, float]) -> None:
-        self.nodes[node].vectors[attr] = (float(value[0]), float(value[1]), float(value[2]))

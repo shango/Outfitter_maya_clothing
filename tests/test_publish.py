@@ -112,7 +112,6 @@ def _clean_facts(**over):
         has_skincluster=True,
         skin_influences=("cloth_spine_01", "cloth_head"),
         cloth_joint_names=("cloth_root", "cloth_spine_01", "cloth_head"),
-        has_fit_ctrl=True,
     )
     base.update(over)
     return P.SceneFacts(**base)

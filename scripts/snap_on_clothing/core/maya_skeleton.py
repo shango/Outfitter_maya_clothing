@@ -3,8 +3,8 @@
 Replays the persisted skeleton (:mod:`core.skeleton`) into the open scene: a framed
 ``Rig_GRP`` plus the full body-derived ``cloth_*`` joint hierarchy, at the rig's real
 rest transforms. The rigger then deletes the joints their garment won't skin to (a hat
-keeps ``cloth_head``; a coat keeps the spine/arms), skins the mesh, and scaffolds the
-fit rig. This removes the import-rig / duplicate / rename / prune chore entirely.
+keeps ``cloth_head``; a coat keeps the spine/arms) and skins the mesh. This removes the
+import-rig / duplicate / rename / prune chore entirely.
 
 Lazy ``maya.cmds``; runs only inside Maya. Headless suite ``py_compile``s this and
 unit-tests the pure skeleton data it replays, consistent with the rest of the Maya
@@ -51,8 +51,8 @@ class SkeletonBuildResult:
     def summary(self) -> str:
         return (
             f"Built the cloth_* skeleton: {self.joint_count} joints under "
-            f"{self.root_group}. Delete the joints your garment won't skin to, then "
-            "skin the mesh and Scaffold fit rig.")
+            f"{self.root_group}. Bind your garment to the highlighted skin joints, "
+            "then test it on the body before publishing.")
 
 
 @dataclass
@@ -71,7 +71,7 @@ class PruneResult:
             msg += (
                 f" Kept {kept} unweighted interior joint{'' if kept == 1 else 's'} "
                 "(they have skinned children — the chain must mirror the body).")
-        return msg + " Scaffold the fit rig next."
+        return msg
 
 
 def _short(path: str) -> str:

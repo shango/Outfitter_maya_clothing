@@ -1,8 +1,8 @@
 """Snap-On Clothing Rig System — Maya 2026 tool package.
 
 Browse local clothing assets, snap a chosen asset onto the animated GenHuman rig
-via direct ``connectAttr`` only, surface its fit/placement controls, and detach
-cleanly. See ``prd.md`` and ``Clothing Asset Authoring Spec.md`` at the repo root.
+via direct ``connectAttr`` only, and detach cleanly. See ``prd.md`` and
+``Clothing Asset Authoring Spec.md`` at the repo root.
 
 Layout:
     config            library paths, connect-attr set, version table

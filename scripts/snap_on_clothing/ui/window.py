@@ -3,8 +3,7 @@
 The window scans the configured library roots and shows a filterable thumbnail
 grid with a read-only detail panel (M1), plus an action bar that drives the real
 ``AttachEngine`` to attach the selected asset onto the GenHuman rig and detach a
-live instance (M2). Fit-control sliders (M3) live in ``controls_panel`` and are
-not wired here yet.
+live instance (M2).
 
 Runs both inside Maya 2026 (parented to the main window, dockable-ready) and
 standalone for dev preview (``python -m`` with PySide6 only — no Maya needed).

@@ -11,9 +11,10 @@ differences are called out explicitly below and were confirmed against the real 
 > **TL;DR for the rigger:** Build the garment. Duplicate the GenHuman joints you need (with their
 > full parent chain up to a single root), rename each to `cloth_` + the *exact* body joint name,
 > smooth-bind the garment to those joints. Add any helper joints / control rig / deformers you want
-> for fit and secondary motion — **inside the asset you may use any Maya nodes**. Expose fit controls
-> using the naming convention in §8. Organize into `Mesh_GRP / Rig_GRP / Ctrl_GRP`, add a `cloth_info`
-> node, run the checklist in §16, export clean `.ma`. The snap-on tool does the rest.
+> for secondary motion — **inside the asset you may use any Maya nodes**. Deliver each garment as a
+> **male** and a **female** variant, pre-fit to each body (see §8 — there is no runtime fit rig).
+> Organize into `Mesh_GRP / Rig_GRP / Ctrl_GRP`, add a `cloth_info` node, run the checklist in §16,
+> export clean `.ma`. The snap-on tool does the rest.
 
 ---
 
@@ -70,7 +71,7 @@ info node:
 cloth_<assetName>                 (top transform, at origin, all transforms zeroed/frozen)
 ├── Mesh_GRP                      garment geometry (skinned meshes)
 ├── Rig_GRP                       all joints (connection joints + helper joints) under cloth_root
-├── Ctrl_GRP                      control rig (controls, fit control, control-rig deformer drivers)
+├── Ctrl_GRP                      control rig (secondary-motion controls + deformer drivers)
 └── cloth_info                    version / metadata node (see §12)
 ```
 
@@ -165,46 +166,24 @@ Constraints:
 
 ---
 
-## 8. Fit-control convention (NEW — build your fit controls to this)
+## 8. Male / female variants (NO runtime fit rig)
 
-Fit (tightness, thickness, length, per-region adjustment) is delivered by **deformers you author into
-the asset, driven by attributes on a fit control**. The snap-on tool discovers these attributes and
-renders them as sliders in the UI — but the tool only *sets the values*; you build the rig that
-responds to them.
+**There is no runtime fit-control convention.** Production uses only two fixed body states — pure
+**male** and pure **female** (`GH_Body_morph` is only ever 0 or 1; no intermediate blends, no other
+morph axes). The body morph moves only the body *mesh*, not the joints, so the `cloth_*` skeleton rest
+pose is identical for both genders — but a single garment skinned to that one skeleton can't follow the
+male↔female *mesh* difference on its own. So fit is solved at authoring time, not runtime:
 
-### Where
-- Create one control transform named **`cloth_fit_ctrl`** under `Ctrl_GRP`. (Per-region controls are
-  allowed too — see below.)
+- **Deliver each garment as two assets — a `male` variant and a `female` variant.** Hand-fit (model) the
+  garment once on the male body and once on the female body; each is its own `.ma` + sidecar.
+- Both variants skin to the **same shared `cloth_*` skeleton** (§5/§6) — no per-gender skeleton.
+- Set the **required `gender` field** (`male` / `female`) in `cloth_info` / the sidecar so the browser
+  files the asset under the right variant.
 
-### Attributes
-Add **keyable, user-defined float** attributes using the `fit_` prefix. Set sensible **min/max** on
-each (the tool reads the attr's min/max for the slider range) and a **neutral default** so a freshly
-attached garment looks exactly as you authored it.
-
-| Attribute | Range | Default (neutral) | Should drive |
-|---|---|---|---|
-| `fit_tightness` | -1.0 … 1.0 | 0.0 | overall garment toward(+) / away(−) from body (normal-based `push` / lattice — **not** `shrinkWrap`-to-body, see §7) |
-| `fit_thickness` | 0.0 … 1.0 | 0.0 | outward push / material thickness |
-| `fit_length` | -1.0 … 1.0 | 0.0 | hem / sleeve length (lattice or cluster scale along length) |
-
-### Per-region variants (optional, recommended for complex garments)
-Same parameters, scoped to a region: **`fit_<region>_<param>`**, region in lowerCamel.
-
-```
-fit_waist_tightness     fit_chest_tightness     fit_hips_tightness
-fit_sleeveL_length      fit_sleeveR_length      fit_hem_length
-fit_collar_tightness    fit_cuffL_tightness     fit_cuffR_tightness
-```
-
-### Rules
-- Attributes must be **keyable** and **custom** (user-defined). The tool surfaces keyable custom float
-  attrs found on `*_ctrl` nodes in `Ctrl_GRP`, preferring `fit_`-prefixed ones on `cloth_fit_ctrl`.
-- **Default = neutral** (no visible change). Moving an attr off default applies your authored fit
-  deformation.
-- Each attr drives a deformer **inside the asset** via direct connection / SDK / utility nodes (§7).
-  The tool never builds this — it only writes the attr value.
-- If an asset exposes no `fit_*` attrs, the tool falls back to surfacing whatever keyable custom attrs
-  exist on your `*_ctrl` nodes — but please build to the convention above.
+There is **no `cloth_fit_ctrl`, no `fit_*` attribute convention, and no fit lattice/SDK to author.** The
+earlier runtime fit layer was retired — pre-fitting the two meshes is what actually compensates for the
+body difference. (Self-contained deformers are still permitted inside the asset per §7; they just aren't
+a tool-driven fit feature.)
 
 ### Secondary-motion / animator controls
 Coat-tail, skirt, strap controls are separate and follow the existing convention:
@@ -288,16 +267,16 @@ These won't block you starting, but flag if they affect your build:
    `jointOrient` and `visibility` are **not**. (So: don't rely on joint visibility for anything, and keep
    joints' jointOrient as-duplicated.) **Scale is connected on purpose** — animators scale body joints to
    seat the character into a matchmove, so your `cloth_*` joints will receive non-uniform scale.
-   **Build and test for it:** your skinning and fit deformers must deform cleanly when connection joints
-   are scaled non-uniformly (scrub a body-joint scale while attached and confirm no collapse/shearing).
+   **Build and test for it:** your skinning must deform cleanly when connection joints are scaled
+   non-uniformly (scrub a body-joint scale while attached and confirm no collapse/shearing).
 2. **Genie-required node names** — the export team may require specific node names present; TBD.
 3. **GenHuman version-id string** and **clothing version-compat method** — set `genHumanCompat="v03"`
    for now (§12).
 4. **Import vs reference** of assets into the shot — default is **import**; either way your file must be
    self-contained and namespace-free.
 
-The fit-control convention (§8) is **proposed** and pending sign-off, but is stable enough to build to —
-if it changes, attr **names** might shift; the rig structure won't.
+The male/female two-variant model (§8) replaces the earlier runtime fit-control convention — there is no
+`cloth_fit_ctrl` / `fit_*` rig to author; deliver a pre-fit male variant and a pre-fit female variant.
 
 ---
 
@@ -323,9 +302,9 @@ Before exporting, confirm:
 - [ ] No blendshapes; no simulation.
 - [ ] Deformers survive `.ma` export.
 
-**Controls / fit**
-- [ ] `cloth_fit_ctrl` present with `fit_*` keyable float attrs, min/max set, neutral defaults.
-- [ ] Each fit attr drives an authored deformer (verify by scrubbing each attr).
+**Variants & controls**
+- [ ] Delivered as a **male** variant and a **female** variant, each pre-fit to that body (§8).
+- [ ] `gender` set (`male` / `female`) in `cloth_info` / sidecar.
 - [ ] Secondary controls named `cloth_<name>_ctrl`, under `Ctrl_GRP`.
 
 **Geometry & materials**
@@ -357,9 +336,10 @@ button sequence, not a manual one.
    **Disconnect test body** so the joints go static and the asset is publish-safe.
 6. **Delete unused joints** — prune the `cloth_*` joints the garment doesn't skin to
    (safe leaf-only; unweighted interior joints with skinned children are kept).
-7. Build control rig + fit deformers; expose `cloth_fit_ctrl` `fit_*` attrs (§8); put
-   controls in `Ctrl_GRP`.
-8. Add and populate `cloth_info`.
+7. Add any secondary-motion controls (`cloth_<name>_ctrl`) under `Ctrl_GRP` (optional).
+   Repeat the build on the other body so each garment ships as a male **and** female
+   variant, pre-fit to each (§8) — there is no runtime fit rig.
+8. Add and populate `cloth_info` (including the `gender` field).
 9. Clean the scene; freeze transforms; delete history. Confirm the test body is
    disconnected (Check scene warns if any `cloth_*` joint is still driven).
 10. Run the §16 checklist.

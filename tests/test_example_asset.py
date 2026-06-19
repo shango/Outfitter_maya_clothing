@@ -45,8 +45,6 @@ def test_example_structure_contract():
     # required groups + info + root joint
     for node in (*config.REQUIRED_GROUPS, config.INFO_NODE, config.ROOT_JOINT):
         assert summary.has_node(node), f"missing required node: {node}"
-    # a fit control with fit_ attrs
-    assert summary.has_node(config.FIT_CTRL)
     # connection joints present, correctly named, no _jnt suffix
     joints = summary.cloth_joints()
     assert config.ROOT_JOINT in joints

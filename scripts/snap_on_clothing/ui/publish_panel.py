@@ -78,7 +78,7 @@ class PublishPanel(QtWidgets.QWidget):
         self._name.setPlaceholderText("e.g. trench_coat_A")
         self._type = QtWidgets.QComboBox()
         self._type.addItems(list(config.ASSET_TYPES))
-        # Start unset on purpose: the type drives scaffold/skin-set/publish, so make the
+        # Start unset on purpose: the type drives skin-set/publish, so make the
         # rigger choose it rather than silently defaulting to the first type.
         self._type.setCurrentIndex(-1)
         self._type.setPlaceholderText("— set clothing type —")
@@ -177,19 +177,9 @@ class PublishPanel(QtWidgets.QWidget):
             "After skinning: delete the cloth_* joints your garment doesn't skin to. "
             "Only safe leaf joints are removed — unweighted joints that still have "
             "skinned children are kept, because the cloth hierarchy must mirror the "
-            "body. Run after skinning, before Scaffold fit rig.")
+            "body. Run after skinning the garment.")
         self._prune_btn.clicked.connect(self._prune_joints)
         right.addWidget(self._prune_btn)
-
-        # authoring helper: build the fit rig (lattice + cloth_fit_ctrl + SDKs) so the
-        # rigger only has to tune the keyed extremes, not wire deformers by hand.
-        self._scaffold_btn = QtWidgets.QPushButton("Scaffold fit rig")
-        self._scaffold_btn.setToolTip(
-            "Build cloth_fit_ctrl + a frontOfChain fit lattice + default fit SDKs for "
-            "the selected Type. Run after modelling + skinning the garment, then tune "
-            "the keyed extremes (and point-key any region attrs).")
-        self._scaffold_btn.clicked.connect(self._scaffold)
-        right.addWidget(self._scaffold_btn)
 
         heading = QtWidgets.QLabel("THUMBNAIL")  # QSS can't upper-case; do it here
         heading.setObjectName("sectionHeading")
@@ -349,7 +339,7 @@ class PublishPanel(QtWidgets.QWidget):
         QtWidgets.QMessageBox.warning(
             self, "Set clothing type",
             "Choose the garment Type in the form before this step — it decides which "
-            "joints and fit rig get built.")
+            "skin joints get highlighted.")
         return None
 
     # --- actions --------------------------------------------------------------
@@ -511,29 +501,6 @@ class PublishPanel(QtWidgets.QWidget):
             QtWidgets.QMessageBox.critical(self, "Delete unused joints failed", str(exc))
             return
         self._report(result.summary(), "ok")
-
-    def _scaffold(self) -> None:
-        if not self._require_maya():
-            return
-        asset_type = self._require_type()
-        if asset_type is None:
-            return
-        from ..core import maya_fitrig
-        self._log(f"Scaffold fit rig ({asset_type})…", "step")
-        try:
-            with _wait_cursor():
-                result = maya_fitrig.scaffold_fit_rig(asset_type)
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
-            self._report(f"Scaffold fit rig failed: {exc}", "error")
-            QtWidgets.QMessageBox.critical(self, "Scaffold fit rig failed", str(exc))
-            return
-        self._report(result.summary(), "ok")
-        for warning in result.warnings:
-            self._log(warning, "warn")
-        if result.warnings:
-            QtWidgets.QMessageBox.information(
-                self, "Fit rig scaffolded",
-                result.summary() + "\n\n" + "\n".join(result.warnings))
 
     def _capture(self) -> None:
         if not self._require_maya():

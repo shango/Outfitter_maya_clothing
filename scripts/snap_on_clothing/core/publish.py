@@ -147,7 +147,6 @@ class SceneFacts:
     has_skincluster: bool
     skin_influences: tuple[str, ...]
     cloth_joint_names: tuple[str, ...]
-    has_fit_ctrl: bool
     driven_cloth_joints: tuple[str, ...] = ()
 
 

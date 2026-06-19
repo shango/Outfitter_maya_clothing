@@ -13,26 +13,7 @@ Node names may be namespaced (``coat:cloth_spine_03``) and/or full DAG paths
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
-
-
-@dataclass(frozen=True)
-class AttrSpec:
-    """Snapshot of one attribute's UI-relevant metadata (M3 fit controls).
-
-    ``min``/``max``/``default`` are ``None`` when the attribute declares no such
-    bound (the tool falls back to convention ranges). ``value`` is the current
-    value, ``None`` if it could not be read.
-    """
-
-    name: str
-    type: str
-    keyable: bool
-    min: float | None
-    max: float | None
-    default: float | None
-    value: float | None
 
 
 @runtime_checkable
@@ -103,31 +84,6 @@ class SceneGateway(Protocol):
 
     def set_world_matrix(self, node: str, matrix: list[float]) -> None:
         """Set the node's world transform from a flat 16-float matrix."""
-        ...
-
-    # --- control / fit-attr discovery + placement (M3) ------------------------
-    def list_namespace_nodes(self, namespace: str) -> list[str]:
-        """All node names belonging to ``namespace`` (addressable as returned)."""
-        ...
-
-    def list_keyable_user_attrs(self, node: str) -> list[str]:
-        """User-defined keyable attribute names on ``node`` (declaration order)."""
-        ...
-
-    def attr_spec(self, node: str, attr: str) -> AttrSpec:
-        """Type / keyable / min / max / default / current value of one attr."""
-        ...
-
-    def set_attr(self, node: str, attr: str, value: float) -> None:
-        """Set a scalar attribute value."""
-        ...
-
-    def get_vector(self, node: str, attr: str) -> tuple[float, float, float]:
-        """Read a 3-float compound (translate / rotate / scale / pivot)."""
-        ...
-
-    def set_vector(self, node: str, attr: str, value: tuple[float, float, float]) -> None:
-        """Set a 3-float compound."""
         ...
 
 
@@ -242,55 +198,3 @@ class MayaScene:
             if path.rsplit("|", 1)[-1].rsplit(":", 1)[-1] == marker:
                 return path
         return None
-
-    # --- control / fit-attr discovery + placement (M3) ------------------------
-    def list_namespace_nodes(self, namespace: str) -> list[str]:
-        return list(self._cmds.ls(f"{namespace}:*", long=False) or [])
-
-    def list_keyable_user_attrs(self, node: str) -> list[str]:
-        return list(self._cmds.listAttr(node, userDefined=True, keyable=True) or [])
-
-    def attr_spec(self, node: str, attr: str) -> AttrSpec:
-        cmds = self._cmds
-        plug = f"{node}.{attr}"
-        try:
-            atype = str(cmds.getAttr(plug, type=True))
-        except Exception:  # noqa: BLE001 — degrade to empty type
-            atype = ""
-        try:
-            keyable = bool(cmds.getAttr(plug, keyable=True))
-        except Exception:  # noqa: BLE001
-            keyable = False
-        mn = (
-            cmds.attributeQuery(attr, node=node, minimum=True)[0]
-            if cmds.attributeQuery(attr, node=node, minExists=True)
-            else None
-        )
-        mx = (
-            cmds.attributeQuery(attr, node=node, maximum=True)[0]
-            if cmds.attributeQuery(attr, node=node, maxExists=True)
-            else None
-        )
-        try:
-            dv = cmds.attributeQuery(attr, node=node, listDefault=True)
-            default = float(dv[0]) if dv else None
-        except Exception:  # noqa: BLE001
-            default = None
-        try:
-            value: float | None = float(cmds.getAttr(plug))
-        except Exception:  # noqa: BLE001 — non-scalar / unreadable
-            value = None
-        return AttrSpec(attr, atype, keyable,
-                        None if mn is None else float(mn),
-                        None if mx is None else float(mx),
-                        default, value)
-
-    def set_attr(self, node: str, attr: str, value: float) -> None:
-        self._cmds.setAttr(f"{node}.{attr}", value)
-
-    def get_vector(self, node: str, attr: str) -> tuple[float, float, float]:
-        v = self._cmds.getAttr(f"{node}.{attr}")[0]
-        return (float(v[0]), float(v[1]), float(v[2]))
-
-    def set_vector(self, node: str, attr: str, value: tuple[float, float, float]) -> None:
-        self._cmds.setAttr(f"{node}.{attr}", value[0], value[1], value[2], type="double3")

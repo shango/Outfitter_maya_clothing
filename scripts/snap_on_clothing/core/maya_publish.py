@@ -160,7 +160,6 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
         has_skincluster=has_skin,
         skin_influences=tuple(influences),
         cloth_joint_names=cloth_joint_names,
-        has_fit_ctrl=config.FIT_CTRL in shorts,
         driven_cloth_joints=driven_cloth_joints,
     )
 

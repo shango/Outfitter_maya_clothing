@@ -5,7 +5,7 @@ install package, like `tests/`). CI only `py_compile`s them.
 
 | Script | What it does |
 |---|---|
-| `build_example_asset.py` | Builds the fully-skinned production version of `assets/trench_coat_A` — real geometry, smooth bind, a `cloth_fit_ctrl`-driven fit lattice, `cloth_info` — and exports a clean `.ma`. |
+| `build_example_asset.py` | Builds the fully-skinned production version of `assets/trench_coat_A` — real geometry, smooth bind, `cloth_info` — and exports a clean `.ma`. |
 | `build_test_scene.py` | Imports the GenHuman rig and attaches compliant assets through the real tool core (connectAttr-only, transactional), then runs the Genie export-readiness audit. |
 
 ## Use
