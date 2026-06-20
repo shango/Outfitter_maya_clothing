@@ -530,6 +530,8 @@ ships **one** GenHuman and flips the switch to match the garment's chosen Gender
   REMAINING (need connection/attr graph that `ma_parse` doesn't capture — a future in-Maya check):
   **unused materials**, **leftover construction history on meshes**, **frozen-scale (=1)** verification,
   and **valid-UVs**. These are best gathered live in `maya_publish` (deferred until needed).
-- [ ] Body-morph propagation to attached clothing.
+- [ ] Body-morph propagation to attached clothing. **DEFERRED to a later phase (reaffirmed
+  2026-06-20).** Staying with two pure variants (male + female); an in-between body shape is a
+  **manual hand-adjustment by the artist**, not tool interpolation. Don't start without a fresh go-ahead.
 - [ ] Migrate GenHuman materials to generic shaders (per Addendum material rule).
 - [ ] Deferred facial-module naming standardization pass (Tier 3).
