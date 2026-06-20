@@ -132,6 +132,34 @@ def validate_asset_summary(summary: MaSummary, metadata: AssetMetadata | None) -
             report.error("forbidden_node_type", f"forbidden node type '{node_type}'", node=node,
                          fix=f"remove {node_type} nodes; blendshapes/sim are not supported")
 
+    # --- unknown / lost-plugin nodes (Authoring Spec §10 / §13) ---
+    for node in summary.nodes_of_types(config.UNKNOWN_NODE_TYPES):
+        report.error("unknown_node", f"unknown (lost-plugin) node '{node}'", node=node,
+                     fix="delete unknown nodes — Edit ▸ Delete All by Type ▸ Unknown Nodes")
+
+    # --- timeline animation curves (Authoring Spec §10 / §13: assets ship static) ---
+    # Time-input curves only; set-driven keys (animCurveU*) are an allowed rig mechanism.
+    for node in summary.nodes_of_types(config.TIMELINE_ANIM_CURVE_TYPES):
+        report.error("anim_curve", f"timeline animation curve '{node}' in asset", node=node,
+                     fix="delete all timeline keyframes; a delivered asset must be static "
+                         "(set-driven keys are fine — only time-based animation is banned)")
+
+    # --- display layers other than the default (Authoring Spec §10 / §13) ---
+    for node in summary.nodes_of_type(config.DISPLAY_LAYER_TYPE):
+        if node in config.DEFAULT_DISPLAY_LAYERS:
+            continue
+        report.error("display_layer", f"display layer '{node}' in asset", node=node,
+                     fix="remove all display layers before export")
+
+    # --- render-engine-specific materials (Authoring Spec §11: generic shaders only) ---
+    for node in summary.nodes_of_types(config.RENDERER_SHADER_TYPES):
+        report.error(
+            "renderer_shader",
+            f"render-engine shader '{node}' (type '{summary.node_types.get(node)}')",
+            node=node,
+            fix="use a generic shader (lambert / standardSurface); render-engine-specific "
+                "materials aren't allowed and don't survive a clean .ma export")
+
     # --- duplicate short names (FR-2) ---
     for name, count in summary.duplicate_names.items():
         report.error("duplicate_name", f"node name '{name}' declared {count} times", node=name,

@@ -123,6 +123,37 @@ def _skin_influences(cmds, meshes: list[str]) -> tuple[list[str], bool]:
     return influences, found
 
 
+def _cleanliness_facts(cmds) -> tuple[tuple[str, ...], ...]:
+    """Scan the scene for the §10/§13/§11 hard-"no" node types.
+
+    Returns ``(unknown, anim_curves, display_layers, renderer_materials)`` as tuples
+    of short names. ``defaultLayer`` is excluded — every scene has it. ``ls(type=…)``
+    tolerates a missing renderer type, so the renderer denylist is queried as a batch.
+    """
+    def _ls_types(types) -> tuple[str, ...]:
+        """Short names of nodes of any of ``types``, tolerating unregistered types.
+
+        A renderer-specific type isn't registered unless its plugin is loaded, and
+        ``cmds.ls(type=…)`` raises on an unknown type — so query type-by-type and skip
+        the ones Maya doesn't know in this session.
+        """
+        found: set[str] = set()
+        for t in types:
+            try:
+                found.update(_short(n) for n in (cmds.ls(type=t, long=True) or []))
+            except (RuntimeError, ValueError):
+                continue  # type not registered in this session — nothing of it can exist
+        return tuple(sorted(found))
+
+    unknown = _ls_types(config.UNKNOWN_NODE_TYPES)
+    anim_curves = _ls_types(config.TIMELINE_ANIM_CURVE_TYPES)  # time-input keys only
+    display_layers = tuple(
+        n for n in _ls_types((config.DISPLAY_LAYER_TYPE,))
+        if n not in config.DEFAULT_DISPLAY_LAYERS)
+    renderer_mats = _ls_types(config.RENDERER_SHADER_TYPES)
+    return unknown, anim_curves, display_layers, renderer_mats
+
+
 def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
     """Collect the facts the pure preflight needs from the open scene.
 
@@ -151,6 +182,8 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
     meshes = find_garment_meshes(mesh_group)
     influences, has_skin = _skin_influences(cmds, meshes)
 
+    unknown, anim_curves, display_layers, renderer_mats = _cleanliness_facts(cmds)
+
     return _publish.SceneFacts(
         has_rig=scene_has_rig(),
         namespaces=tuple(namespaces),
@@ -161,6 +194,10 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
         skin_influences=tuple(influences),
         cloth_joint_names=cloth_joint_names,
         driven_cloth_joints=driven_cloth_joints,
+        unknown_nodes=unknown,
+        anim_curves=anim_curves,
+        display_layers=display_layers,
+        renderer_materials=renderer_mats,
     )
 
 

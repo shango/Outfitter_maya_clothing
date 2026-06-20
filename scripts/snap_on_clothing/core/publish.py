@@ -150,6 +150,11 @@ class SceneFacts:
     skin_influences: tuple[str, ...]
     cloth_joint_names: tuple[str, ...]
     driven_cloth_joints: tuple[str, ...] = ()
+    # §10/§13/§11 cleanliness facts (short node names; empty = clean):
+    unknown_nodes: tuple[str, ...] = ()
+    anim_curves: tuple[str, ...] = ()
+    display_layers: tuple[str, ...] = ()
+    renderer_materials: tuple[str, ...] = ()
 
 
 def root_namespaces(namespaces, ignore=("UI", "shared")) -> list[str]:
@@ -175,6 +180,13 @@ def split_influences(influences, cloth_prefix: str) -> tuple[list[str], list[str
         short = inf.rsplit("|", 1)[-1].rsplit(":", 1)[-1]
         (cloth if short.startswith(cloth_prefix) else other).append(short)
     return cloth, other
+
+
+def _sample(names, limit: int = 6) -> str:
+    """``"a, b, c (+N more)"`` — a short, sorted, de-duped preview of node names."""
+    uniq = sorted(set(names))
+    head = ", ".join(uniq[:limit])
+    return head if len(uniq) <= limit else f"{head} (+{len(uniq) - limit} more)"
 
 
 def assemble_preflight(
@@ -246,6 +258,30 @@ def assemble_preflight(
             f"{sample}{more}.",
             "Click 'Disconnect test body' so the joints go static before publishing — "
             "the connections (and the body that drives them) must not ship in the asset."))
+
+    # §10/§13/§11 cleanliness — the same hard "no" list validate_asset_summary enforces
+    # on the saved .ma, surfaced here in-scene so the author fixes it before the save.
+    if facts.unknown_nodes:
+        issues.append(PreflightIssue(
+            "error", f"Unknown (lost-plugin) node(s): {_sample(facts.unknown_nodes)}.",
+            "Delete unknown nodes — Edit ▸ Delete All by Type ▸ Unknown Nodes."))
+
+    if facts.anim_curves:
+        issues.append(PreflightIssue(
+            "error", f"Animation curve(s) in the scene: {_sample(facts.anim_curves)}.",
+            "Delete all keyframes/animation — a delivered asset must be static."))
+
+    if facts.display_layers:
+        issues.append(PreflightIssue(
+            "error", f"Display layer(s) present: {_sample(facts.display_layers)}.",
+            "Remove all display layers before publishing."))
+
+    if facts.renderer_materials:
+        issues.append(PreflightIssue(
+            "error",
+            f"Render-engine shader(s): {_sample(facts.renderer_materials)}.",
+            "Use generic shaders only (lambert / standardSurface). Render-engine-specific "
+            "materials aren't allowed and don't survive a clean .ma export."))
 
     if not facts.has_info_node:
         issues.append(PreflightIssue(

@@ -66,6 +66,70 @@ def test_duplicate_name_detected(tmp_path):
     assert "duplicate_name" in _codes(report)
 
 
+# --- export-time cleanliness (Authoring Spec §10 / §13 / §11) -----------------
+def test_unknown_node_rejected(tmp_path):
+    p = _assets.write_asset_ma(
+        tmp_path / "a.ma", joints=["cloth_root", "cloth_spine_01"],
+        extra_lines=['createNode unknown -n "lostPluginNode";'])
+    summary = ma_parse.summarize_file(p)
+    report = V.validate_asset_summary(summary, _assets.load(p).metadata)
+    assert "unknown_node" in _codes(report)
+
+
+def test_timeline_animation_curve_rejected(tmp_path):
+    # animCurveT* are timeline keyframes — banned (assets ship static).
+    p = _assets.write_asset_ma(
+        tmp_path / "a.ma", joints=["cloth_root", "cloth_spine_01"],
+        extra_lines=['createNode animCurveTL -n "cloth_root_translateX";'])
+    summary = ma_parse.summarize_file(p)
+    report = V.validate_asset_summary(summary, _assets.load(p).metadata)
+    assert "anim_curve" in _codes(report)
+
+
+def test_set_driven_key_curve_allowed(tmp_path):
+    # animCurveU* are set-driven keys (input = a driver attr), an allowed rig mechanism
+    # — the shipped example drives its fit lattice with animCurveUU. Must not be flagged.
+    p = _assets.write_asset_ma(
+        tmp_path / "a.ma", joints=["cloth_root", "cloth_spine_01"],
+        extra_lines=['createNode animCurveUU -n "cloth_fit_lattice_scaleX";'])
+    summary = ma_parse.summarize_file(p)
+    report = V.validate_asset_summary(summary, _assets.load(p).metadata)
+    assert "anim_curve" not in _codes(report)
+    assert report.ok, [str(i) for i in report.errors]
+
+
+def test_display_layer_rejected_but_default_allowed(tmp_path):
+    p = _assets.write_asset_ma(
+        tmp_path / "a.ma", joints=["cloth_root", "cloth_spine_01"],
+        extra_lines=['createNode displayLayer -n "defaultLayer";',
+                     'createNode displayLayer -n "garment_layer";'])
+    summary = ma_parse.summarize_file(p)
+    report = V.validate_asset_summary(summary, _assets.load(p).metadata)
+    layer_issues = [i for i in report.issues if i.code == "display_layer"]
+    assert [i.node for i in layer_issues] == ["garment_layer"]  # defaultLayer not flagged
+
+
+def test_renderer_shader_rejected(tmp_path):
+    p = _assets.write_asset_ma(
+        tmp_path / "a.ma", joints=["cloth_root", "cloth_spine_01"],
+        extra_lines=['createNode aiStandardSurface -n "coat_arnold_mtl";'])
+    summary = ma_parse.summarize_file(p)
+    report = V.validate_asset_summary(summary, _assets.load(p).metadata)
+    assert "renderer_shader" in _codes(report)
+
+
+def test_generic_shader_allowed(tmp_path):
+    # lambert / standardSurface are explicitly permitted (§11) — must not be flagged.
+    p = _assets.write_asset_ma(
+        tmp_path / "a.ma", joints=["cloth_root", "cloth_spine_01"],
+        extra_lines=['createNode lambert -n "coat_lambert";',
+                     'createNode standardSurface -n "coat_std";'])
+    summary = ma_parse.summarize_file(p)
+    report = V.validate_asset_summary(summary, _assets.load(p).metadata)
+    assert report.ok, [str(i) for i in report.errors]
+    assert "renderer_shader" not in _codes(report)
+
+
 def test_no_cloth_joints_error(tmp_path):
     p = _assets.write_asset_ma(tmp_path / "a.ma", joints=[])
     summary = ma_parse.summarize_file(p)

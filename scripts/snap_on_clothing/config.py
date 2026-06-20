@@ -71,6 +71,49 @@ GENIE_REQUIRED_NODES: tuple[str, ...] = ()
 # Node types forbidden inside a clothing asset (Authoring Spec §10 hard "no" list).
 DISALLOWED_ASSET_NODE_TYPES: tuple[str, ...] = ("blendShape", "nCloth", "nucleus")
 
+# --- export-time cleanliness rules (Authoring Spec §10 / §13 / §11) -----------
+# The hard "no" list also bans unknown nodes, animation curves and display layers,
+# and requires generic shaders only. These are enforced at publish/export time on
+# the saved .ma (validate_asset_summary) so a non-compliant asset never ships.
+
+# Unknown / lost-plugin nodes — Maya parks them as these types when a plugin that
+# created a node is missing; they bloat the file and break a clean re-open.
+UNKNOWN_NODE_TYPES: tuple[str, ...] = ("unknown", "unknownDag", "unknownTransform")
+
+# Timeline animation curves — keyframes driven by *time* (animCurveT*). Assets ship
+# static, so these are banned. Set-driven keys (animCurveU*, driven by another attr)
+# are NOT included: they're a legitimate control-rig mechanism the spec allows ("any
+# Maya node types within the control rig"), and the example asset drives its fit
+# lattice with animCurveUU. Only the time-input subtypes are flagged.
+TIMELINE_ANIM_CURVE_TYPES: tuple[str, ...] = (
+    "animCurveTL", "animCurveTA", "animCurveTU", "animCurveTT",
+)
+
+# Display layers other than Maya's built-in defaultLayer are not allowed in an asset.
+DISPLAY_LAYER_TYPE: str = "displayLayer"
+DEFAULT_DISPLAY_LAYERS: tuple[str, ...] = ("defaultLayer",)
+
+# §11 Materials: generic shaders only (e.g. lambert / standardSurface). Render-engine-
+# specific shaders don't survive a clean .ma export into the pipeline, so a curated
+# denylist of the renderer materials studios actually use is flagged at export time.
+# Extensible — add a type string here as new renderers appear. (A denylist of exact
+# types is used rather than prefix matching to avoid false positives like aimConstraint.)
+RENDERER_SHADER_TYPES: tuple[str, ...] = (
+    # Arnold
+    "aiStandardSurface", "aiToon", "aiStandardHair", "aiLambert", "aiFlat",
+    "aiCarPaint", "aiSkin", "aiMatte", "aiAmbientOcclusion",
+    # Redshift
+    "RedshiftMaterial", "RedshiftArchitectural", "RedshiftCarPaint",
+    "RedshiftSkin", "RedshiftHair", "RedshiftSubSurfaceScatter",
+    # V-Ray
+    "VRayMtl", "VRayCarPaintMtl", "VRayFastSSS2", "VRayBlendMtl",
+    "VRayLightMtl", "VRayHairNextMtl",
+    # RenderMan
+    "PxrSurface", "PxrLayerSurface", "PxrDisney", "PxrHair",
+    # mental ray (legacy)
+    "mia_material", "mia_material_x", "mia_material_x_passes",
+)
+
 # --- sidecar metadata file extensions ----------------------------------------
 SIDECAR_EXT: str = ".json"
 THUMB_EXTS: tuple[str, ...] = (".png", ".jpg", ".jpeg")

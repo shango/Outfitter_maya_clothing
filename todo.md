@@ -511,7 +511,25 @@ ships **one** GenHuman and flips the switch to match the garment's chosen Gender
   static, Publish unblocked. Confirm the bundled `data/genhuman/GenHuman_rig_v03.ma` is present in the build.
 
 ## Backlog / future
-- [ ] Asset **validator/exporter** tool for authors (enforce Addendum at export time).
+- [~] Asset **validator/exporter** tool for authors (enforce Addendum at export time).
+  **Export-time cleanliness rules added 2026-06-20:** the publish/export path already validated
+  structure (groups, `cloth_root`, info node, refs/namespaces, blendShape/sim, dup names). Added the
+  rest of the Authoring Spec §10/§13/§11 hard-"no" list to `validate_asset_summary` (runs on the saved
+  `.ma` via `validate_published_ma`, and in the browser): **unknown/lost-plugin nodes** (`unknown_node`),
+  **timeline animation curves** (`anim_curve` — `animCurveT*` only; set-driven keys `animCurveU*` stay
+  allowed, the example asset drives its fit lattice with `animCurveUU`), **non-default display layers**
+  (`display_layer`), and **render-engine shaders** (`renderer_shader` — curated denylist of Arnold/
+  Redshift/V-Ray/RenderMan/mental-ray material types; generic lambert/standardSurface pass). New
+  `config` constants (`UNKNOWN_NODE_TYPES`, `TIMELINE_ANIM_CURVE_TYPES`, `DISPLAY_LAYER_TYPE` +
+  `DEFAULT_DISPLAY_LAYERS`, `RENDERER_SHADER_TYPES`) + `MaSummary.nodes_of_types`. Mirrored as
+  in-scene **preflight** errors so authors catch them before the save: 4 new `SceneFacts` fields +
+  `assemble_preflight` blocks, gathered in `maya_publish._cleanliness_facts` (tolerates unregistered
+  renderer types via per-type `ls`). Publish-tab UI renders them with no change (generic issue list).
+  **181 headless tests passing** (+12). *(In-Maya: confirm a scene with a renderer shader / leftover
+  display layer / baked keys is blocked by the Publish preflight, and a clean garment still publishes.)*
+  REMAINING (need connection/attr graph that `ma_parse` doesn't capture — a future in-Maya check):
+  **unused materials**, **leftover construction history on meshes**, **frozen-scale (=1)** verification,
+  and **valid-UVs**. These are best gathered live in `maya_publish` (deferred until needed).
 - [ ] Body-morph propagation to attached clothing.
 - [ ] Migrate GenHuman materials to generic shaders (per Addendum material rule).
 - [ ] Deferred facial-module naming standardization pass (Tier 3).

@@ -224,3 +224,40 @@ def test_preflight_test_body_warning_truncates_long_lists():
 def test_preflight_clean_scene_has_no_test_body_warning():
     issues = P.assemble_preflight(_clean_facts())  # driven_cloth_joints defaults to ()
     assert not any("test body" in i.message for i in issues)
+
+
+# --- §10/§13/§11 cleanliness facts (mirror the export-time .ma validation) ----
+def test_preflight_flags_unknown_nodes():
+    issues = P.assemble_preflight(_clean_facts(unknown_nodes=("lostPluginNode",)))
+    err = next(i for i in _levels(issues, "error") if "Unknown" in i.message)
+    assert "lostPluginNode" in err.message and err.fix
+
+
+def test_preflight_flags_animation_curves():
+    issues = P.assemble_preflight(_clean_facts(anim_curves=("cloth_root_translateX",)))
+    assert any("Animation curve" in i.message for i in _levels(issues, "error"))
+
+
+def test_preflight_flags_display_layers():
+    issues = P.assemble_preflight(_clean_facts(display_layers=("garment_layer",)))
+    assert any("Display layer" in i.message for i in _levels(issues, "error"))
+
+
+def test_preflight_flags_renderer_materials():
+    issues = P.assemble_preflight(_clean_facts(renderer_materials=("coat_arnold_mtl",)))
+    err = next(i for i in _levels(issues, "error") if "Render-engine" in i.message)
+    assert "generic shaders only" in err.fix
+
+
+def test_preflight_cleanliness_sample_truncates_long_lists():
+    issues = P.assemble_preflight(_clean_facts(
+        renderer_materials=tuple(f"mtl_{i:02d}" for i in range(10))))
+    msg = next(i.message for i in issues if "Render-engine" in i.message)
+    assert "+4 more" in msg
+
+
+def test_preflight_clean_scene_has_no_cleanliness_errors():
+    # all four cleanliness facts default to () — a clean scene must still pass.
+    issues = P.assemble_preflight(_clean_facts())
+    assert not _levels(issues, "error")
+    assert _levels(issues, "ok")

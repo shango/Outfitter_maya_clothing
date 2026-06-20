@@ -117,6 +117,10 @@ class MaSummary:
     def nodes_of_type(self, node_type: str) -> list[str]:
         return sorted(n for n, t in self.node_types.items() if t == node_type)
 
+    def nodes_of_types(self, node_types) -> list[str]:
+        wanted = set(node_types)
+        return sorted(n for n, t in self.node_types.items() if t in wanted)
+
     @property
     def duplicate_names(self) -> dict[str, int]:
         """Short names declared more than once (clean assets should have none)."""
