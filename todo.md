@@ -533,5 +533,9 @@ ships **one** GenHuman and flips the switch to match the garment's chosen Gender
 - [ ] Body-morph propagation to attached clothing. **DEFERRED to a later phase (reaffirmed
   2026-06-20).** Staying with two pure variants (male + female); an in-between body shape is a
   **manual hand-adjustment by the artist**, not tool interpolation. Don't start without a fresh go-ahead.
-- [ ] Migrate GenHuman materials to generic shaders (per Addendum material rule).
+- [x] ~~Migrate GenHuman materials to generic shaders~~ — **CUT 2026-06-20 (executive decision).**
+  The tool does **not** touch GenHuman shaders: GenHuman is leveraged only as (a) the body the artist
+  fits/skins the garment against and (b) the attach target. Its materials are a **different department's**
+  concern — out of scope. The generic-shader material rule (Authoring Spec §11) is still **enforced on
+  published clothing** (done — `renderer_shader` check in `validate_asset_summary` + Publish preflight).
 - [ ] Deferred facial-module naming standardization pass (Tier 3).
