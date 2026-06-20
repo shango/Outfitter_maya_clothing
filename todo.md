@@ -538,4 +538,7 @@ ships **one** GenHuman and flips the switch to match the garment's chosen Gender
   fits/skins the garment against and (b) the attach target. Its materials are a **different department's**
   concern — out of scope. The generic-shader material rule (Authoring Spec §11) is still **enforced on
   published clothing** (done — `renderer_shader` check in `validate_asset_summary` + Publish preflight).
-- [ ] Deferred facial-module naming standardization pass (Tier 3).
+- [x] ~~Deferred facial-module naming standardization pass (Tier 3)~~ — **CUT 2026-06-20 (executive
+  decision).** Renaming the GenHuman rig's ~228 facial-module joints is GenHuman-internal hygiene for a
+  **different department**; clothing never connects to facial joints (attach = body/Epic skeleton only),
+  so it has zero effect on the clothing pipeline. Out of scope — same boundary as the cut shader item.
