@@ -12,6 +12,7 @@ require a running Maya (they report this clearly if invoked standalone).
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -102,7 +103,10 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         super().__init__(parent)
         self.setObjectName(WINDOW_OBJECT_NAME)
         self.setWindowTitle(f"{WINDOW_TITLE}  v{__version__}")
-        self.resize(820, 560)
+        # Width sets a comfortable default; the Publish tab's step column carries a
+        # minimum height (so every step shows without scrolling), which pushes the
+        # window taller than this floor as needed.
+        self.resize(1040, 900)
 
         self._roots = roots
         self._scan: library.LibraryScanResult | None = None
@@ -198,7 +202,6 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         actions = QtWidgets.QHBoxLayout()
         self._attach_btn = QtWidgets.QPushButton("Attach ▸")
         self._attach_btn.setProperty("positive", True)
-        self._attach_btn.setToolTip("Import the selected asset and connect it to the GenHuman rig")
         self._attach_btn.clicked.connect(self._attach_selected)
         actions.addWidget(self._attach_btn)
         actions.addStretch(1)
@@ -207,7 +210,6 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._attached_combo.setMinimumWidth(150)
         actions.addWidget(self._attached_combo)
         self._detach_btn = QtWidgets.QPushButton("Detach")
-        self._detach_btn.setToolTip("Break this instance's connections and remove its namespace")
         self._detach_btn.clicked.connect(self._detach_selected)
         actions.addWidget(self._detach_btn)
         outer.addLayout(actions)
@@ -455,11 +457,9 @@ class ClothingBrowser(QtWidgets.QMainWindow):
             QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
         self._copy_btn = QtWidgets.QToolButton()
         self._copy_btn.setText("Copy")
-        self._copy_btn.setToolTip("Copy the full file path")
         self._copy_btn.clicked.connect(self._copy_path)
         self._open_btn = QtWidgets.QToolButton()
         self._open_btn.setText("Open ▸")
-        self._open_btn.setToolTip("Reveal the asset folder")
         self._open_btn.clicked.connect(self._open_folder)
         path_row.addWidget(self._d_path, 1)
         path_row.addWidget(self._copy_btn)
@@ -833,7 +833,15 @@ def show(roots: list[Path] | None = None) -> ClothingBrowser:
 
     parent = _maya_main_window()
     _window_singleton = ClothingBrowser(roots=roots, parent=parent)
-    _window_singleton.setWindowFlag(QtCore.Qt.Window, True)
+    # Keep the tool above Maya. On Windows a parented top-level already stacks
+    # above the main window with the plain Qt.Window flag. On macOS (Cocoa) that
+    # same window falls *behind* Maya whenever Maya takes focus, so use Qt.Tool
+    # instead — a utility window that floats above its parent without pinning
+    # itself over every other app the way WindowStaysOnTopHint would.
+    if sys.platform == "darwin" and parent is not None:
+        _window_singleton.setWindowFlag(QtCore.Qt.Tool, True)
+    else:
+        _window_singleton.setWindowFlag(QtCore.Qt.Window, True)
     _window_singleton.show()
     _window_singleton.raise_()
     return _window_singleton

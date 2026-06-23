@@ -12,7 +12,6 @@ test env).
 """
 from __future__ import annotations
 
-import os
 import shutil
 import tempfile
 from contextlib import contextmanager
@@ -25,7 +24,7 @@ from .. import config
 from ..core import publish as _publish
 from ..core import settings as _settings
 
-_PREVIEW_BOX = 220
+_PREVIEW_BOX = 140
 
 
 def _maya_available() -> bool:
@@ -54,7 +53,7 @@ class PublishPanel(QtWidgets.QWidget):
         self._on_published = on_published
         self._captured_thumb: Path | None = None
         self._build_ui()
-        self._reset_dest_to_default()
+        self._refresh_remote_label()
 
     # --- construction ---------------------------------------------------------
     def _build_ui(self) -> None:
@@ -62,175 +61,219 @@ class PublishPanel(QtWidgets.QWidget):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(10)
 
+        self._build_widgets()
         top = QtWidgets.QWidget()
         outer = QtWidgets.QHBoxLayout(top)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(14)
+        outer.addWidget(self._build_steps(), 0)          # left: numbered workflow
+        outer.addWidget(self._build_details_form(), 1)   # right: metadata
 
-        # left: identity / version form
-        form_box = QtWidgets.QWidget()
-        form = QtWidgets.QFormLayout(form_box)
-        form.setLabelAlignment(QtCore.Qt.AlignRight)
-        form.setHorizontalSpacing(10)
-        form.setVerticalSpacing(8)
+        # The steps/metadata row sizes to its content (every step stays visible); the
+        # log takes the remaining vertical space at the bottom instead of leaving a gap.
+        root.addWidget(top, 0)
+        root.addWidget(self._build_log_panel(), 1)
+        self._log("Publish tab ready. Work down the numbered steps, then publish.", "info")
 
+    def _build_widgets(self) -> None:
+        """Create every interactive widget once; the layout builders place them."""
+        # identity / metadata fields (left form, filled in Step 4)
         self._name = QtWidgets.QLineEdit()
         self._name.setPlaceholderText("e.g. trench_coat_A")
-        self._type = QtWidgets.QComboBox()
-        self._type.addItems(list(config.ASSET_TYPES))
-        # Start unset on purpose: the type drives skin-set/publish, so make the
-        # rigger choose it rather than silently defaulting to the first type.
-        self._type.setCurrentIndex(-1)
-        self._type.setPlaceholderText("— set clothing type —")
-        self._gender = QtWidgets.QComboBox()
-        self._gender.addItems(list(config.GENDERS))
-        # Unset by default like Type — gender is a required field (the garment is pre-fit
-        # to one body), so make the rigger pick the variant rather than defaulting it.
-        self._gender.setCurrentIndex(-1)
-        self._gender.setPlaceholderText("— set body variant —")
         self._version = QtWidgets.QLineEdit("1.0.0")
         self._compat = QtWidgets.QLineEdit("v03")
         self._compat.setPlaceholderText("comma-separated, e.g. v03, v04")
-
-        rig_row = QtWidgets.QHBoxLayout()
         self._rigver = QtWidgets.QLineEdit()
         self._rigver.setPlaceholderText("e.g. v03")
-        detect = QtWidgets.QToolButton()
-        detect.setText("Detect")
-        detect.setToolTip("Read the rig version from the current scene")
-        detect.clicked.connect(self._detect_rig)
-        rig_row.addWidget(self._rigver, 1)
-        rig_row.addWidget(detect)
-
         self._author = QtWidgets.QLineEdit()
         self._desc = QtWidgets.QPlainTextEdit()
         self._desc.setPlaceholderText("Brief description shown in the browser…")
         self._desc.setFixedHeight(70)
 
+        # Type / Gender drive Step 1 (skin-set + body variant). Start unset on purpose
+        # so the rigger picks them rather than silently defaulting to the first entry.
+        self._type = QtWidgets.QComboBox()
+        self._type.addItems(list(config.ASSET_TYPES))
+        self._type.setCurrentIndex(-1)
+        self._type.setPlaceholderText("— set clothing type —")
+        self._gender = QtWidgets.QComboBox()
+        self._gender.addItems(list(config.GENDERS))
+        self._gender.setCurrentIndex(-1)
+        self._gender.setPlaceholderText("— set body variant —")
+
+        # step action buttons
+        self._skeleton_btn = QtWidgets.QPushButton("Create cloth skeleton")
+        self._skeleton_btn.clicked.connect(self._create_skeleton)
+        self._connect_btn = QtWidgets.QPushButton("Load test body")
+        self._connect_btn.clicked.connect(self._load_test_body)
+        self._disconnect_btn = QtWidgets.QPushButton("Remove test body")
+        self._disconnect_btn.clicked.connect(self._remove_test_body)
+        self._prune_btn = QtWidgets.QPushButton("Delete unused joints (optional)")
+        self._prune_btn.clicked.connect(self._prune_joints)
+        self._capture_btn = QtWidgets.QPushButton("Capture thumbnail")
+        self._capture_btn.clicked.connect(self._capture)
+        self._check_btn = QtWidgets.QPushButton("Check scene")
+        self._check_btn.clicked.connect(self._check_scene)
+        self._publish_btn = QtWidgets.QPushButton("Publish ▸")
+        self._publish_btn.setProperty("accent", True)
+        self._publish_btn.clicked.connect(self._publish)
+
+        # rare maintenance: re-capture the canonical skeleton data from the rig in-scene
+        # (e.g. after a new rig generation). Overwrites the shipped cloth_skeleton.json.
+        self._regen_btn = QtWidgets.QToolButton()
+        self._regen_btn.setText("Regenerate skeleton data from rig…")
+        self._regen_btn.clicked.connect(self._regen_skeleton)
+
+        # thumbnail preview (Step 4)
+        self._preview = QtWidgets.QLabel("no thumbnail\ncaptured yet")
+        self._preview.setObjectName("previewImage")
+        self._preview.setAlignment(QtCore.Qt.AlignCenter)
+        self._preview.setFixedSize(_PREVIEW_BOX, _PREVIEW_BOX)
+
+        # publish destination read-out (Step 5) + one-line status strip
+        self._dest_label = QtWidgets.QLabel("")
+        self._dest_label.setObjectName("stepDest")
+        self._dest_label.setWordWrap(True)
+        self._status = QtWidgets.QLabel("")
+        self._status.setObjectName("muted")
+        self._status.setWordWrap(True)
+
+    def _build_details_form(self) -> QtWidgets.QWidget:
+        """Right column: asset identity / metadata, filled out during Step 4."""
+        box = QtWidgets.QWidget()
+        v = QtWidgets.QVBoxLayout(box)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(8)
+
+        heading = QtWidgets.QLabel("ASSET DETAILS")  # QSS can't upper-case; do it here
+        heading.setObjectName("sectionHeading")
+        v.addWidget(heading)
+        hint = QtWidgets.QLabel("Fill these out in Step 4, before you publish.")
+        hint.setObjectName("muted")
+        hint.setWordWrap(True)
+        v.addWidget(hint)
+
+        form = QtWidgets.QFormLayout()
+        form.setLabelAlignment(QtCore.Qt.AlignRight)
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(8)
+
+        rig_row = QtWidgets.QHBoxLayout()
+        detect = QtWidgets.QToolButton()
+        detect.setText("Detect")
+        detect.clicked.connect(self._detect_rig)
+        rig_row.addWidget(self._rigver, 1)
+        rig_row.addWidget(detect)
+
         form.addRow("Asset name", self._name)
-        form.addRow("Type", self._type)
-        form.addRow("Gender", self._gender)
         form.addRow("Version", self._version)
         form.addRow("GenHuman compat", self._compat)
         form.addRow("Rig version built-for", self._wrap(rig_row))
         form.addRow("Author", self._author)
         form.addRow("Description", self._desc)
+        v.addLayout(form)
+        v.addStretch(1)
+        return box
 
-        # destination folder
-        dest_row = QtWidgets.QHBoxLayout()
-        self._dest = QtWidgets.QLineEdit()
-        self._dest.setReadOnly(True)
-        dest_browse = QtWidgets.QToolButton()
-        dest_browse.setText("Browse…")
-        dest_browse.clicked.connect(self._choose_dest)
-        dest_row.addWidget(self._dest, 1)
-        dest_row.addWidget(dest_browse)
-        form.addRow("Library folder", self._wrap(dest_row))
+    def _build_steps(self) -> QtWidgets.QWidget:
+        """Left column: the numbered authoring workflow, stacked top to bottom."""
+        steps = QtWidgets.QVBoxLayout()
+        steps.setContentsMargins(0, 0, 0, 0)
+        steps.setSpacing(8)
 
-        outer.addWidget(form_box, 1)
+        # Step 1 — set up the rig (Type + Gender live here, with the build buttons)
+        card, body = self._step_card(
+            1, "Set up the cloth rig",
+            "Choose the garment Type and Gender, build the cloth rig, then load a "
+            "test body to pose the garment against.")
+        picks = QtWidgets.QFormLayout()
+        picks.setLabelAlignment(QtCore.Qt.AlignRight)
+        picks.setContentsMargins(0, 0, 0, 0)
+        picks.addRow("Type", self._type)
+        picks.addRow("Gender", self._gender)
+        body.addLayout(picks)
+        body.addWidget(self._skeleton_btn)
+        body.addWidget(self._connect_btn)
+        steps.addWidget(card)
 
-        # right: preview + actions
-        right = QtWidgets.QVBoxLayout()
-        right.setSpacing(8)
+        # Step 2 — skin (instruction only, no buttons)
+        card, _ = self._step_card(
+            2, "Skin the mesh",
+            "Bind the garment mesh to the highlighted (green) joints: "
+            "Skin ▸ Bind Skin.")
+        steps.addWidget(card)
 
-        # authoring helper: rebuild the canonical cloth_* skeleton in-scene (skipping the
-        # import-rig / duplicate / rename chore) AND, in the same click, gather the
-        # recommended skin joints for the chosen Type into cloth_skin_SET. One button.
-        self._skeleton_btn = QtWidgets.QPushButton("Create cloth skeleton")
-        self._skeleton_btn.setToolTip(
-            "Rebuild the canonical GenHuman cloth_* skeleton in the scene (no rig "
-            "import needed) and select + highlight (green) the joints to bind to for the "
-            "chosen Type, gathered into 'cloth_skin_SET'. Set the Type first. Then skin "
-            "the mesh to the selection (Skin > Bind Skin).")
-        self._skeleton_btn.clicked.connect(self._create_skeleton)
-        right.addWidget(self._skeleton_btn)
+        # Step 3 — remove the test body (+ optional joint prune)
+        card, body = self._step_card(
+            3, "Remove the test body",
+            "Delete the test body so the cloth joints go static and the asset is "
+            "publish-safe.")
+        body.addWidget(self._disconnect_btn)
+        body.addWidget(self._prune_btn)
+        steps.addWidget(card)
 
-        # skinning test (M14): the tool imports its bundled GenHuman, flips GH_Body_morph
-        # to the chosen Gender (male = base, female = morph), and drives the cloth_*
-        # skeleton from it so the rigger poses the body and confirms the garment deforms.
-        # Remove deletes the body so the asset is publish-safe. Authoring-time attach().
-        test_row = QtWidgets.QHBoxLayout()
-        test_row.setContentsMargins(0, 0, 0, 0)
-        self._connect_btn = QtWidgets.QPushButton("Load test body")
-        self._connect_btn.setToolTip(
-            "After binding: import the GenHuman body for the selected Gender (the tool "
-            "flips GH_Body_morph to match), connected to the cloth_* skeleton. Pose the "
-            "body's controls and watch the garment deform. Remove it before publishing.")
-        self._connect_btn.clicked.connect(self._load_test_body)
-        self._disconnect_btn = QtWidgets.QPushButton("Remove test body")
-        self._disconnect_btn.setToolTip(
-            "Disconnect and delete the GenHuman test body so the cloth_* joints go static "
-            "again and the asset is publish-safe. Run before Publish.")
-        self._disconnect_btn.clicked.connect(self._remove_test_body)
-        test_row.addWidget(self._connect_btn)
-        test_row.addWidget(self._disconnect_btn)
-        right.addWidget(self._wrap(test_row))
+        # Step 4 — thumbnail (metadata is filled in the form on the right)
+        card, body = self._step_card(
+            4, "Capture the thumbnail",
+            "Frame the garment in the viewport and capture a thumbnail, then fill out "
+            "the asset details on the right.")
+        body.addWidget(self._preview, 0, QtCore.Qt.AlignHCenter)
+        body.addWidget(self._capture_btn)
+        steps.addWidget(card)
 
-        # maintenance: re-capture the canonical skeleton data from the rig in-scene
-        # (e.g. after a new rig generation). Overwrites the shipped cloth_skeleton.json.
-        self._regen_btn = QtWidgets.QToolButton()
-        self._regen_btn.setText("Regenerate skeleton data from rig…")
-        self._regen_btn.setToolTip(
-            "Capture a fresh cloth_skeleton.json from the GenHuman rig currently in the "
-            "scene. Use after a new rig build; 'Create cloth skeleton' then rebuilds "
-            "this pose. Overwrites the shipped skeleton data.")
-        self._regen_btn.clicked.connect(self._regen_skeleton)
-        right.addWidget(self._regen_btn)
+        # Step 5 — publish (always to the remote library)
+        card, body = self._step_card(
+            5, "Publish",
+            "Run a final scene check, then publish. The asset is sent to the shared "
+            "remote library.")
+        body.addWidget(self._dest_label)
+        body.addWidget(self._check_btn)
+        body.addWidget(self._publish_btn)
+        steps.addWidget(card)
 
-        # authoring helper (post-skin): delete the cloth_* joints the garment doesn't
-        # skin to, replacing the manual prune chore. Safe — only leaf non-influence
-        # joints go; unweighted interior joints are kept (the chain mirrors the body).
-        self._prune_btn = QtWidgets.QPushButton("Delete unused joints")
-        self._prune_btn.setToolTip(
-            "After skinning: delete the cloth_* joints your garment doesn't skin to. "
-            "Only safe leaf joints are removed — unweighted joints that still have "
-            "skinned children are kept, because the cloth hierarchy must mirror the "
-            "body. Run after skinning the garment.")
-        self._prune_btn.clicked.connect(self._prune_joints)
-        right.addWidget(self._prune_btn)
+        steps.addWidget(self._status)
 
-        heading = QtWidgets.QLabel("THUMBNAIL")  # QSS can't upper-case; do it here
-        heading.setObjectName("sectionHeading")
-        right.addWidget(heading)
-        self._preview = QtWidgets.QLabel("no thumbnail\ncaptured yet")
-        self._preview.setObjectName("previewImage")
-        self._preview.setAlignment(QtCore.Qt.AlignCenter)
-        self._preview.setFixedSize(_PREVIEW_BOX, _PREVIEW_BOX)
-        right.addWidget(self._preview, 0, QtCore.Qt.AlignHCenter)
+        host = QtWidgets.QWidget()
+        host.setLayout(steps)
+        # The column sizes to its content (every step visible, no surplus space) and
+        # keeps a consistent width next to the metadata form.
+        host.setMinimumWidth(330)
+        host.setMaximumWidth(380)
+        return host
 
-        self._capture_btn = QtWidgets.QPushButton("Capture thumbnail")
-        self._capture_btn.setToolTip("Playblast a framed shot of the garment")
-        self._capture_btn.clicked.connect(self._capture)
-        right.addWidget(self._capture_btn)
+    def _step_card(self, number: int, title: str,
+                   instruction: str) -> tuple[QtWidgets.QFrame, QtWidgets.QVBoxLayout]:
+        """A numbered step card: big number + title + instruction, returns its body layout."""
+        card = QtWidgets.QFrame()
+        card.setObjectName("stepCard")
+        row = QtWidgets.QHBoxLayout(card)
+        row.setContentsMargins(12, 8, 12, 10)
+        row.setSpacing(12)
 
-        right.addStretch(1)
+        num = QtWidgets.QLabel(str(number))
+        num.setObjectName("stepNumber")
+        num.setFixedWidth(28)
+        num.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
+        row.addWidget(num, 0)
 
-        # pre-publish sanity check: surface the common authoring mistakes (rig left in,
-        # namespaces, garment skinned to non-cloth_* joints) with fixes, before Publish.
-        self._check_btn = QtWidgets.QPushButton("Check scene")
-        self._check_btn.setToolTip(
-            "Run the pre-publish sanity check: rig present, namespaces, required groups, "
-            "cloth_root, and whether the garment is skinned to the cloth_* joints. "
-            "Results go to the log below.")
-        self._check_btn.clicked.connect(self._check_scene)
-        right.addWidget(self._check_btn)
+        body = QtWidgets.QVBoxLayout()
+        body.setSpacing(6)
+        title_lbl = QtWidgets.QLabel(title)
+        title_lbl.setObjectName("stepTitle")
+        title_lbl.setWordWrap(True)
+        body.addWidget(title_lbl)
+        ins = QtWidgets.QLabel(instruction)
+        ins.setObjectName("stepInstruction")
+        ins.setWordWrap(True)
+        body.addWidget(ins)
+        row.addLayout(body, 1)
+        return card, body
 
-        self._publish_btn = QtWidgets.QPushButton("Publish ▸")
-        self._publish_btn.setProperty("accent", True)
-        self._publish_btn.setToolTip("Save the .ma + sidecar + thumbnail into the library")
-        self._publish_btn.clicked.connect(self._publish)
-        right.addWidget(self._publish_btn)
-
-        self._status = QtWidgets.QLabel("")
-        self._status.setObjectName("muted")
-        self._status.setWordWrap(True)
-        right.addWidget(self._status)
-
-        outer.addLayout(right, 0)
-
-        root.addWidget(top)
-        root.addWidget(self._build_log_panel(), 1)
-        self._log("Publish tab ready. Run 'Check scene' before publishing.", "info")
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        # The remote folder may be changed on the Setup tab after this panel is built;
+        # refresh the Step 5 destination read-out each time the tab is shown.
+        super().showEvent(event)
+        self._refresh_remote_label()
 
     @staticmethod
     def _wrap(layout: QtWidgets.QLayout) -> QtWidgets.QWidget:
@@ -259,9 +302,10 @@ class PublishPanel(QtWidgets.QWidget):
         title.setObjectName("sectionHeading")
         header.addWidget(title)
         header.addStretch(1)
+        # rare maintenance action — parked here, out of the numbered step flow
+        header.addWidget(self._regen_btn)
         clear = QtWidgets.QToolButton()
         clear.setText("Clear")
-        clear.setToolTip("Clear the log")
         clear.clicked.connect(self._clear_log)
         header.addWidget(clear)
         v.addLayout(header)
@@ -269,7 +313,9 @@ class PublishPanel(QtWidgets.QWidget):
         self._log_view = QtWidgets.QPlainTextEdit()
         self._log_view.setObjectName("logView")
         self._log_view.setReadOnly(True)
-        self._log_view.setMinimumHeight(150)
+        # The log fills the leftover space below the steps; give it a sensible floor
+        # and let it grow with the window (it scrolls its own content).
+        self._log_view.setMinimumHeight(140)
         mono = QtGui.QFont("Consolas")
         mono.setStyleHint(QtGui.QFont.Monospace)
         mono.setPointSize(9)
@@ -316,16 +362,24 @@ class PublishPanel(QtWidgets.QWidget):
         return errors
 
     # --- destination ----------------------------------------------------------
-    def _reset_dest_to_default(self) -> None:
-        loc = _settings.read_locations()
-        default = loc.local or config.bundled_asset_dir()
-        self._dest.setText(str(default))
+    def _remote_dir(self) -> Path | None:
+        """The configured remote library — the one and only publish target."""
+        return _settings.read_locations().remote
 
-    def _choose_dest(self) -> None:
-        folder = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Choose library folder to publish into", self._dest.text())
-        if folder:
-            self._dest.setText(folder)
+    def _refresh_remote_label(self) -> None:
+        """Update the Step 5 destination read-out (warns when no remote is set)."""
+        remote = self._remote_dir()
+        if remote is not None:
+            self._dest_label.setText(f"Publishes to remote library:\n{remote}")
+            self._dest_label.setProperty("warn", False)
+        else:
+            self._dest_label.setText(
+                "⚠ No remote library set — configure it on the Setup tab before "
+                "publishing.")
+            self._dest_label.setProperty("warn", True)
+        # re-polish so the dynamic 'warn' property restyles the label
+        self._dest_label.style().unpolish(self._dest_label)
+        self._dest_label.style().polish(self._dest_label)
 
     # --- Maya guard -----------------------------------------------------------
     def _require_maya(self) -> bool:
@@ -603,6 +657,20 @@ class PublishPanel(QtWidgets.QWidget):
     def _publish(self) -> None:
         if not self._require_maya():
             return
+        # Publishing always targets the shared remote library; refuse (and warn) if
+        # the studio remote folder hasn't been configured on the Setup tab.
+        self._refresh_remote_label()
+        remote = self._remote_dir()
+        if remote is None:
+            self._report(
+                "No remote library set — configure it on the Setup tab, then publish "
+                "again.", "error")
+            QtWidgets.QMessageBox.warning(
+                self, "No remote library set",
+                "Publishing sends the asset to the shared remote library, but no "
+                "remote folder is configured.\n\nSet it on the Setup tab, then "
+                "publish again.")
+            return
         self._log("Publish: validating metadata…", "step")
         spec = self._gather_spec()
         if spec is None:
@@ -641,11 +709,11 @@ class PublishPanel(QtWidgets.QWidget):
                 + "\n".join(f"• {i.message}\n   → {i.fix}" for i in issues if i.is_error))
             return
 
-        paths = _publish.destination_paths(self._dest.text(), spec.asset_name)
+        paths = _publish.destination_paths(remote, spec.asset_name)
         if paths.ma.exists():
             ok = QtWidgets.QMessageBox.question(
                 self, "Overwrite?",
-                f"'{paths.ma.name}' already exists in the library.\nOverwrite it?")
+                f"'{paths.ma.name}' already exists in the remote library.\nOverwrite it?")
             if ok != QtWidgets.QMessageBox.Yes:
                 self._log("Publish cancelled (kept existing file).", "info")
                 return

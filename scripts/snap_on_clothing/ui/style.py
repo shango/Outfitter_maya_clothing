@@ -59,6 +59,24 @@ def stylesheet(accent: str = "#4a90d9") -> str:
     QLabel#muted {{ color: {_MUTED}; }}
     QLabel#description {{ color: #c4c4c4; }}
 
+    /* Publish tab — numbered step cards down the right column */
+    QFrame#stepCard {{
+        background: {_SURFACE};
+        border: 1px solid {_BORDER};
+        border-radius: 8px;
+    }}
+    QLabel#stepNumber {{
+        color: {accent};
+        font-size: 24px;
+        font-weight: 800;
+    }}
+    QLabel#stepTitle {{ font-size: 14px; font-weight: 700; color: #ffffff; }}
+    QLabel#stepInstruction {{ color: {_MUTED}; }}
+    QLabel#stepDest {{ color: {_MUTED}; }}
+    QLabel#stepDest[warn="true"] {{ color: #e0b057; font-weight: 600; }}
+    QScrollArea#stepsScroll {{ background: transparent; border: none; }}
+    QScrollArea#stepsScroll > QWidget > QWidget {{ background: transparent; }}
+
     /* Type badge — a rounded accent chip */
     QLabel#typeBadge {{
         background: {accent_dim};
