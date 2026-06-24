@@ -75,7 +75,7 @@ def load_asset(ma_path: Path) -> ClothingAsset:
             return ClothingAsset(ma_path, meta2, thumb, sidecar, source="ma_info")
         return ClothingAsset(
             ma_path, None, thumb, sidecar, source="none",
-            errors=tuple([f"sidecar: {e}" for e in errors] + [f"cloth_info: {e}" for e in errors2]),
+            errors=tuple(f"sidecar: {e}" for e in errors) + tuple(f"cloth_info: {e}" for e in errors2),
         )
 
     info = ma_parse.read_info_attrs(ma_path, config.INFO_NODE)

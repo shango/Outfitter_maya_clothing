@@ -63,6 +63,8 @@ GENDER_BODY_MORPH: dict[str, float] = {"male": 0.0, "female": 1.0}
 # lib/ dir so the installer copytree ships it alongside the code; kept OUT of git (large
 # rig, like the root *.ma files) and dropped in at package/release time.
 BUNDLED_GENHUMAN_FILE: str = "GenHuman_rig_v03.ma"
+# Namespace the test body is referenced under (the file stem, version token kept).
+BUNDLED_GENHUMAN_NAMESPACE: str = BUNDLED_GENHUMAN_FILE.rsplit(".", 1)[0]
 
 # Genie export may require specific node names present (PRD §9 open task — TBD).
 # Empty = check is a no-op until the export team supplies the list.

@@ -213,23 +213,23 @@ def build_cloth_skeleton(spec: _skeleton.SkeletonSpec | None = None) -> Skeleton
         joint_count=len(spec.joints))
 
 
-def _scene_cloth_joints(cmds) -> dict:
+def _scene_cloth_joints(cmds) -> dict[str, str]:
     """``{short name: short parent name}`` for every ``cloth_*`` joint in the scene.
 
     Short names match how the persisted skeleton and the skinCluster influences are
     referenced; a joint parented to ``Rig_GRP`` maps to that group (a non-joint), which
     :func:`core.skeleton.plan_prune` simply treats as "not a deletable joint".
     """
-    parents: dict = {}
+    parents: dict[str, str] = {}
     for j in (cmds.ls(f"{config.CLOTH_PREFIX}*", type="joint", long=True) or []):
         par = (cmds.listRelatives(j, parent=True, fullPath=True) or [None])[0]
         parents[_short(j)] = _short(par) if par else ""
     return parents
 
 
-def _skin_influences(cmds, meshes: list[str]) -> set:
+def _skin_influences(cmds, meshes: list[str]) -> set[str]:
     """Short names of every joint actually bound by a skinCluster on ``meshes``."""
-    infl: set = set()
+    infl: set[str] = set()
     for m in meshes:
         hist = cmds.listHistory(m, pruneDagObjects=True) or []
         for sc in (cmds.ls(hist, type="skinCluster") or []):

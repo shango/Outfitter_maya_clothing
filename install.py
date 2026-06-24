@@ -109,5 +109,5 @@ def onMayaDroppedPythonFile(*_args) -> None:  # noqa: N802 — Maya-defined name
 
 
 if __name__ == "__main__":
-    # Allow `mayapy install.py` / manual invocation outside the drop flow.
+    # Manual run via `mayapy install.py` (mayapy only — the install needs maya.cmds).
     onMayaDroppedPythonFile()

@@ -1,6 +1,6 @@
 """A single, self-contained dark stylesheet for the browser window.
 
-Returns a QSS string applied to the ``ClothingBrowser`` instance only (set on the
+Returns a QSS string applied to the ``OutfitterBrowser`` instance only (set on the
 window, not the QApplication), so it styles the tool without bleeding into Maya's
 other UI. No external image assets — all chrome is drawn by Qt from these rules.
 
@@ -74,8 +74,6 @@ def stylesheet(accent: str = "#4a90d9") -> str:
     QLabel#stepInstruction {{ color: {_MUTED}; }}
     QLabel#stepDest {{ color: {_MUTED}; }}
     QLabel#stepDest[warn="true"] {{ color: #e0b057; font-weight: 600; }}
-    QScrollArea#stepsScroll {{ background: transparent; border: none; }}
-    QScrollArea#stepsScroll > QWidget > QWidget {{ background: transparent; }}
 
     /* Type badge — a rounded accent chip */
     QLabel#typeBadge {{
@@ -112,15 +110,14 @@ def stylesheet(accent: str = "#4a90d9") -> str:
     QTabBar::tab:selected {{ background: {_SURFACE}; color: {_TEXT}; }}
     QTabBar::tab:hover:!selected {{ color: {_TEXT}; }}
 
-    QLineEdit, QComboBox, QDoubleSpinBox, QSpinBox, QPlainTextEdit, QTextEdit {{
+    QLineEdit, QComboBox, QPlainTextEdit {{
         background: {_SURFACE};
         border: 1px solid {_BORDER};
         border-radius: 5px;
         padding: 5px 8px;
         selection-background-color: {accent};
     }}
-    QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus,
-    QSpinBox:focus, QPlainTextEdit:focus, QTextEdit:focus {{
+    QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus {{
         border: 1px solid {accent};
     }}
     QComboBox::drop-down {{ border: none; width: 18px; }}
@@ -172,15 +169,6 @@ def stylesheet(accent: str = "#4a90d9") -> str:
         background: {_SURFACE_HI};
         border: 1px solid {accent};
         color: #ffffff;
-    }}
-
-    QGroupBox {{
-        border: 1px solid {_BORDER}; border-radius: 6px;
-        margin-top: 10px; padding-top: 8px;
-    }}
-    QGroupBox::title {{
-        subcontrol-origin: margin; left: 10px; padding: 0 4px;
-        color: {_MUTED};
     }}
 
     QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}

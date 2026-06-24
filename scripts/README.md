@@ -44,8 +44,8 @@ in-memory `FakeScene`. Maya/Qt live only in `ui/`.
 
 Inside Maya 2026 (Script Editor / shelf button):
 ```python
-import outfitter.launch as scl
-scl.run()
+import outfitter.launch
+outfitter.launch.run()
 ```
 
 Standalone dev preview (PySide6 only, no Maya):

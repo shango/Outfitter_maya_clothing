@@ -25,7 +25,7 @@ from ..core.asset import ClothingAsset
 from . import style
 from .publish_panel import PublishPanel
 
-WINDOW_OBJECT_NAME = "snapOnClothingBrowser"
+WINDOW_OBJECT_NAME = "outfitterBrowser"
 WINDOW_TITLE = "Outfitter"
 _THUMB_SIZE = 120
 _PREVIEW_MAX = 260
@@ -96,7 +96,7 @@ class _SyncWorker(QtCore.QObject):
         self.finished.emit(result)
 
 
-class ClothingBrowser(QtWidgets.QMainWindow):
+class OutfitterBrowser(QtWidgets.QMainWindow):
     """Read-only library browser: grid of assets + detail panel."""
 
     def __init__(self, roots: list[Path] | None = None, parent: QtWidgets.QWidget | None = None):
@@ -111,6 +111,9 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._roots = roots
         self._scan: library.LibraryScanResult | None = None
         self._preview_pixmap: QtGui.QPixmap | None = None
+        self._current_asset: ClothingAsset | None = None
+        self._sync_thread: QtCore.QThread | None = None
+        self._sync_worker: _SyncWorker | None = None
 
         self.setStyleSheet(style.stylesheet())
         self._build_ui()
@@ -255,9 +258,6 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._sync_progress.setTextVisible(True)
         self._sync_progress.hide()  # shown only while a sync runs
         v.addWidget(self._sync_progress)
-        # Worker thread handles for an in-flight sync (None when idle).
-        self._sync_thread: QtCore.QThread | None = None
-        self._sync_worker: _SyncWorker | None = None
 
         v.addStretch(1)
         note = QtWidgets.QLabel(
@@ -637,13 +637,13 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._d_path.setToolTip(text)
 
     def _copy_path(self) -> None:
-        asset = getattr(self, "_current_asset", None)
+        asset = self._current_asset
         if asset is not None:
             QtWidgets.QApplication.clipboard().setText(str(asset.ma_path))
             self._status.setText(f"Copied path: {asset.ma_path}")
 
     def _open_folder(self) -> None:
-        asset = getattr(self, "_current_asset", None)
+        asset = self._current_asset
         if asset is None:
             return
         folder = Path(asset.ma_path).parent
@@ -652,7 +652,7 @@ class ClothingBrowser(QtWidgets.QMainWindow):
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)
         self._rescale_preview()
-        asset = getattr(self, "_current_asset", None)
+        asset = self._current_asset
         if asset is not None and hasattr(self, "_d_path"):
             self._set_path(asset.ma_path)
 
@@ -768,7 +768,7 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         self._detach_btn.setEnabled(bool(names))
 
 
-_window_singleton: ClothingBrowser | None = None
+_window_singleton: OutfitterBrowser | None = None
 
 # The attach engine carries the in-session registry of what's currently attached
 # (which connections each instance made), so detach can break exactly those edges.
@@ -825,14 +825,14 @@ def _delete_existing_windows() -> None:
             pass
 
 
-def show(roots: list[Path] | None = None) -> ClothingBrowser:
+def show(roots: list[Path] | None = None) -> OutfitterBrowser:
     """Create (or re-show) the browser. Inside Maya, parents to the main window."""
     global _window_singleton
     _window_singleton = None
     _delete_existing_windows()
 
     parent = _maya_main_window()
-    _window_singleton = ClothingBrowser(roots=roots, parent=parent)
+    _window_singleton = OutfitterBrowser(roots=roots, parent=parent)
     # Keep the tool above Maya. On Windows a parented top-level already stacks
     # above the main window with the plain Qt.Window flag. On macOS (Cocoa) that
     # same window falls *behind* Maya whenever Maya takes focus, so use Qt.Tool

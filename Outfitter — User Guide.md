@@ -38,8 +38,8 @@ assets and your library paths (`path.txt`, see §3) are preserved.
 You can also launch it from the Script Editor (Python):
 
 ```python
-import outfitter.launch as scl
-scl.run()
+import outfitter.launch
+outfitter.launch.run()
 ```
 
 ---

@@ -83,6 +83,13 @@ _RECOMMENDED: dict[str, tuple[str, ...]] = {
     "hat": _HEAD,
 }
 
+# Enforce the "keep keys aligned" note above: a new config.ASSET_TYPES entry without a
+# recommendation here (or vice versa) is a developer error, caught at import in dev/CI.
+assert set(_RECOMMENDED) == set(config.ASSET_TYPES), (
+    f"skin_sets._RECOMMENDED {sorted(_RECOMMENDED)} != "
+    f"config.ASSET_TYPES {sorted(config.ASSET_TYPES)}"
+)
+
 
 @dataclass(frozen=True)
 class SkinSetPlan:

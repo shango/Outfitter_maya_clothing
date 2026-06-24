@@ -1,6 +1,6 @@
 """In-scene skinning test — drive the ``cloth_*`` skeleton from the body (Maya-side).
 
-The rigger hits **Load test body** (M14): the tool references in its bundled GenHuman, flips
+The rigger hits **Load test body**: the tool references in its bundled GenHuman, flips
 ``GH_Body_morph`` to match the garment's chosen gender (male = base, female = morph),
 aligns the garment's ``Rig_GRP`` to the rig's export frame, and ``connectAttr``s each
 body joint's ``{translate,rotate,scale}`` onto the matching ``cloth_*`` joint — exactly
@@ -109,11 +109,10 @@ def _align_rig_group(cmds, export_grp: str) -> None:
     the garment lands rotated off the body (see ``attach._align_root_group``). Best-effort
     — if either group is missing the connections still drive, just possibly off-frame.
     """
-    rig_group = _mskel._resolve_joint(cmds, config.RIG_GROUP)
-    if rig_group is None:
-        matches = cmds.ls(config.RIG_GROUP, long=True) or cmds.ls(
-            f"*:{config.RIG_GROUP}", long=True) or []
-        rig_group = matches[0] if matches else None
+    # Rig_GRP is a transform group, not a joint, so match by name across any namespace.
+    matches = cmds.ls(config.RIG_GROUP, long=True) or cmds.ls(
+        f"*:{config.RIG_GROUP}", long=True) or []
+    rig_group = matches[0] if matches else None
     if not rig_group:
         return
     try:
@@ -223,7 +222,7 @@ def disconnect_test_body() -> DisconnectResult:
 def _genhuman_present(cmds) -> bool:
     """True if a GenHuman rig (any marker node) is already in the scene."""
     for marker in config.RIG_MARKERS:
-        if cmds.objExists(marker) or (cmds.ls(f"*:{marker}") or cmds.ls(f"*{marker}*")):
+        if cmds.objExists(marker) or cmds.ls(f"*:{marker}"):
             return True
     return False
 
@@ -280,7 +279,7 @@ def load_test_body(gender: str, mesh_group: str = "Mesh_GRP") -> LoadBodyResult:
     # carries the version token so detect_rig_version still reads it, and removeReference
     # later wipes the rig cleanly. _short strips the namespace, so the cloth_<base> -> body
     # <base> match and the godnode/morph attr path still resolve as connect expects.
-    cmds.file(str(body_file), reference=True, namespace=config.BUNDLED_GENHUMAN_FILE.rsplit(".", 1)[0])
+    cmds.file(str(body_file), reference=True, namespace=config.BUNDLED_GENHUMAN_NAMESPACE)
     morph = _set_body_morph(cmds, gender)
     connect = connect_test_body(mesh_group)
     return LoadBodyResult(gender=gender.strip().lower(), morph=morph, connect=connect)

@@ -4,12 +4,11 @@ Detach must break **only** the edges attach created (FR-5) and detaching one
 instance must never affect another (FR-6). Both guarantees rest on recording the
 precise ``(src, dst)`` plug pairs per instance, keyed by its import namespace.
 
-Pure data + serialization (no Maya). Serializes to plain dicts so the registry
-can later be persisted into a scene node or a sidecar without code changes.
+Pure data (no Maya).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -30,23 +29,6 @@ class AttachedInstance:
     ma_path: str
     cloth_root: str
     connections: list[Connection] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        d = asdict(self)
-        d["connections"] = [asdict(c) for c in self.connections]
-        return d
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "AttachedInstance":
-        conns = [Connection(**c) for c in data.get("connections", [])]
-        return cls(
-            namespace=data["namespace"],
-            asset_name=data["asset_name"],
-            asset_type=data["asset_type"],
-            ma_path=data["ma_path"],
-            cloth_root=data["cloth_root"],
-            connections=conns,
-        )
 
 
 class InstanceRegistry:
@@ -77,13 +59,3 @@ class InstanceRegistry:
 
     def instances(self) -> list[AttachedInstance]:
         return [self._instances[ns] for ns in self.namespaces()]
-
-    def to_dict(self) -> dict:
-        return {ns: inst.to_dict() for ns, inst in self._instances.items()}
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "InstanceRegistry":
-        reg = cls()
-        for inst in data.values():
-            reg.add(AttachedInstance.from_dict(inst))
-        return reg

@@ -22,8 +22,8 @@ BUTTON_COMMAND = (
     "if n == 'outfitter' or n.startswith('outfitter.')]:\n"
     "    del sys.modules[_name]\n"
     "try:\n"
-    "    import outfitter.launch as scl\n"
-    "    scl.run()\n"
+    "    import outfitter.launch\n"
+    "    outfitter.launch.run()\n"
     "except Exception as exc:\n"
     "    import maya.cmds as cmds\n"
     "    cmds.warning('Outfitter failed to launch: %s' % exc)\n"
@@ -55,6 +55,8 @@ def active_shelf(cmds, mel) -> str:
 
 # Labels a previous install may have used — matched so re-dropping refreshes the same
 # button (and migrates the old name) instead of leaving a stale duplicate behind.
+# "Clothing" is the pre-rename (snap_on_clothing-era) label; keep until users have
+# re-dropped at least once.
 _KNOWN_LABELS = (BUTTON_LABEL, "Clothing")
 
 

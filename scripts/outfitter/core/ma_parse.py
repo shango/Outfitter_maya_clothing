@@ -9,8 +9,8 @@ MEL/.ma parser is out of scope; we only need to:
   * read string ``setAttr`` values inside a named node block.
 
 This is read-only and tolerant: it never raises on malformed input, it returns
-best-effort results. It is NOT a validator — real validation happens in Maya
-(``core.validate``, later milestone) where node typing is authoritative.
+best-effort results. It is NOT a validator — structural validation runs in
+``core.validate``; authoritative node-type checking runs in Maya.
 
 Maya ASCII shapes we rely on:
     createNode network -n "cloth_info";
@@ -25,7 +25,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator
+from typing import Iterable, Iterator
 
 # createNode <type> -n "<name>" [-p "<parent>"] ...
 _CREATE_NODE_RE = re.compile(r'^createNode\s+(\S+)\s+.*?-n\s+"((?:\\.|[^"\\])*)"')
@@ -117,7 +117,7 @@ class MaSummary:
     def nodes_of_type(self, node_type: str) -> list[str]:
         return sorted(n for n, t in self.node_types.items() if t == node_type)
 
-    def nodes_of_types(self, node_types) -> list[str]:
+    def nodes_of_types(self, node_types: Iterable[str]) -> list[str]:
         wanted = set(node_types)
         return sorted(n for n, t in self.node_types.items() if t in wanted)
 

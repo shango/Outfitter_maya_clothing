@@ -235,12 +235,10 @@ def assemble_preflight(
         cloth_infl, other = split_influences(facts.skin_influences, cloth_prefix)
         uniq_other = sorted(set(other))
         if uniq_other:
-            sample = ", ".join(uniq_other[:6])
-            more = "" if len(uniq_other) <= 6 else f" (+{len(uniq_other) - 6} more)"
             issues.append(PreflightIssue(
                 "error",
                 f"Garment is skinned to {len(uniq_other)} non-{cloth_prefix}* "
-                f"joint(s): {sample}{more}.",
+                f"joint(s): {_sample(uniq_other)}.",
                 f"Re-skin the garment to the {cloth_prefix}* joints. Influences outside "
                 "the cloth skeleton are deleted with the rig and break attach."))
         elif not cloth_infl:

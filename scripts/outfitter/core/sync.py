@@ -27,7 +27,7 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 # Filesystem mtime resolution varies (FAT rounds to 2s); treat times within this
 # many seconds as equal so we don't re-copy unchanged files forever.
@@ -49,7 +49,7 @@ class SyncProgress:
     phase: str
     done: int = 0
     total: int = 0
-    current: Optional[Path] = None
+    current: Path | None = None
 
 
 # A progress sink: receives each SyncProgress as the sync advances.
@@ -65,10 +65,6 @@ class SyncResult:
     skipped: int = 0                                       # up-to-date, left alone
     errors: list[str] = field(default_factory=list)       # per-file copy failures
     ok: bool = True                                        # False if the run could not start
-
-    @property
-    def copied(self) -> int:
-        return len(self.added) + len(self.updated)
 
     @property
     def changed(self) -> bool:
@@ -99,7 +95,7 @@ def _needs_copy(src: Path, dst: Path) -> bool:
 
 def sync_remote_to_local(remote: Path | str, local: Path | str,
                          *, dry_run: bool = False,
-                         progress: Optional[ProgressCallback] = None) -> SyncResult:
+                         progress: ProgressCallback | None = None) -> SyncResult:
     """Pull new/changed files from ``remote`` into ``local``. Never deletes.
 
     Returns a :class:`SyncResult`. When ``dry_run`` is True the result reports
@@ -115,7 +111,7 @@ def sync_remote_to_local(remote: Path | str, local: Path | str,
     result = SyncResult()
 
     def _emit(phase: str, done: int = 0, total: int = 0,
-              current: Optional[Path] = None) -> None:
+              current: Path | None = None) -> None:
         if progress is not None:
             progress(SyncProgress(phase, done=done, total=total, current=current))
 

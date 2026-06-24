@@ -2,8 +2,8 @@
 
 Inside Maya 2026 (Script Editor or a shelf button)::
 
-    import outfitter.launch as scl
-    scl.run()
+    import outfitter.launch
+    outfitter.launch.run()
 
 Standalone dev preview (needs only PySide6 on PYTHONPATH; no Maya)::
 
@@ -34,7 +34,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    # allow `python scripts/outfitter/launch.py` and `python -m ...`
+    # allow `python scripts/outfitter/launch.py` (direct script run; -m already works)
     if __package__ is None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     raise SystemExit(main())

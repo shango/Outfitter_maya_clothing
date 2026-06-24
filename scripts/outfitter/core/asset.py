@@ -10,7 +10,7 @@ the Authoring Spec §12 attribute names so a sidecar can be a verbatim dump of t
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..config import ASSET_TYPES, GENDERS
@@ -152,7 +152,7 @@ class ClothingAsset:
     thumbnail: Path | None = None
     sidecar: Path | None = None
     source: str = "none"  # "sidecar" | "ma_info" | "none"
-    errors: tuple[str, ...] = field(default_factory=tuple)
+    errors: tuple[str, ...] = ()
 
     @property
     def is_valid(self) -> bool:

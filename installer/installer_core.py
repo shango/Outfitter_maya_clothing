@@ -46,7 +46,7 @@ class InstallResult:
                 f"{len(self.errors)} error(s)")
 
 
-def install_package(source_scripts: Path, scripts_dir: Path) -> Path:
+def install_package(source_scripts: str | Path, scripts_dir: str | Path) -> Path:
     """Copy ``<source_scripts>/outfitter`` into ``scripts_dir`` (overwrite).
 
     Returns the destination package dir. Raises ``FileNotFoundError`` if the
@@ -61,7 +61,7 @@ def install_package(source_scripts: Path, scripts_dir: Path) -> Path:
     return dest
 
 
-def install_path_example(source_scripts: Path, scripts_dir: Path) -> bool:
+def install_path_example(source_scripts: str | Path, scripts_dir: str | Path) -> bool:
     """Ship ``path.txt.example`` beside the package so the format is discoverable.
 
     The template is safe to overwrite on upgrade. The user's real ``path.txt`` (if
@@ -75,7 +75,7 @@ def install_path_example(source_scripts: Path, scripts_dir: Path) -> bool:
     return True
 
 
-def install_assets(bundled_assets: Path, assets_target: Path) -> tuple[int, int]:
+def install_assets(bundled_assets: str | Path, assets_target: str | Path) -> tuple[int, int]:
     """Merge ``bundled_assets`` into ``assets_target`` without clobbering.
 
     Returns ``(copied, skipped)``. A bundled file is copied only when no file
@@ -103,10 +103,10 @@ def install_assets(bundled_assets: Path, assets_target: Path) -> tuple[int, int]
 
 def install(
     *,
-    source_root: Path,
-    scripts_dir: Path,
-    assets_target: Path,
-    bundled_assets: Path | None = None,
+    source_root: str | Path,
+    scripts_dir: str | Path,
+    assets_target: str | Path,
+    bundled_assets: str | Path | None = None,
 ) -> InstallResult:
     """Run the full install: package then starter assets.
 
