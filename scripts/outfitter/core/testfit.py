@@ -22,7 +22,7 @@ from .. import config
 def body_morph_value(gender: str) -> float:
     """The ``GH_Body_morph`` value that puts the GenHuman body into ``gender`` (M14).
 
-    The tool ships one rig and flips this switch (male = base, female = full morph), so
+    The tool ships one rig and flips this switch (female = base, male = full morph), so
     the loaded test body matches the garment variant being authored. Raises ``ValueError``
     on an unknown gender so the caller surfaces it rather than silently loading the base.
     """

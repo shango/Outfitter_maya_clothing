@@ -1,7 +1,7 @@
 """In-scene skinning test — drive the ``cloth_*`` skeleton from the body (Maya-side).
 
 The rigger hits **Load test body**: the tool references in its bundled GenHuman, flips
-``GH_Body_morph`` to match the garment's chosen gender (male = base, female = morph),
+``GH_Body_morph`` to match the garment's chosen gender (female = base, male = morph),
 aligns the garment's ``Rig_GRP`` to the rig's export frame, and ``connectAttr``s each
 body joint's ``{translate,rotate,scale}`` onto the matching ``cloth_*`` joint — exactly
 production attach, in-scene. They pose the body's controls, confirm the mesh follows,
@@ -228,7 +228,14 @@ def _genhuman_present(cmds) -> bool:
 
 
 def _set_body_morph(cmds, gender: str) -> float:
-    """Drive ``GH_Body_morph`` to the value for ``gender``; tolerate an absent attr."""
+    """Drive ``GH_Body_morph`` to the value for ``gender``; return the value actually on
+    the rig afterwards.
+
+    Reads the morph back after setting it, so the caller reports what the body is *really*
+    at — not just what we asked for. Tolerates a genuinely-absent node/attr (returns the
+    requested value), but if the plug exists and the set silently doesn't take (the attr is
+    locked or driven by the rig), the read-back exposes that instead of masking it.
+    """
     value = _testfit.body_morph_value(gender)
     # Resolve the godnode whether imported at root or under a namespace.
     node = config.BODY_MORPH_NODE
@@ -236,18 +243,23 @@ def _set_body_morph(cmds, gender: str) -> float:
         matches = cmds.ls(f"*:{config.BODY_MORPH_NODE}") or []
         node = matches[0] if matches else node
     plug = f"{node}.{config.BODY_MORPH_ATTR}"
+    if not cmds.objExists(plug):
+        return value  # attr genuinely absent — nothing to set or read back
     try:
         cmds.setAttr(plug, value)
-    except Exception:  # noqa: BLE001 — surface as a warning at the UI, don't abort load
+    except Exception:  # noqa: BLE001 — locked/driven; the read-back below tells the truth
         pass
-    return value
+    try:
+        return float(cmds.getAttr(plug))
+    except Exception:  # noqa: BLE001
+        return value
 
 
 def load_test_body(gender: str, mesh_group: str = "Mesh_GRP") -> LoadBodyResult:
     """Reference in the bundled GenHuman, flip it to ``gender``, and connect it for a test.
 
     The tool ships one GenHuman and sets ``GH_Body_morph`` to match the chosen gender
-    (male = base, female = full morph), so the rigger skins/poses the garment against the
+    (female = base, male = full morph), so the rigger skins/poses the garment against the
     correct body without hand-importing one. Refuses if a GenHuman is already in the scene
     (avoid a double body), if there's no cloth skeleton to drive, or if the bundled rig
     file isn't installed. After loading it sets the morph then runs :func:`connect_test_body`.

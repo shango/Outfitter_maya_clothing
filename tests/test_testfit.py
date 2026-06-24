@@ -92,7 +92,7 @@ def test_non_cloth_nodes_are_ignored():
 
 # --- gendered test body (M14) -----------------------------------------------
 def test_body_morph_value_per_gender():
-    # The tool ships ONE rig and flips GH_Body_morph: male = base (0), female = morph (1).
+    # The tool ships ONE rig and flips GH_Body_morph: female = base (0), male = full morph (1).
     assert T.body_morph_value("male") == config.GENDER_BODY_MORPH["male"]
     assert T.body_morph_value("female") == config.GENDER_BODY_MORPH["female"]
     assert T.body_morph_value("male") != T.body_morph_value("female")

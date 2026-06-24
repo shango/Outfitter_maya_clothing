@@ -189,7 +189,6 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
         namespaces=tuple(namespaces),
         present_groups=tuple(g for g in config.REQUIRED_GROUPS if g in shorts),
         has_cloth_root=config.ROOT_JOINT in shorts,
-        has_info_node=config.INFO_NODE in shorts,
         has_skincluster=has_skin,
         skin_influences=tuple(influences),
         cloth_joint_names=cloth_joint_names,
@@ -263,8 +262,28 @@ def capture_thumbnail(meshes: list[str], out_png: str, size: int = 512) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Save
+# Embed metadata + save
 # --------------------------------------------------------------------------- #
+def write_info_node(attrs: dict, node: str = config.INFO_NODE) -> str:
+    """Create/refresh the ``cloth_info`` node so the saved ``.ma`` is self-describing.
+
+    ``attrs`` is the published metadata as ``cloth_info`` attribute names → values (use
+    :meth:`core.publish.PublishSpec.to_sidecar`, so the embedded node mirrors the sidecar
+    exactly). Every value is stored as a string ``addAttr`` (the browser's ``ma_parse``
+    reads string attrs and coerces numbers). Idempotent — re-publishing refreshes the same
+    node's attributes rather than duplicating it.
+    """
+    cmds = _cmds()
+    if not cmds.objExists(node):
+        node = cmds.createNode("network", name=node)
+    for attr, value in attrs.items():
+        plug = f"{node}.{attr}"
+        if not cmds.objExists(plug):
+            cmds.addAttr(node, longName=attr, dataType="string")
+        cmds.setAttr(plug, str(value), type="string")
+    return node
+
+
 def save_ma(out_path: str) -> str:
     """Rename the current scene to ``out_path`` and save it as Maya ASCII.
 

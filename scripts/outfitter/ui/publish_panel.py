@@ -72,9 +72,10 @@ class PublishPanel(QtWidgets.QWidget):
         outer.addWidget(self._build_left_column(), 0)
         outer.addWidget(self._build_right_column(), 1)
 
-        # The steps/metadata row sizes to its content (every step stays visible); the
-        # log takes the remaining vertical space at the bottom instead of leaving a gap.
+        # The two-column steps row sizes to its content (every step stays visible); the
+        # one-line status sits just beneath it and the log takes the remaining height.
         root.addWidget(top, 0)
+        root.addWidget(self._status, 0)
         root.addWidget(self._build_log_panel(), 1)
         self._log("Publish tab ready. Work down the numbered steps, then publish.", "info")
 
@@ -185,12 +186,15 @@ class PublishPanel(QtWidgets.QWidget):
         col = QtWidgets.QVBoxLayout()
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(10)
+        # The right column (form + steps 4/5) is taller, so this column is stretched to
+        # match. Rather than pool that slack into gaps *between* the cards, steps 2 and 3
+        # grow to absorb it — uniform card spacing, and step 3 bottom-aligns with steps 4/5.
 
         # Step 1 — set up the rig (Type + Gender live here, with the build buttons)
         card, body = self._step_card(
             1, "Set up the cloth rig",
             "Choose the garment Type and Gender, build the cloth rig, then load a "
-            "test body to pose the garment against.")
+            "test body to pose the garment against.", center=True)
         picks = QtWidgets.QFormLayout()
         picks.setLabelAlignment(QtCore.Qt.AlignRight)
         picks.setContentsMargins(0, 2, 0, 2)
@@ -202,25 +206,28 @@ class PublishPanel(QtWidgets.QWidget):
         body.addLayout(picks)
         body.addWidget(self._skeleton_btn)
         body.addWidget(self._connect_btn)
-        col.addWidget(card)
+        col.addWidget(card, 0)  # step 1 keeps its natural height (most content)
 
-        # Step 2 — skin (instruction only, no buttons)
+        # Step 2 — skin (instruction only, no buttons); grows to share the slack
         card, _ = self._step_card(
             2, "Skin the mesh",
             "Bind the garment mesh to the highlighted (green) joints: "
-            "Skin ▸ Bind Skin.")
-        col.addWidget(card)
+            "Skin ▸ Bind Skin.", center=True)
+        card.setSizePolicy(QtWidgets.QSizePolicy.Preferred,
+                           QtWidgets.QSizePolicy.MinimumExpanding)
+        col.addWidget(card, 1)
 
-        # Step 3 — remove the test body (+ optional joint prune)
+        # Step 3 — remove the test body (+ optional joint prune); grows, content centered
         card, body = self._step_card(
             3, "Remove the test body",
             "Delete the test body so the cloth joints go static and the asset is "
-            "publish-safe.")
+            "publish-safe.", center=True)
+        card.setSizePolicy(QtWidgets.QSizePolicy.Preferred,
+                           QtWidgets.QSizePolicy.MinimumExpanding)
         body.addWidget(self._disconnect_btn)
         body.addWidget(self._prune_btn)
-        col.addWidget(card)
+        col.addWidget(card, 1)
 
-        col.addStretch(1)
         host = QtWidgets.QWidget()
         host.setLayout(col)
         host.setMinimumWidth(300)
@@ -259,16 +266,23 @@ class PublishPanel(QtWidgets.QWidget):
 
         col.addWidget(self._build_details_form())
         col.addLayout(row)
-        col.addWidget(self._status)
-        col.addStretch(1)
+        # No trailing stretch: the steps 4/5 row is the column's bottom, so the left
+        # column (steps 1–3) stretches to align step 3 with it. The status strip lives
+        # full-width below both columns (see _build_ui).
 
         host = QtWidgets.QWidget()
         host.setLayout(col)
         return host
 
-    def _step_card(self, number: int, title: str,
-                   instruction: str) -> tuple[QtWidgets.QFrame, QtWidgets.QVBoxLayout]:
-        """A numbered step card: big number + title + instruction, returns its body layout."""
+    def _step_card(self, number: int, title: str, instruction: str, *,
+                   center: bool = False) -> tuple[QtWidgets.QFrame, QtWidgets.QVBoxLayout]:
+        """A numbered step card: big number + title + instruction, returns its body layout.
+
+        With ``center=True`` the number and the body content (title, instruction, and any
+        buttons the caller appends) sit in the vertical middle of the card, so a card taller
+        than its content keeps balanced top/bottom padding. Default top-aligns — steps 4 & 5
+        rely on that for their preview image and bottom-pinned Publish button.
+        """
         card = QtWidgets.QFrame()
         card.setObjectName("stepCard")
         # Vertically the card hugs its content; horizontally it fills its column slot.
@@ -280,7 +294,8 @@ class PublishPanel(QtWidgets.QWidget):
         num = QtWidgets.QLabel(str(number))
         num.setObjectName("stepNumber")
         num.setFixedWidth(28)
-        num.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
+        num_v = QtCore.Qt.AlignVCenter if center else QtCore.Qt.AlignTop
+        num.setAlignment(num_v | QtCore.Qt.AlignRight)
         row.addWidget(num, 0)
 
         body = QtWidgets.QVBoxLayout()
@@ -297,7 +312,17 @@ class PublishPanel(QtWidgets.QWidget):
         ins.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
         ins.setMinimumHeight(ins.fontMetrics().height())
         body.addWidget(ins)
-        row.addLayout(body, 1)
+
+        if center:
+            # Sandwich the content between stretches so it stays a block and sits centered;
+            # the number is aligned to vertical-centre above to pair with it.
+            wrap = QtWidgets.QVBoxLayout()
+            wrap.addStretch(1)
+            wrap.addLayout(body)
+            wrap.addStretch(1)
+            row.addLayout(wrap, 1)
+        else:
+            row.addLayout(body, 1)
         return card, body
 
     def showEvent(self, event: QtGui.QShowEvent) -> None:
@@ -477,6 +502,9 @@ class PublishPanel(QtWidgets.QWidget):
             with _wait_cursor():
                 skel = maya_skeleton.build_cloth_skeleton()
                 self._log(skel.summary(), "ok")
+                groups = maya_skeleton.scaffold_asset_groups()
+                self._log(groups.summary(),
+                          "warn" if groups.mesh_group_empty else "ok")
                 skin = maya_skeleton.build_skin_set(asset_type)
         except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
             self._report(f"Create cloth skeleton failed: {exc}", "error")
@@ -762,6 +790,9 @@ class PublishPanel(QtWidgets.QWidget):
                 else:
                     maya_publish.capture_thumbnail(meshes, str(paths.thumbnail))
 
+                # Embed the metadata in the scene (cloth_info) so the saved .ma is
+                # self-describing, then save; the sidecar carries the same data.
+                maya_publish.write_info_node(spec.to_sidecar())
                 maya_publish.save_ma(str(paths.ma))
                 _publish.write_sidecar(paths, spec)
                 report = _publish.validate_published_ma(paths.ma)

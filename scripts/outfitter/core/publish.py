@@ -145,7 +145,6 @@ class SceneFacts:
     namespaces: tuple[str, ...]
     present_groups: tuple[str, ...]
     has_cloth_root: bool
-    has_info_node: bool
     has_skincluster: bool
     skin_influences: tuple[str, ...]
     cloth_joint_names: tuple[str, ...]
@@ -193,7 +192,6 @@ def assemble_preflight(
     facts: SceneFacts,
     required_groups=config.REQUIRED_GROUPS,
     cloth_prefix: str = config.CLOTH_PREFIX,
-    info_node: str = config.INFO_NODE,
     root_joint: str = config.ROOT_JOINT,
 ) -> list[PreflightIssue]:
     """Turn gathered :class:`SceneFacts` into an ordered list of :class:`PreflightIssue`.
@@ -281,11 +279,8 @@ def assemble_preflight(
             "Use generic shaders only (lambert / standardSurface). Render-engine-specific "
             "materials aren't allowed and don't survive a clean .ma export."))
 
-    if not facts.has_info_node:
-        issues.append(PreflightIssue(
-            "warn", f"No '{info_node}' node in the scene.",
-            "Publish writes metadata from the form, but add the info node if your "
-            "pipeline expects it embedded in the .ma."))
+    # No cloth_info check here: publish writes the node from the form before saving
+    # (see maya_publish.write_info_node), so the saved .ma is always self-describing.
 
     if not any(i.is_error for i in issues):
         issues.append(PreflightIssue("ok", "Scene looks publish-ready.", ""))

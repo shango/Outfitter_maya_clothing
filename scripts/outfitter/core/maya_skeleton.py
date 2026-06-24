@@ -56,6 +56,28 @@ class SkeletonBuildResult:
 
 
 @dataclass
+class ScaffoldGroupsResult:
+    created_groups: list[str]   # required groups newly created this run
+    grouped_meshes: list[str]   # loose objects moved under Mesh_GRP (short names)
+    mesh_group_empty: bool      # Mesh_GRP holds nothing (geo not found / skipped)
+
+    def summary(self) -> str:
+        parts = []
+        if self.created_groups:
+            parts.append("created " + ", ".join(self.created_groups))
+        if self.grouped_meshes:
+            n = len(self.grouped_meshes)
+            parts.append(
+                f"moved {n} object{'' if n == 1 else 's'} into Mesh_GRP "
+                f"({', '.join(self.grouped_meshes)})")
+        body = ("Asset groups ready — " + "; ".join(parts) + "."
+                if parts else "Asset groups already in place.")
+        if self.mesh_group_empty:
+            body += " Mesh_GRP is empty — put your garment mesh inside it."
+        return body
+
+
+@dataclass
 class PruneResult:
     deleted: list[str]
     kept_unweighted: list[str]
@@ -211,6 +233,51 @@ def build_cloth_skeleton(spec: _skeleton.SkeletonSpec | None = None) -> Skeleton
     return SkeletonBuildResult(
         root_group=spec.root_group, root_joint=spec.root_joint,
         joint_count=len(spec.joints))
+
+
+def _loose_garment_roots(cmds, reserved: set[str]) -> list[str]:
+    """Top-level (world-child) transforms holding renderable mesh geometry that aren't one
+    of the asset's own groups or a namespaced (referenced rig/body) node."""
+    roots: list[str] = []
+    for mesh in (cmds.ls(type="mesh", long=True) or []):
+        if cmds.getAttr(f"{mesh}.intermediateObject"):
+            continue
+        top = next((p for p in mesh.split("|") if p), "")  # first non-empty path component
+        if not top or ":" in top or top in reserved:       # referenced/rig or own group
+            continue
+        full = "|" + top
+        if full not in roots:
+            roots.append(full)
+    return roots
+
+
+def scaffold_asset_groups(
+        mesh_group: str = config.MESH_GROUP,
+        ctrl_group: str = config.CTRL_GROUP) -> ScaffoldGroupsResult:
+    """Create the required Mesh_GRP / Ctrl_GRP and tuck loose garment geo under Mesh_GRP.
+
+    Run straight after the skeleton build (which already makes Rig_GRP) so a single click
+    leaves the three-group asset skeleton the publish preflight requires. Mesh grouping is
+    skipped when a GenHuman rig is in the scene — its body mesh would be ambiguous — so then
+    Mesh_GRP is left empty for the rigger to fill. Parenting preserves world position, so the
+    garment stays at its authored height.
+    """
+    cmds = _cmds()
+    created: list[str] = []
+    for grp in (ctrl_group, mesh_group):
+        if not cmds.objExists(grp):
+            cmds.group(empty=True, name=grp)
+            created.append(grp)
+
+    grouped: list[str] = []
+    if not maya_publish.scene_has_rig():
+        reserved = {mesh_group, ctrl_group, config.RIG_GROUP}
+        for root in _loose_garment_roots(cmds, reserved):
+            grouped.append(_short(cmds.parent(root, mesh_group)[0]))
+
+    cmds.select(clear=True)
+    mesh_empty = not (cmds.listRelatives(mesh_group, children=True) or [])
+    return ScaffoldGroupsResult(created, grouped, mesh_empty)
 
 
 def _scene_cloth_joints(cmds) -> dict[str, str]:

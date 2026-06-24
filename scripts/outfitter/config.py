@@ -17,7 +17,10 @@ ASSET_TYPES: tuple[str, ...] = ("shoes", "pants", "shirt", "dress", "coat", "hat
 GENDERS: tuple[str, ...] = ("male", "female")
 
 # --- asset structure contract (Authoring Spec §3) -----------------------------
-REQUIRED_GROUPS: tuple[str, ...] = ("Mesh_GRP", "Rig_GRP", "Ctrl_GRP")
+MESH_GROUP: str = "Mesh_GRP"   # holds the garment meshes
+RIG_GROUP: str = "Rig_GRP"     # holds the cloth_* joint hierarchy (frame note below)
+CTRL_GROUP: str = "Ctrl_GRP"   # holds controls; often empty since the fit rig was retired
+REQUIRED_GROUPS: tuple[str, ...] = (MESH_GROUP, RIG_GROUP, CTRL_GROUP)
 INFO_NODE: str = "cloth_info"
 ROOT_JOINT: str = "cloth_root"
 CLOTH_PREFIX: str = "cloth_"
@@ -36,10 +39,9 @@ CONNECT_ATTRS: tuple[str, ...] = ("translate", "rotate", "scale")
 # never short name, because a rig-internal deform skeleton shares short names.
 EXPORT_SKELETON_GROUP: str = "GenHuman_Joint_GRP"  # verify-in-Maya (PRD §4 open task)
 
-# The garment's joint group (Authoring Spec §3). At attach this group is aligned to
-# the rig's EXPORT_SKELETON_GROUP world frame, because that group carries a transform
+# RIG_GROUP frame note (defined above): at attach the garment's Rig_GRP is aligned to the
+# rig's EXPORT_SKELETON_GROUP world frame, because that group carries a transform
 # (GenHuman_Joint_GRP has rotate -90 X) and attach only connects LOCAL joint transforms.
-RIG_GROUP: str = "Rig_GRP"
 
 # Any of these existing in the scene identifies the GenHuman rig as present.
 # (Post-rename names; verify-in-Maya which is most stable — PRD §9 open task.)
@@ -53,11 +55,11 @@ RIG_MARKERS: tuple[str, ...] = (
 # The tool ships ONE GenHuman and flips the male/female switch to match the chosen
 # gender, because the two genders are the SAME rig differing only by this morph value
 # (it moves the body MESH, not the joints — hence one shared cloth_* skeleton).
-# The switch is `GH_Body_morph` (0-1) on the godnode (M0 finding). male = base (0),
-# female = full morph (1).  *** Morph VALUES are verify-in-Maya. ***
+# The switch is `GH_Body_morph` (0-1) on the godnode. Verified in Maya 2026-06-24:
+# female = base (0), male = full morph (1).
 BODY_MORPH_NODE: str = "god_m_godnode_anim"
 BODY_MORPH_ATTR: str = "GH_Body_morph"
-GENDER_BODY_MORPH: dict[str, float] = {"male": 0.0, "female": 1.0}
+GENDER_BODY_MORPH: dict[str, float] = {"male": 1.0, "female": 0.0}
 
 # The bundled GenHuman the "Load test body" action references. Lives in the package's
 # lib/ dir so the installer copytree ships it alongside the code; kept OUT of git (large

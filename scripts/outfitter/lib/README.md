@@ -1,7 +1,7 @@
 # Bundled GenHuman test body
 
 The **"Load test body"** action on the Publish tab *references* a GenHuman rig from here,
-flips `GH_Body_morph` to match the garment's chosen Gender (male = base, female = full
+flips `GH_Body_morph` to match the garment's chosen Gender (female = base, male = full
 morph), and connects it to the `cloth_*` skeleton so the rigger can pose the body and
 confirm the garment deforms before publishing. **"Remove test body"** drops that reference,
 which deletes every node it brought in (selection sets included) so nothing is stranded to

@@ -117,7 +117,6 @@ def _clean_facts(**over):
         namespaces=(),
         present_groups=("Mesh_GRP", "Rig_GRP", "Ctrl_GRP"),
         has_cloth_root=True,
-        has_info_node=True,
         has_skincluster=True,
         skin_influences=("cloth_spine_01", "cloth_head"),
         cloth_joint_names=("cloth_root", "cloth_spine_01", "cloth_head"),
@@ -196,12 +195,6 @@ def test_preflight_flags_missing_groups_and_root():
     assert any("Missing required group" in i.message and i.is_error for i in issues)
     assert any("cloth_root" in i.message and i.is_error for i in issues)
     assert any("Rig_GRP" in i.message for i in issues)
-
-
-def test_preflight_info_node_is_only_a_warning():
-    issues = P.assemble_preflight(_clean_facts(has_info_node=False))
-    assert any("cloth_info" in i.message and i.level == "warn" for i in issues)
-    assert not _levels(issues, "error")
 
 
 def test_preflight_warns_when_test_body_still_connected():
