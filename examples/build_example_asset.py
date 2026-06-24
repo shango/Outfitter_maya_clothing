@@ -63,7 +63,7 @@ _EXAMPLE_DESCRIPTION = (
     "Example trench coat: a skinned structural reference garment."
 )
 
-# The rig's export-skeleton group (matches snap_on_clothing.config.EXPORT_SKELETON_GROUP).
+# The rig's export-skeleton group (matches outfitter.config.EXPORT_SKELETON_GROUP).
 # attach connects FROM these joints, so the garment must duplicate exactly these.
 _EXPORT_GROUP = "GenHuman_Joint_GRP"
 
@@ -94,7 +94,7 @@ _BUILD_ROOTS = ("cloth_*", "Mesh_GRP", "Rig_GRP", "Ctrl_GRP", TOP)
 
 
 def _ensure_package_importable() -> None:
-    """Put ``<repo>/scripts`` on ``sys.path`` so ``snap_on_clothing`` imports.
+    """Put ``<repo>/scripts`` on ``sys.path`` so ``outfitter`` imports.
 
     The build writes its sidecar + thumbnail through the shared ``core.publish`` /
     ``core.maya_publish`` helpers, so the package must import. Resolved from ``__file__``
@@ -285,7 +285,7 @@ def _build_info_node() -> str:
         "gender": "male",
         "clothVersion": "1.0.0",
         "genHumanCompat": "v03",
-        "author": "Snap-On Clothing (example)",
+        "author": "Outfitter (example)",
         "notes": _EXAMPLE_DESCRIPTION,
     }
     for attr, value in strings.items():
@@ -415,7 +415,7 @@ def _publish_sidecar_and_thumbnail(out_path: str) -> None:
     The rig is already gone here, so the rig version is stamped explicitly (``v03``).
     """
     try:
-        from snap_on_clothing.core import maya_publish, publish as _pub
+        from outfitter.core import maya_publish, publish as _pub
     except Exception as exc:  # noqa: BLE001 — package not on path; skip the extras
         print(f"[build_example_asset] sidecar/thumbnail skipped (no package: {exc})")
         return
@@ -432,7 +432,7 @@ def _publish_sidecar_and_thumbnail(out_path: str) -> None:
         print(f"[build_example_asset] thumbnail capture skipped: {exc}")
     spec = _pub.PublishSpec(
         asset_name=ASSET_NAME, asset_type="coat", gender="male", cloth_version="1.0.0",
-        genhuman_compat=("v03",), author="Snap-On Clothing (example)",
+        genhuman_compat=("v03",), author="Outfitter (example)",
         description=_EXAMPLE_DESCRIPTION,
         rig_version="v03", created=_pub.today_iso(), tri_count=tris, vert_count=verts)
     _pub.write_sidecar(paths, spec)

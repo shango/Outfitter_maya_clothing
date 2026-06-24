@@ -1,4 +1,4 @@
-"""Snap-On Clothing Rig System — Maya 2026 tool package.
+"""Outfitter Rig System — Maya 2026 tool package.
 
 Browse local clothing assets, snap a chosen asset onto the animated GenHuman rig
 via direct ``connectAttr`` only, and detach cleanly. See ``prd.md`` and

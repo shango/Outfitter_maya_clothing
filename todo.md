@@ -1,6 +1,6 @@
-# TODO — GenHuman Snap-On Clothing Tool
+# TODO — GenHuman Outfitter Tool
 
-Multi-session build tracker. Source of truth: `Snap-On Clothing Rig System.md` + `prd.md`.
+Multi-session build tracker. Source of truth: `Outfitter Rig System.md` + `prd.md`.
 Artist-facing build contract: `Clothing Asset Authoring Spec.md` (handed to the clothing rigger 2026-06-04).
 Host: Maya 2026 · Python 3 · PySide6. Convention: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked/needs decision.
 
@@ -46,16 +46,16 @@ line/createNode counts identical pre/post; 0 new duplicate node names; **male/fe
 ---
 
 ## M1 — Library + read-only browser
-**STARTED 2026-06-04: package scaffolded under `scripts/snap_on_clothing/`; pure core built + headless-tested (19 passing).**
+**STARTED 2026-06-04: package scaffolded under `scripts/outfitter/`; pure core built + headless-tested (19 passing).**
 Core has zero `maya`/`PySide6` imports at module scope so validators run in CI; Maya/Qt confined to `ui/`.
-Run tests: `cd tests && python -m pytest -q`. Dev preview: `PYTHONPATH=scripts python -m snap_on_clothing.launch`.
+Run tests: `cd tests && python -m pytest -q`. Dev preview: `PYTHONPATH=scripts python -m outfitter.launch`.
 - [x] `config.py`: taxonomy (`ASSET_TYPES`), structure contract (groups/info/root/fit-ctrl), **CONNECT_ATTRS = translate/rotate/scale** (LOCKED), `EXPORT_SKELETON_GROUP`, install paths.
 - [x] `core/asset.py`: `AssetMetadata` (spec §12 fields, compat list parse, validation w/ collected errors) + `ClothingAsset` (path/meta/thumb/sidecar/source/errors, valid/invalid).
 - [x] `core/library.py`: recursive scan of roots for `.ma`; sidecar `.json` first then `cloth_info`; thumbnail discovery; invalid assets surfaced not dropped; `LibraryScanResult` (valid/invalid/by_type).
 - [x] Lightweight `.ma` metadata read **without importing** — `core/ma_parse.py`: quote-aware statement tokenizer, `createNode`/`setAttr` string extraction, `summarize()` (node names+types, info attrs, cloth-joint list). No Maya.
 - [x] `ui/window.py`: PySide6 `ClothingBrowser` (QMainWindow) shell; parents to Maya main window via `MQtUtil`/`wrapInstance` when present, standalone otherwise.
 - [x] Library grid: `QListWidget` IconMode thumbnails (placeholder when none), type filter combo, live search, selection → read-only detail panel (name/type/version/compat/author/source/path/issues); status bar.
-- [x] Launch via `snap_on_clothing.launch.run()` (Maya) or `python -m snap_on_clothing.launch` (standalone). Temp shelf wiring lands with the installer in M4.
+- [x] Launch via `outfitter.launch.run()` (Maya) or `python -m outfitter.launch` (standalone). Temp shelf wiring lands with the installer in M4.
 - [x] **Setup tab + configurable library roots (2026-06-04):** user points the browser at one or more asset folders (external drive / shared server) once on a **Setup** tab. The Setup tab **reads and writes a plain-text store, `scripts/path.txt`** (one folder per line) — a tiny hand-editable "db" that sits beside the package and survives installer upgrades. `core/settings.py` (pure, headless-tested — read/write/add/remove, dedup-by-resolved-path, order preserved, comments+blanks ignored, unreadable-file tolerant). `effective_library_roots()` = saved roots else built-in defaults (installed + bundled). Browser scan + status bar use the resolved roots; clearing the file reverts to defaults. `ui/window.py` now a `Library`/`Setup` `QTabWidget`; `path.txt.example` ships beside the package; installer copies the example (never clobbers a real `path.txt`). `tests/test_settings.py` (13 tests).
 - [!] **Verify in Maya 2026:** Setup tab — set a Local folder, confirm it writes `path.txt`, persists across relaunch, and its assets appear in the grid; `QFileDialog` folder picker works parented to Maya. *(Needs Maya.)*
 - [x] **Local + Remote locations + Sync (2026-06-09):** Setup tab now sets **two** folders — `local` (the only folder scanned/worked from) and `remote` (shared master, never scanned). `path.txt` is now a keyed store (`local = …` / `remote = …`; legacy bare-line files still read, first folder → local). New pure `core/sync.py` `sync_remote_to_local(remote, local)`: one-way, additive (copies new + size/mtime-changed files, `copy2` preserves mtime so re-syncs skip unchanged), **never deletes**, won't clobber a locally-newer file; returns `SyncResult` (added/updated/skipped/errors + `.summary()`). `core/settings.py` rewritten to `Locations`/`read_locations`/`write_locations`/`set_local`/`set_remote`; `effective_library_roots()` → `[local]` else defaults (remote excluded). Setup tab: Local/Remote rows (Browse/Clear) + **Sync from remote ↓** button (wait cursor → summary → auto-refresh). Docs: User Guide §3 + `path.txt.example` updated. Tests: `test_settings.py` rewritten + new `test_sync.py` (9) — **105 headless tests passing.**
@@ -111,9 +111,9 @@ unit-tested with no Maya. **Still needs in-Maya smoke (see `[!]` below).**
 - [x] Genie export check: preserve required node names; confirm attach didn't mutate the rig / introduce nodes; DG stays lightweight. → `core/export.py` `audit_export_readiness(scene, registry)`: asserts (a) `GENIE_REQUIRED_NODES` all present (empty list ⇒ INFO, not fail), (b) export skeleton resolves ≥1 joint, (c) **every recorded edge is a transform-channel `connectAttr` whose dst is the instance's own clothing and whose src is a rig joint (never the reverse / never cross-instance)** — proving connectAttr-only + rig-untouched headlessly. `tests/test_export.py` (5 tests). *Live `.ma`/USD/FBX/Alembic export still an in-Maya smoke check (needs Maya + Genie node list).*
 - [x] **Drag-and-drop installer (viewport):**
   - [x] `install.py` with `onMayaDroppedPythonFile()` at distribution root; wires Maya paths (`internalVar(userScriptDir)`, `config.user_asset_dir()`) to the pure core, then refreshes the shelf; `confirmDialog` + Script-Editor report.
-  - [x] `install/installer_core.py` (pure, no maya): `install_package` copies `snap_on_clothing` → scripts dir (overwrite, skips `__pycache__`); `install_assets` merges bundled `assets/` **without clobbering** user files; `install()` orchestrates + returns `InstallResult`.
-  - [x] Copy **bundled `assets/` library** → `~/maya/snap_on_clothing/assets/` (per-user root from `config.user_asset_dir()`); non-clobbering so user assets/paths survive.
-  - [x] `installer/shelf.py`: create/refresh "Clothing" shelf button on a `SnapOnClothing` tab; button command imports the package lazily at click time. *(py_compile only — needs Maya.)*
+  - [x] `install/installer_core.py` (pure, no maya): `install_package` copies `outfitter` → scripts dir (overwrite, skips `__pycache__`); `install_assets` merges bundled `assets/` **without clobbering** user files; `install()` orchestrates + returns `InstallResult`.
+  - [x] Copy **bundled `assets/` library** → `~/maya/outfitter/assets/` (per-user root from `config.user_asset_dir()`); non-clobbering so user assets/paths survive.
+  - [x] `installer/shelf.py`: create/refresh "Clothing" shelf button on a `Outfitter` tab; button command imports the package lazily at click time. *(py_compile only — needs Maya.)*
   - [x] Idempotent re-run (upgrade): package re-copied fresh, every existing asset skipped (proven by `test_full_install_idempotent`).
   - [x] Success/failure reporting; `onMayaDroppedPythonFile` catches everything so Maya is never left broken.
   - [x] `tests/test_installer.py` (6 tests): overwrite-on-upgrade, pycache-skip, non-clobber merge, missing-source no-op, idempotent full run, missing-package failure.
@@ -128,7 +128,7 @@ unit-tested with no Maya. **Still needs in-Maya smoke (see `[!]` below).**
 - [x] Author one **example compliant clothing asset** (`.ma`) → `assets/trench_coat_A/` (`trench_coat_A.ma` + `.json` sidecar + `README.md`). Hand-authored, **validator-passing**, Maya-loadable: required hierarchy (`Mesh_GRP`/`Rig_GRP`/`Ctrl_GRP` + `cloth_info`), full `cloth_*` connection skeleton (spine/neck/arms/legs, names = `cloth_` + EXACT body name, no `_jnt`), helper coat-tail joints, `cloth_fit_ctrl` with keyable `fit_*` floats (min/max/neutral), real cube geometry. Geometry is placeholder + **no skinCluster** (vertex/skin data can't be hand-authored safely) → the fully-skinned production build is generated in Maya by `examples/build_example_asset.py`. `tests/test_example_asset.py` (6 tests) validates the SHIPPED `.ma` through the real `ma_parse`+`validate`+`library` core every run, so it can't drift.
   - Parser fix: `core/ma_parse.iter_statements` now strips `//` line comments (outside strings) — Maya files use them as inline node dividers; previously a comment merged into the next statement and hid its `createNode`. Existing fixture had comments only at top/bottom so it never surfaced.
 - [x] Build a **test scene**: GenHuman rig + clothing attached → `examples/build_test_scene.py` (in-Maya): imports `GenHuman_rig_v03.ma`, attaches asset(s) via the **real tool core** (`AttachEngine`+`MayaScene`, connectAttr-only, transactional), runs `audit_export_readiness`. *(needs Maya — py_compile verified; run as the M5 in-Maya smoke.)*
-- [x] Docs: **asset-authoring side** → `Clothing Asset Authoring Spec.md`. **Tool-user side DONE** → `Snap-On Clothing — User Guide.md` (install/drop · Setup tab + `path.txt` · browse→validate→attach→fit→detach · full validation-error reference pulled from `validate.py`/`attach.py` · Genie export notes · supported versions · troubleshooting).
+- [x] Docs: **asset-authoring side** → `Clothing Asset Authoring Spec.md`. **Tool-user side DONE** → `Outfitter — User Guide.md` (install/drop · Setup tab + `path.txt` · browse→validate→attach→fit→detach · full validation-error reference pulled from `validate.py`/`attach.py` · Genie export notes · supported versions · troubleshooting).
 - [x] **Dev-only `examples/`** dir (excluded from the ship package, like `tests/`): `build_example_asset.py` (skinned asset generator + fit lattice driven by `cloth_fit_ctrl` SDK), `build_test_scene.py`, `__init__.py`, `README.md`. py_compile clean.
 - [x] **Verify in Maya 2026 — `build_example_asset` DONE (2026-06-10):** ran `examples/build_example_asset.build()` from Windows Maya 2026 importing the script directly over the WSL UNC path (`\\wsl.localhost\Ubuntu-24.04\...`, no copy) → clean skinned `.ma` exported back into the WSL repo (100 KB, 27 joints, 2 skinClusters, ffd+lattice+baseLattice fit deformer, `cloth_info` network, SDK animCurves). Re-validated through the real core: `test_example_asset.py` 6/6 + full suite 105/105 green. *(`build_test_scene.build()` against `GenHuman_rig_v03.ma` — attach/follow/detach + export audit — still pending the M2/M3/M4 in-Maya smoke checks.)*
 - [ ] (Future-proofing note) Keep architecture compatible with body-morph propagation.
@@ -216,7 +216,7 @@ Driver: there's exactly one GenHuman rig ⇒ one `cloth_*` export skeleton. Inst
 import-rig → duplicate → rename → prune every time, ship the skeleton as data and rebuild
 it in-scene. Rigger then deletes the joints their garment won't skin to (per user: "we'll
 let the rigger delete the joints that aren't relevant"), skins, and scaffolds the fit rig.
-- [x] **Persisted data** (`scripts/snap_on_clothing/data/cloth_skeleton.json`): the canonical
+- [x] **Persisted data** (`scripts/outfitter/data/cloth_skeleton.json`): the canonical
   skeleton extracted from the verified `assets/trench_coat_A/trench_coat_A.ma` — **89 body-derived
   export joints** (full body chain + both arms incl. finger hierarchies + legs + twists + Epic
   `ik_*`/`interaction`/`center_of_mass` virtuals). Garment helper joints (`cloth_coatTail_*`)
@@ -391,7 +391,7 @@ skinning are unchanged. The proper long-term answer to shape variation remains *
   `SceneFacts.has_fit_ctrl` field (set in `maya_publish`, never read by `assemble_preflight`) was removed.
   The shipped `trench_coat_A.ma` still contains a `cloth_fit_ctrl` (regenerable only in Maya) and stays
   valid; the `test_example_asset` assertion that required it was dropped.
-- [x] Docs: dropped the fit-control + Scaffold workflow from `Snap-On Clothing — User Guide.md` (§5 is now
+- [x] Docs: dropped the fit-control + Scaffold workflow from `Outfitter — User Guide.md` (§5 is now
   "Male / female variants") and `Clothing Asset Authoring Spec.md` (§8 rewritten to the two-variant model;
   intro TL;DR / Ctrl_GRP tree / §15 note / §16 checklist / §17 workflow updated). Noted the male/female
   model throughout. `__init__.py` docstring de-fit-ed.
@@ -426,7 +426,7 @@ skinning are unchanged. The proper long-term answer to shape variation remains *
 - [x] Updated all fixtures for the required field; `py_compile` clean on the Maya-boundary modules
   (`publish_panel`, `window`, `maya_publish`, builder).
 - [x] Synced `prd.md` (M12 amendment banner superseding FR-4/FR-7/§7 + controls/placement/presets) +
-  `Snap-On Clothing Rig System.md` (two-variant note); Authoring Spec §12 + validator hint + User Guide
+  `Outfitter Rig System.md` (two-variant note); Authoring Spec §12 + validator hint + User Guide
   validation row now list `gender`. Memory updated (`m12-…`, `publish-tab-authoring-helpers`,
   `recommended-skin-joint-sets`).
 - [!] **Verify in Maya 2026 (end-to-end):** with the single shared skeleton, author one garment's male

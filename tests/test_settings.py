@@ -7,8 +7,8 @@ import _bootstrap  # noqa: F401
 
 from pathlib import Path
 
-from snap_on_clothing import config
-from snap_on_clothing.core import settings as st
+from outfitter import config
+from outfitter.core import settings as st
 
 
 def test_read_missing_file_is_empty(tmp_path):

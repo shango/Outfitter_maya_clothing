@@ -14,8 +14,8 @@ from installer import installer_core  # noqa: E402
 
 
 def _make_distribution(root: Path) -> Path:
-    """Build a fake distribution tree: scripts/snap_on_clothing + assets/."""
-    pkg = root / "scripts" / "snap_on_clothing"
+    """Build a fake distribution tree: scripts/outfitter + assets/."""
+    pkg = root / "scripts" / "outfitter"
     (pkg / "core").mkdir(parents=True)
     (pkg / "__init__.py").write_text("# v1\n")
     (pkg / "core" / "asset.py").write_text("# asset v1\n")
@@ -43,7 +43,7 @@ def test_install_package_overwrites_on_upgrade(tmp_path):
     scripts_dir = tmp_path / "maya" / "scripts"
     installer_core.install_package(dist / "scripts", scripts_dir)
     # simulate a newer build
-    (dist / "scripts" / "snap_on_clothing" / "__init__.py").write_text("# v2\n")
+    (dist / "scripts" / "outfitter" / "__init__.py").write_text("# v2\n")
     dest = installer_core.install_package(dist / "scripts", scripts_dir)
     assert (dest / "__init__.py").read_text() == "# v2\n"
 
@@ -76,7 +76,7 @@ def test_full_install_idempotent(tmp_path):
         source_root=dist, scripts_dir=scripts_dir, assets_target=target)
     assert r1.ok, r1.errors
     assert r1.assets_copied == 2 and r1.assets_skipped == 0
-    assert (scripts_dir / "snap_on_clothing" / "__init__.py").exists()
+    assert (scripts_dir / "outfitter" / "__init__.py").exists()
 
     # second run: package re-copied, every asset already present -> all skipped
     r2 = installer_core.install(

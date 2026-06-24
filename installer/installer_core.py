@@ -5,7 +5,7 @@ headlessly with temp dirs. ``install.py`` (the drop handler) supplies the real
 Maya paths and then calls :func:`install`.
 
 Policy (FR-9):
-  * The ``snap_on_clothing`` package is **overwritten** on every run so re-dropping
+  * The ``outfitter`` package is **overwritten** on every run so re-dropping
     a newer build upgrades cleanly (``__pycache__`` is never copied).
   * Bundled starter assets are **merged, never clobbered**: a file is copied only
     when the target does not already exist, so a user's own/edited assets and any
@@ -19,7 +19,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-PACKAGE_NAME = "snap_on_clothing"
+PACKAGE_NAME = "outfitter"
 _IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", ".pytest_cache")
 
 
@@ -40,14 +40,14 @@ class InstallResult:
         self.errors.append(msg)
 
     def summary(self) -> str:
-        head = "Snap-On Clothing installed" if self.ok else "Snap-On Clothing install FAILED"
+        head = "Outfitter installed" if self.ok else "Outfitter install FAILED"
         return (f"{head}: package -> {self.package_dest}; "
                 f"assets {self.assets_copied} copied / {self.assets_skipped} kept; "
                 f"{len(self.errors)} error(s)")
 
 
 def install_package(source_scripts: Path, scripts_dir: Path) -> Path:
-    """Copy ``<source_scripts>/snap_on_clothing`` into ``scripts_dir`` (overwrite).
+    """Copy ``<source_scripts>/outfitter`` into ``scripts_dir`` (overwrite).
 
     Returns the destination package dir. Raises ``FileNotFoundError`` if the
     source package is missing.

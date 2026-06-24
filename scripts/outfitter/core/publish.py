@@ -9,7 +9,7 @@ This module is the **pure** half — it assembles the sidecar payload, computes 
 destination paths, sanitizes the asset name, and validates a saved ``.ma`` by reusing
 the existing file validator. Everything that needs a live Maya scene (polycount,
 playblast thumbnail, rig-version detection, saving the file) lives in
-:mod:`snap_on_clothing.core.maya_publish`. Keeping them apart lets the assembly and
+:mod:`outfitter.core.maya_publish`. Keeping them apart lets the assembly and
 validation logic run in CI with no Maya, exactly like the rest of ``core``.
 """
 from __future__ import annotations

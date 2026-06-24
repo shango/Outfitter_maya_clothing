@@ -1,6 +1,6 @@
 # Example asset — `trench_coat_A`
 
-A spec-compliant **example clothing asset** for the GenHuman Snap-On Clothing tool,
+A spec-compliant **example clothing asset** for the GenHuman Outfitter tool,
 built to `Clothing Asset Authoring Spec.md`. It ships in the bundled starter library
 so the tool always has something to browse, validate, attach, and detach.
 

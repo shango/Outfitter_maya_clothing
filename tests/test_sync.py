@@ -3,7 +3,7 @@ import _bootstrap  # noqa: F401
 
 import os
 
-from snap_on_clothing.core import sync
+from outfitter.core import sync
 
 
 def _write(path, text, *, mtime=None):

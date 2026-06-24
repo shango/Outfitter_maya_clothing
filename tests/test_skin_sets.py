@@ -10,14 +10,14 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from snap_on_clothing import config
-from snap_on_clothing.core import skin_sets
+from outfitter import config
+from outfitter.core import skin_sets
 
 
 def _canonical_joint_names() -> set[str]:
     data = json.loads(
         (Path(__file__).resolve().parents[1]
-         / "scripts/snap_on_clothing/data/cloth_skeleton.json").read_text())
+         / "scripts/outfitter/data/cloth_skeleton.json").read_text())
     return {j["name"] for j in data["joints"]}
 
 

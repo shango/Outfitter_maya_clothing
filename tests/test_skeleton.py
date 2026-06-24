@@ -12,8 +12,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from snap_on_clothing import config
-from snap_on_clothing.core import skeleton as sk
+from outfitter import config
+from outfitter.core import skeleton as sk
 
 
 @pytest.fixture(scope="module")

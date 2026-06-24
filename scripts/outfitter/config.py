@@ -59,9 +59,9 @@ BODY_MORPH_NODE: str = "god_m_godnode_anim"
 BODY_MORPH_ATTR: str = "GH_Body_morph"
 GENDER_BODY_MORPH: dict[str, float] = {"male": 0.0, "female": 1.0}
 
-# The bundled GenHuman the "Load test body" action imports. Lives under the package's
-# data/genhuman/ dir so the installer copytree ships it; kept OUT of git (large rig,
-# like the root *.ma files) and dropped in at package/release time.
+# The bundled GenHuman the "Load test body" action references. Lives in the package's
+# lib/ dir so the installer copytree ships it alongside the code; kept OUT of git (large
+# rig, like the root *.ma files) and dropped in at package/release time.
 BUNDLED_GENHUMAN_FILE: str = "GenHuman_rig_v03.ma"
 
 # Genie export may require specific node names present (PRD §9 open task — TBD).
@@ -120,17 +120,17 @@ THUMB_EXTS: tuple[str, ...] = (".png", ".jpg", ".jpeg")
 ASSET_EXT: str = ".ma"
 
 # --- install locations (FR-9) -------------------------------------------------
-USER_ASSET_DIR_ENV: str = "SNAP_ON_CLOTHING_ASSETS"
-PATH_FILE_ENV: str = "SNAP_ON_CLOTHING_PATH_FILE"
+USER_ASSET_DIR_ENV: str = "OUTFITTER_ASSETS"
+PATH_FILE_ENV: str = "OUTFITTER_PATH_FILE"
 
 
 def _repo_root() -> Path:
-    # config.py -> snap_on_clothing -> scripts -> <repo root>
+    # config.py -> outfitter -> scripts -> <repo root>
     return Path(__file__).resolve().parents[2]
 
 
 def package_dir() -> Path:
-    """Directory of the installed ``snap_on_clothing`` package."""
+    """Directory of the installed ``outfitter`` package."""
     return Path(__file__).resolve().parent
 
 
@@ -155,18 +155,19 @@ def bundled_asset_dir() -> Path:
 
 
 def bundled_genhuman_path() -> Path:
-    """The GenHuman rig the 'Load test body' action imports (under the package data dir).
+    """The GenHuman rig the 'Load test body' action references (under the package lib dir).
 
-    Shipped via the installer's ``data/`` copytree but kept out of git (large rig). May
-    not exist in a fresh checkout until the file is dropped in / the bundle is built;
-    callers must handle absence with a clear message.
+    Ships inside the package's ``lib/`` dir so the installer's package copytree carries it
+    alongside the code, but kept out of git (large rig). May not exist in a fresh checkout
+    until the file is dropped in / the bundle is built; callers must handle absence with a
+    clear message.
     """
-    return package_dir() / "data" / "genhuman" / BUNDLED_GENHUMAN_FILE
+    return package_dir() / "lib" / BUNDLED_GENHUMAN_FILE
 
 
 def user_config_dir() -> Path:
     """Per-user tool config/data dir (holds settings + the installed library)."""
-    return Path.home() / "maya" / "snap_on_clothing"
+    return Path.home() / "maya" / "outfitter"
 
 
 def user_asset_dir() -> Path:

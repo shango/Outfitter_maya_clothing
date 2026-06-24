@@ -2,7 +2,7 @@
 
 Everything here imports ``maya.cmds`` lazily and only runs inside Maya: count the
 garment polys, playblast a thumbnail, sniff the rig version, and save the ``.ma``.
-The pure assembly/validation lives in :mod:`snap_on_clothing.core.publish`. This
+The pure assembly/validation lives in :mod:`outfitter.core.publish`. This
 module is exercised by the in-Maya smoke check, never the headless suite (which only
 ``py_compile``s it), consistent with the rest of the Maya boundary.
 """

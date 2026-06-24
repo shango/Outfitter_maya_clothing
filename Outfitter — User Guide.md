@@ -1,4 +1,4 @@
-# Snap-On Clothing — User Guide
+# Outfitter — User Guide
 
 **For:** the Maya artist using the tool to dress the GenHuman rig
 **Host:** Maya 2026 · Python 3 · PySide6
@@ -26,10 +26,10 @@ everything else untouched.
 
 1. Unzip the distribution somewhere (keep its layout intact).
 2. In Maya 2026, **drag `install.py` from a file browser into the Maya viewport.**
-3. The installer copies the `snap_on_clothing` package into your Maya scripts folder,
-   merges the bundled starter library into `~/maya/snap_on_clothing/assets/` (without
+3. The installer copies the `outfitter` package into your Maya scripts folder,
+   merges the bundled starter library into `~/maya/outfitter/assets/` (without
    overwriting anything you already have), and adds a **Clothing** button on a
-   **SnapOnClothing** shelf tab. A confirmation dialog reports what it did.
+   **Outfitter** shelf tab. A confirmation dialog reports what it did.
 4. Click the **Clothing** shelf button to open the browser.
 
 Re-dropping `install.py` later **upgrades** the tool: the package is replaced, but your
@@ -38,7 +38,7 @@ assets and your library paths (`path.txt`, see §3) are preserved.
 You can also launch it from the Script Editor (Python):
 
 ```python
-import snap_on_clothing.launch as scl
+import outfitter.launch as scl
 scl.run()
 ```
 
@@ -61,7 +61,7 @@ Use **Browse…** on each row to pick the folder, or **Clear** to unset it. Both
 to a plain-text file, `path.txt`, beside the installed package:
 
 ```
-# Snap-On Clothing — asset library locations (managed by the Setup tab).
+# Outfitter — asset library locations (managed by the Setup tab).
 local  = D:/clothing_library
 remote = //studio-nas/projects/genhuman/clothing
 ```

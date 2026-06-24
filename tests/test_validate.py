@@ -3,10 +3,10 @@ import _bootstrap  # noqa: F401
 import _assets
 from _fake_scene import FakeScene
 
-from snap_on_clothing.core import ma_parse, library
-from snap_on_clothing.core.asset import AssetMetadata
-from snap_on_clothing.core.scene import SceneGateway
-from snap_on_clothing.core import validate as V
+from outfitter.core import ma_parse, library
+from outfitter.core.asset import AssetMetadata
+from outfitter.core.scene import SceneGateway
+from outfitter.core import validate as V
 
 
 def _codes(report):

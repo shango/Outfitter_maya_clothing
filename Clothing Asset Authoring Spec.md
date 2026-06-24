@@ -332,11 +332,11 @@ button sequence, not a manual one.
    manual duplicate / rename / pick-influences chore.)
 3. Add helper joints for secondary motion (optional).
 4. Smooth-bind geometry to the selected (green) joints — Skin ▸ Bind Skin.
-5. **Load test body** — the tool imports its bundled GenHuman, flips `GH_Body_morph` to
-   match the chosen **Gender** (so you fit against the right body), and drives the
+5. **Load test body** — the tool *references in* its bundled GenHuman, flips `GH_Body_morph`
+   to match the chosen **Gender** (so you fit against the right body), and drives the
    `cloth_*` skeleton from it; pose the body's controls and confirm the garment deforms.
-   Then **Remove test body** to delete it so the joints go static and the asset is
-   publish-safe.
+   Then **Remove test body** to drop the reference (which removes the rig and every node it
+   brought in, selection sets included) so the joints go static and the asset is publish-safe.
 6. **Delete unused joints** — prune the `cloth_*` joints the garment doesn't skin to
    (safe leaf-only; unweighted interior joints with skinned children are kept).
 7. Add any secondary-motion controls (`cloth_<name>_ctrl`) under `Ctrl_GRP` (optional).

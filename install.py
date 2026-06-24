@@ -1,9 +1,9 @@
-"""Drag-and-drop installer for the Snap-On Clothing tool (FR-9 / M4).
+"""Drag-and-drop installer for the Outfitter tool (FR-9 / M4).
 
 Drop this file into a Maya 2026 viewport to install. Maya calls
 ``onMayaDroppedPythonFile`` automatically. It:
 
-  1. copies the ``snap_on_clothing`` package into your Maya user script dir,
+  1. copies the ``outfitter`` package into your Maya user script dir,
   2. merges the bundled starter assets into your clothing library
      (never overwriting assets you already have),
   3. adds/refreshes an "Outfitter" shelf button on your active shelf.
@@ -30,7 +30,7 @@ def _report(lines: list[str], *, ok: bool) -> None:
         import maya.cmds as cmds
 
         cmds.confirmDialog(
-            title="Snap-On Clothing Installer",
+            title="Outfitter Installer",
             message=text,
             button=["OK"],
             icon="information" if ok else "critical",
@@ -41,20 +41,20 @@ def _report(lines: list[str], *, ok: bool) -> None:
 
 def _do_install(drop_dir: Path) -> None:
     # Make both the distribution root (for `installer/`) and its bundled scripts
-    # (for `snap_on_clothing.config`) importable for the duration of the install.
+    # (for `outfitter.config`) importable for the duration of the install.
     for p in (str(drop_dir), str(drop_dir / "scripts")):
         if p not in sys.path:
             sys.path.insert(0, p)
 
-    # A previous drop in this Maya session leaves installer/* and snap_on_clothing/*
+    # A previous drop in this Maya session leaves installer/* and outfitter/*
     # cached in sys.modules; purge them so THIS drop runs the freshly-dropped code.
     # Without this, re-dropping silently reuses the stale shelf/icon/active-shelf logic.
     for _name in [n for n in list(sys.modules)
-                  if n.split(".", 1)[0] in ("installer", "snap_on_clothing")]:
+                  if n.split(".", 1)[0] in ("installer", "outfitter")]:
         del sys.modules[_name]
 
     from installer import installer_core
-    from snap_on_clothing import config
+    from outfitter import config
 
     import maya.cmds as cmds
 
@@ -102,7 +102,7 @@ def onMayaDroppedPythonFile(*_args) -> None:  # noqa: N802 — Maya-defined name
         import traceback
 
         _report(
-            ["Snap-On Clothing install FAILED before completion:",
+            ["Outfitter install FAILED before completion:",
              str(exc), "", traceback.format_exc()],
             ok=False,
         )

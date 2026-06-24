@@ -6,10 +6,10 @@ browser uses) so it can never silently drift out of compliance with the Authorin
 """
 import _bootstrap  # noqa: F401
 
-from snap_on_clothing import config
-from snap_on_clothing.core import library, ma_parse
-from snap_on_clothing.core.asset import AssetMetadata
-from snap_on_clothing.core.validate import validate_asset_summary
+from outfitter import config
+from outfitter.core import library, ma_parse
+from outfitter.core.asset import AssetMetadata
+from outfitter.core.validate import validate_asset_summary
 
 EXAMPLE_DIR = config.bundled_asset_dir() / "trench_coat_A"
 EXAMPLE_MA = EXAMPLE_DIR / "trench_coat_A.ma"

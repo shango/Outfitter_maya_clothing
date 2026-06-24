@@ -1,7 +1,7 @@
 """Headless tests for the asset metadata model."""
 import _bootstrap  # noqa: F401
 
-from snap_on_clothing.core.asset import AssetMetadata
+from outfitter.core.asset import AssetMetadata
 
 
 def test_from_spec_attr_names():

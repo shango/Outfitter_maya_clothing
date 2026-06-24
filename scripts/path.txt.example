@@ -1,7 +1,7 @@
-# Snap-On Clothing — asset library locations.
+# Outfitter — asset library locations.
 #
 # This is the store the Setup tab reads and writes. You can also manage it by
-# hand: rename this file to "path.txt" (same folder, beside the snap_on_clothing
+# hand: rename this file to "path.txt" (same folder, beside the outfitter
 # package) and set your two folders below. Blank lines and lines starting with
 # "#" are ignored. An installer upgrade never overwrites your path.txt.
 #

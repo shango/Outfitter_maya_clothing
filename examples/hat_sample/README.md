@@ -96,7 +96,7 @@ From the repo root, headless (no Maya needed):
 
 ```bash
 python3 -c "import sys; sys.path.insert(0,'scripts'); \
-from snap_on_clothing.core.publish import validate_published_ma; \
+from outfitter.core.publish import validate_published_ma; \
 r=validate_published_ma('path/to/your_hat.ma'); print(r.summary_line()); \
 [print(' ', i) for i in r.issues]"
 ```

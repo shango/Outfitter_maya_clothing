@@ -37,10 +37,10 @@ if _SCRIPTS not in sys.path:
 
 import maya.cmds as cmds  # noqa: E402
 
-from snap_on_clothing.core import library  # noqa: E402
-from snap_on_clothing.core.attach import AttachEngine  # noqa: E402
-from snap_on_clothing.core.export import audit_export_readiness  # noqa: E402
-from snap_on_clothing.core.scene import MayaScene  # noqa: E402
+from outfitter.core import library  # noqa: E402
+from outfitter.core.attach import AttachEngine  # noqa: E402
+from outfitter.core.export import audit_export_readiness  # noqa: E402
+from outfitter.core.scene import MayaScene  # noqa: E402
 
 DEFAULT_RIG = "GenHuman_rig_v03.ma"
 DEFAULT_ASSETS = [("trench_coat_A", "coat")]

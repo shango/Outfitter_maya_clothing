@@ -66,8 +66,11 @@ class PublishPanel(QtWidgets.QWidget):
         outer = QtWidgets.QHBoxLayout(top)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(14)
-        outer.addWidget(self._build_steps(), 0)          # left: numbered workflow
-        outer.addWidget(self._build_details_form(), 1)   # right: metadata
+        # Left: steps 1–3 (the in-Maya rig work). Right: steps 4 & 5 side by side,
+        # with the asset-details form below them. Splitting the five steps across two
+        # columns keeps the window from growing too tall.
+        outer.addWidget(self._build_left_column(), 0)
+        outer.addWidget(self._build_right_column(), 1)
 
         # The steps/metadata row sizes to its content (every step stays visible); the
         # log takes the remaining vertical space at the bottom instead of leaving a gap.
@@ -100,6 +103,9 @@ class PublishPanel(QtWidgets.QWidget):
         self._gender.addItems(list(config.GENDERS))
         self._gender.setCurrentIndex(-1)
         self._gender.setPlaceholderText("— set body variant —")
+        # keep both dropdowns a comfortable height so they aren't squeezed flat
+        for combo in (self._type, self._gender):
+            combo.setMinimumHeight(28)
 
         # step action buttons
         self._skeleton_btn = QtWidgets.QPushButton("Create cloth skeleton")
@@ -148,7 +154,7 @@ class PublishPanel(QtWidgets.QWidget):
         heading = QtWidgets.QLabel("ASSET DETAILS")  # QSS can't upper-case; do it here
         heading.setObjectName("sectionHeading")
         v.addWidget(heading)
-        hint = QtWidgets.QLabel("Fill these out in Step 4, before you publish.")
+        hint = QtWidgets.QLabel("Fill these out before you publish (Step 5).")
         hint.setObjectName("muted")
         hint.setWordWrap(True)
         v.addWidget(hint)
@@ -172,14 +178,13 @@ class PublishPanel(QtWidgets.QWidget):
         form.addRow("Author", self._author)
         form.addRow("Description", self._desc)
         v.addLayout(form)
-        v.addStretch(1)
         return box
 
-    def _build_steps(self) -> QtWidgets.QWidget:
-        """Left column: the numbered authoring workflow, stacked top to bottom."""
-        steps = QtWidgets.QVBoxLayout()
-        steps.setContentsMargins(0, 0, 0, 0)
-        steps.setSpacing(8)
+    def _build_left_column(self) -> QtWidgets.QWidget:
+        """Left column: steps 1–3 — build the rig, skin it, strip the test body."""
+        col = QtWidgets.QVBoxLayout()
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(10)
 
         # Step 1 — set up the rig (Type + Gender live here, with the build buttons)
         card, body = self._step_card(
@@ -188,20 +193,23 @@ class PublishPanel(QtWidgets.QWidget):
             "test body to pose the garment against.")
         picks = QtWidgets.QFormLayout()
         picks.setLabelAlignment(QtCore.Qt.AlignRight)
-        picks.setContentsMargins(0, 0, 0, 0)
+        picks.setContentsMargins(0, 2, 0, 2)
+        picks.setHorizontalSpacing(10)
+        picks.setVerticalSpacing(8)
+        picks.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
         picks.addRow("Type", self._type)
         picks.addRow("Gender", self._gender)
         body.addLayout(picks)
         body.addWidget(self._skeleton_btn)
         body.addWidget(self._connect_btn)
-        steps.addWidget(card)
+        col.addWidget(card)
 
         # Step 2 — skin (instruction only, no buttons)
         card, _ = self._step_card(
             2, "Skin the mesh",
             "Bind the garment mesh to the highlighted (green) joints: "
             "Skin ▸ Bind Skin.")
-        steps.addWidget(card)
+        col.addWidget(card)
 
         # Step 3 — remove the test body (+ optional joint prune)
         card, body = self._step_card(
@@ -210,35 +218,52 @@ class PublishPanel(QtWidgets.QWidget):
             "publish-safe.")
         body.addWidget(self._disconnect_btn)
         body.addWidget(self._prune_btn)
-        steps.addWidget(card)
+        col.addWidget(card)
 
-        # Step 4 — thumbnail (metadata is filled in the form on the right)
+        col.addStretch(1)
+        host = QtWidgets.QWidget()
+        host.setLayout(col)
+        host.setMinimumWidth(300)
+        host.setMaximumWidth(360)
+        return host
+
+    def _build_right_column(self) -> QtWidgets.QWidget:
+        """Right column: the asset-details form, then steps 4 & 5 side by side below."""
+        col = QtWidgets.QVBoxLayout()
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(10)
+
+        row = QtWidgets.QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(10)
+
+        # Step 4 — thumbnail: capture button sits *beneath* the preview image
         card, body = self._step_card(
             4, "Capture the thumbnail",
-            "Frame the garment in the viewport and capture a thumbnail, then fill out "
-            "the asset details on the right.")
+            "Frame the garment in the viewport, then capture a thumbnail.")
+        body.addSpacing(2)
         body.addWidget(self._preview, 0, QtCore.Qt.AlignHCenter)
         body.addWidget(self._capture_btn)
-        steps.addWidget(card)
+        row.addWidget(card, 1)
 
         # Step 5 — publish (always to the remote library)
         card, body = self._step_card(
             5, "Publish",
-            "Run a final scene check, then publish. The asset is sent to the shared "
-            "remote library.")
+            "Fill out the asset details below, run a final scene check, then "
+            "publish. The asset is sent to the shared remote library.")
         body.addWidget(self._dest_label)
+        body.addStretch(1)
         body.addWidget(self._check_btn)
         body.addWidget(self._publish_btn)
-        steps.addWidget(card)
+        row.addWidget(card, 1)
 
-        steps.addWidget(self._status)
+        col.addWidget(self._build_details_form())
+        col.addLayout(row)
+        col.addWidget(self._status)
+        col.addStretch(1)
 
         host = QtWidgets.QWidget()
-        host.setLayout(steps)
-        # The column sizes to its content (every step visible, no surplus space) and
-        # keeps a consistent width next to the metadata form.
-        host.setMinimumWidth(330)
-        host.setMaximumWidth(380)
+        host.setLayout(col)
         return host
 
     def _step_card(self, number: int, title: str,
@@ -246,8 +271,10 @@ class PublishPanel(QtWidgets.QWidget):
         """A numbered step card: big number + title + instruction, returns its body layout."""
         card = QtWidgets.QFrame()
         card.setObjectName("stepCard")
+        # Vertically the card hugs its content; horizontally it fills its column slot.
+        card.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
         row = QtWidgets.QHBoxLayout(card)
-        row.setContentsMargins(12, 8, 12, 10)
+        row.setContentsMargins(14, 12, 14, 14)
         row.setSpacing(12)
 
         num = QtWidgets.QLabel(str(number))
@@ -257,7 +284,7 @@ class PublishPanel(QtWidgets.QWidget):
         row.addWidget(num, 0)
 
         body = QtWidgets.QVBoxLayout()
-        body.setSpacing(6)
+        body.setSpacing(8)
         title_lbl = QtWidgets.QLabel(title)
         title_lbl.setObjectName("stepTitle")
         title_lbl.setWordWrap(True)
@@ -265,6 +292,10 @@ class PublishPanel(QtWidgets.QWidget):
         ins = QtWidgets.QLabel(instruction)
         ins.setObjectName("stepInstruction")
         ins.setWordWrap(True)
+        # wordWrap labels need their height-for-width respected or they clip; let the
+        # label grow vertically to fit the wrapped text in this column width.
+        ins.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+        ins.setMinimumHeight(ins.fontMetrics().height())
         body.addWidget(ins)
         row.addLayout(body, 1)
         return card, body
@@ -387,7 +418,7 @@ class PublishPanel(QtWidgets.QWidget):
             return True
         self._log("This action needs a running Maya 2026.", "error")
         QtWidgets.QMessageBox.warning(
-            self, "Snap-On Clothing",
+            self, "Outfitter",
             "Publishing needs a running Maya 2026 — it captures the thumbnail and "
             "polycount from the open garment scene.")
         return False
@@ -585,7 +616,7 @@ class PublishPanel(QtWidgets.QWidget):
         if not self._require_maya():
             return
         from ..core import maya_publish
-        out = Path(tempfile.gettempdir()) / "snap_on_clothing_thumb.png"
+        out = Path(tempfile.gettempdir()) / "outfitter_thumb.png"
         self._log("Capture thumbnail…", "step")
         try:
             with _wait_cursor():

@@ -3,9 +3,9 @@ import _bootstrap  # noqa: F401
 import _assets
 from _fake_scene import FakeScene
 
-from snap_on_clothing.core.attach import AttachEngine
-from snap_on_clothing.core.export import audit_export_readiness
-from snap_on_clothing.core.registry import Connection
+from outfitter.core.attach import AttachEngine
+from outfitter.core.export import audit_export_readiness
+from outfitter.core.registry import Connection
 
 BODY = ["root", "pelvis", "spine_01", "spine_02", "neck_01", "head"]
 GROUP = "GenHuman_Joint_GRP"

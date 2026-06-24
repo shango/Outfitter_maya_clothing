@@ -1,13 +1,13 @@
-"""Launch entry points for the Snap-On Clothing browser.
+"""Launch entry points for the Outfitter browser.
 
 Inside Maya 2026 (Script Editor or a shelf button)::
 
-    import snap_on_clothing.launch as scl
+    import outfitter.launch as scl
     scl.run()
 
 Standalone dev preview (needs only PySide6 on PYTHONPATH; no Maya)::
 
-    python -m snap_on_clothing.launch
+    python -m outfitter.launch
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    # allow `python scripts/snap_on_clothing/launch.py` and `python -m ...`
+    # allow `python scripts/outfitter/launch.py` and `python -m ...`
     if __package__ is None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     raise SystemExit(main())

@@ -3,7 +3,7 @@ import _bootstrap  # noqa: F401
 import _assets
 from _fake_scene import FakeScene
 
-from snap_on_clothing.core.attach import AttachEngine, sanitize_namespace
+from outfitter.core.attach import AttachEngine, sanitize_namespace
 
 BODY = ["root", "pelvis", "spine_01", "spine_02", "neck_01", "head"]
 GROUP = "GenHuman_Joint_GRP"

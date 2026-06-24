@@ -1,6 +1,6 @@
-# Snap-On Clothing Rig System
+# Outfitter Rig System
 
-## **GenHuman Snap-On Clothing Rig System** 
+## **GenHuman Outfitter Rig System** 
 
 ##  **Development Specification**
 
@@ -178,16 +178,16 @@ See Addendum for specifications of Snap-On compatible Cloth Rigging System
 
 # Addendum — Clothing Rig Specification
 
-# **Addendum — Snap-On Clothing Rig Preparation Specification**
+# **Addendum — Outfitter Rig Preparation Specification**
 
 ## **Purpose**
 
-This document defines the preparation, rigging, hierarchy, validation, and export requirements for clothing assets intended for use with the GenHuman Snap-On Clothing System.
+This document defines the preparation, rigging, hierarchy, validation, and export requirements for clothing assets intended for use with the GenHuman Outfitter System.
 
 All clothing assets must conform to these requirements in order to:
 
 * connect successfully to GenHuman rigs  
-* validate within the Snap-On Clothing System  
+* validate within the Outfitter System  
 * remain compatible with Genie export workflows  
 * support lightweight realtime playback
 
@@ -350,7 +350,7 @@ cloth\_skirtFront\_ctrl
 * Any Maya deformers are permitted.  
 * Deformers must remain compatible with:  
   * Maya ASCII export  
-  * Snap-On Clothing import  
+  * Outfitter import  
   * realtime playback requirements
 
 ---
@@ -446,7 +446,7 @@ Validation failures should hard stop export.
 
 * Clothing assets export as:  
   * Maya ASCII only  
-* Exported assets are intended for import into the Snap-On Clothing System browser.  
+* Exported assets are intended for import into the Outfitter System browser.  
 * Export must preserve:  
   * hierarchy  
   * naming  
@@ -475,7 +475,7 @@ Recommended workflow:
 5. Skin geometry  
 6. Validate clothing asset  
 7. Export Maya ASCII asset  
-8. Import through Snap-On Clothing System browser
+8. Import through Outfitter System browser
 
 ---
 

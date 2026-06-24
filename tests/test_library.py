@@ -3,7 +3,7 @@ import json
 
 import _bootstrap  # noqa: F401
 
-from snap_on_clothing.core import library
+from outfitter.core import library
 
 
 def _write_ma(path, info_node=True, name="x", gender="male"):

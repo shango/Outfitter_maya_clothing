@@ -5,8 +5,8 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401
 
-from snap_on_clothing.core import library
-from snap_on_clothing.core.asset import ClothingAsset
+from outfitter.core import library
+from outfitter.core.asset import ClothingAsset
 
 
 def write_asset_ma(

@@ -1,4 +1,4 @@
-"""Put ``scripts/`` on sys.path so ``import snap_on_clothing`` works in tests."""
+"""Put ``scripts/`` on sys.path so ``import outfitter`` works in tests."""
 import sys
 from pathlib import Path
 

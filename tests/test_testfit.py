@@ -7,8 +7,8 @@ joints with no body match are left unconnected; locked / already-driven plugs ar
 """
 import _bootstrap  # noqa: F401
 
-from snap_on_clothing import config
-from snap_on_clothing.core import testfit as T
+from outfitter import config
+from outfitter.core import testfit as T
 
 
 def _cloth(*shorts):

@@ -15,7 +15,7 @@ Install
 Launch
 ------
 Click the "Outfitter" shelf button.
-(Or, in the Script Editor: import snap_on_clothing.launch as scl; scl.run())
+(Or, in the Script Editor: import outfitter.launch as scl; scl.run())
 
 Upgrade
 -------

@@ -1,12 +1,12 @@
-# PRD — GenHuman Snap-On Clothing Browser & Attach Tool
+# PRD — GenHuman Outfitter Browser & Attach Tool
 
 **Status:** Draft v1 · 2026-06-03
 **Owner:** Shannon
-**Source of truth:** `Snap-On Clothing Rig System.md` (Tony Hudson, 5/15/2026) + its Addendum.
+**Source of truth:** `Outfitter Rig System.md` (Tony Hudson, 5/15/2026) + its Addendum.
 **Target host:** Maya **2026** (Python 3, PySide6) · GenHuman rig `GenHuman_rig_v02.ma`
 
 > This PRD does **not** invent a new system. It is the implementation plan for the system already
-> specified in `Snap-On Clothing Rig System.md`. Where this document and the spec disagree, **the
+> specified in `Outfitter Rig System.md`. Where this document and the spec disagree, **the
 > spec wins** — flag the conflict here rather than silently diverging.
 
 ---
@@ -162,11 +162,11 @@ Mirror the spec's two validation lists. Before attach, verify:
 - **Single drag-and-drop installer dropped into the Maya viewport.** A top-level `install.py`
   implementing `onMayaDroppedPythonFile(obj)` (Maya's viewport-drop entry point) that runs the install
   with zero manual steps.
-- The installer must be **self-contained / bundle everything**: the `snap_on_clothing` Python package,
+- The installer must be **self-contained / bundle everything**: the `outfitter` Python package,
   all lib files, **and** the starter clothing **asset library** (example assets + thumbnails/metadata).
 - On drop it must:
-  1. Copy the package to the user's Maya scripts dir (e.g. `~/maya/2026/scripts/snap_on_clothing/`).
-  2. Copy the bundled **asset library** to a known location (e.g. `~/maya/snap_on_clothing/assets/`)
+  1. Copy the package to the user's Maya scripts dir (e.g. `~/maya/2026/scripts/outfitter/`).
+  2. Copy the bundled **asset library** to a known location (e.g. `~/maya/outfitter/assets/`)
      and register that path as a default library root in `config.py` (don't clobber user-added paths).
   3. Create/refresh the **shelf button** that launches the UI.
   4. Be **re-runnable** (idempotent upgrade — overwrite package, merge config, keep user assets/paths).
@@ -179,7 +179,7 @@ Mirror the spec's two validation lists. Before attach, verify:
 
 ```
 maya_clothing_rig/
-  scripts/snap_on_clothing/
+  scripts/outfitter/
     __init__.py
     ui/
       window.py          # PySide6 main window: library grid + controls panel
@@ -202,7 +202,7 @@ maya_clothing_rig/
     <type>/<asset>.ma + <asset>.json + <asset>_thumb.png
   tools/
     rename_genhuman.py   # rig hygiene script (§8), run INSIDE Maya
-  prd.md  todo.md  Snap-On Clothing Rig System.md  rig_naming_rename_*.csv
+  prd.md  todo.md  Outfitter Rig System.md  rig_naming_rename_*.csv
 ```
 
 ---

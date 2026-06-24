@@ -1,11 +1,11 @@
-# snap_on_clothing — developer notes
+# outfitter — developer notes
 
 Maya 2026 tool for browsing/attaching snap-on clothing assets to the GenHuman rig.
 Build contract: `../prd.md` + `../Clothing Asset Authoring Spec.md` (spec wins on conflict).
 
 ## Layout
 ```
-snap_on_clothing/
+outfitter/
   config.py        taxonomy, structure contract, connect-attr set, install paths
   core/            PURE logic — no maya / no PySide6 at import (headless-testable)
     ma_parse.py    lightweight Maya-ASCII (.ma) reader
@@ -44,13 +44,13 @@ in-memory `FakeScene`. Maya/Qt live only in `ui/`.
 
 Inside Maya 2026 (Script Editor / shelf button):
 ```python
-import snap_on_clothing.launch as scl
+import outfitter.launch as scl
 scl.run()
 ```
 
 Standalone dev preview (PySide6 only, no Maya):
 ```bash
-PYTHONPATH=scripts python -m snap_on_clothing.launch
+PYTHONPATH=scripts python -m outfitter.launch
 ```
 
 ## Tests (headless, no Maya)
@@ -63,15 +63,15 @@ cd tests && python -m pytest -q
 - M2 done: validate → attach → detach (`core.scene`/`validate`/`attach`/`registry`), transactional + dual-skeleton safe.
 - M3 done: fit controls + placement + presets (`core.controls`/`placement`/`presets`, `ui.controls_panel`).
 - M4 done: multi-asset independence combos, Genie export-readiness audit (`core.export`), drag-and-drop installer (`install.py` + `installer/`).
-- M5 done: example compliant asset (`assets/trench_coat_A/`), tool-user docs (`../Snap-On Clothing — User Guide.md`), in-Maya `examples/` scripts (build the skinned asset + the GenHuman test scene). `tests/test_example_asset.py` re-validates the shipped asset every run.
+- M5 done: example compliant asset (`assets/trench_coat_A/`), tool-user docs (`../Outfitter — User Guide.md`), in-Maya `examples/` scripts (build the skinned asset + the GenHuman test scene). `tests/test_example_asset.py` re-validates the shipped asset every run.
 - Setup tab done: user points the browser at one+ library folders (external drive / server). The Setup tab **reads and writes `scripts/path.txt`** (one folder per line) — that plain-text file is the single store ("db"). When it holds any folder the tool scans exactly those, else falls back to built-in defaults. `path.txt.example` ships beside the package; `path.txt` is hand-editable and survives installer upgrades (installer overwrites the package dir, never `path.txt`).
 - **95 headless tests passing.** A handful of `[!]` in-Maya smoke checks remain (see `../todo.md`).
 
 ## Packaging (what ships to tool users)
-Ship, preserving layout: `install.py`, `installer/` (no `__pycache__`), `scripts/snap_on_clothing/`
+Ship, preserving layout: `install.py`, `installer/` (no `__pycache__`), `scripts/outfitter/`
 (no `__pycache__`), `scripts/path.txt.example`, and `assets/` (the starter library,
 incl. `assets/trench_coat_A/`). **Exclude** (dev-only): `tests/`, `examples/`, the
-`GenHuman_rig_*.ma` files, `prd.md`, `todo.md`, `Snap-On Clothing Rig System.md`, the
+`GenHuman_rig_*.ma` files, `prd.md`, `todo.md`, `Outfitter Rig System.md`, the
 `rig_naming_*.csv` files, and every `__pycache__`. Optionally bundle the two artist docs
 (`Clothing Asset Authoring Spec.md`, `Clothing Asset Quick Guide.*`) and the tool-user
-`Snap-On Clothing — User Guide.md`.
+`Outfitter — User Guide.md`.

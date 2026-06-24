@@ -172,6 +172,6 @@ Notes on the example:
 6. Make `cloth_info` and fill it.
 7. Clean scene. Freeze transforms. Delete history.
 8. Check the list in part 6.
-9. Save `.ma` → give to the Snap-On Clothing tool.
+9. Save `.ma` → give to the Outfitter tool.
 
 **Remember:** name = `cloth_` + exact body name. This is the most important thing. ✅

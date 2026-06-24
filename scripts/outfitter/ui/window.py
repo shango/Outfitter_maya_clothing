@@ -26,7 +26,7 @@ from . import style
 from .publish_panel import PublishPanel
 
 WINDOW_OBJECT_NAME = "snapOnClothingBrowser"
-WINDOW_TITLE = "Snap-On Clothing"
+WINDOW_TITLE = "Outfitter"
 _THUMB_SIZE = 120
 _PREVIEW_MAX = 260
 _ALL_TYPES = "All types"
@@ -103,10 +103,10 @@ class ClothingBrowser(QtWidgets.QMainWindow):
         super().__init__(parent)
         self.setObjectName(WINDOW_OBJECT_NAME)
         self.setWindowTitle(f"{WINDOW_TITLE}  v{__version__}")
-        # Width sets a comfortable default; the Publish tab's step column carries a
-        # minimum height (so every step shows without scrolling), which pushes the
-        # window taller than this floor as needed.
-        self.resize(1040, 900)
+        # Comfortable default; the Publish tab now spreads its five steps across two
+        # columns (steps 1–3 left, 4–5 + details right), so it no longer forces the
+        # window unusually tall.
+        self.resize(1040, 760)
 
         self._roots = roots
         self._scan: library.LibraryScanResult | None = None
@@ -807,7 +807,7 @@ def _delete_existing_windows() -> None:
     """Close every prior browser instance found in the live Qt tree, by objectName.
 
     The module-level ``_window_singleton`` is the fast path, but the shelf button purges
-    all ``snap_on_clothing`` modules on each click (to hot-reload code), which resets that
+    all ``outfitter`` modules on each click (to hot-reload code), which resets that
     global to ``None`` and orphans the previous window — leaving it parented to Maya and
     visible. Sweeping top-level widgets by :data:`WINDOW_OBJECT_NAME` survives the reload,
     so repeated clicks replace the window instead of stacking new ones.

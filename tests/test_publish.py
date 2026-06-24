@@ -2,8 +2,8 @@
 import _bootstrap  # noqa: F401
 import _assets
 
-from snap_on_clothing.core import publish as P
-from snap_on_clothing.core import library
+from outfitter.core import publish as P
+from outfitter.core import library
 
 
 # --- name + path helpers ------------------------------------------------------

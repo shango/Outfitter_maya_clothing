@@ -4,8 +4,8 @@ import _bootstrap  # noqa: F401
 import _assets
 from _fake_scene import FakeScene
 
-from snap_on_clothing.core.attach import AttachEngine
-from snap_on_clothing.core.export import audit_export_readiness
+from outfitter.core.attach import AttachEngine
+from outfitter.core.export import audit_export_readiness
 
 # A body with enough joints for tops, bottoms and shoes.
 BODY = [

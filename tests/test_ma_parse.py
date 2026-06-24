@@ -1,7 +1,7 @@
 """Headless tests for the .ma reader."""
 import _bootstrap  # noqa: F401  (path setup)
 
-from snap_on_clothing.core import ma_parse
+from outfitter.core import ma_parse
 
 SAMPLE = (_bootstrap.FIXTURES / "sample_coat.ma").read_text()
 

@@ -2,16 +2,16 @@
 
 Maya-only (imports ``maya.cmds``/``maya.mel`` at call time) — exercised by the
 in-Maya smoke check, not the headless suite, which only ``py_compile``s it. Kept
-free of any package import so it can run before ``snap_on_clothing`` is on the
+free of any package import so it can run before ``outfitter`` is on the
 path; the button's command imports the package lazily when clicked.
 """
 from __future__ import annotations
 
-SHELF_NAME = "SnapOnClothing"  # fallback only — the button normally lands on the active shelf
+SHELF_NAME = "Outfitter"  # fallback only — the button normally lands on the active shelf
 BUTTON_LABEL = "Outfitter"
 BUTTON_ANNOTATION = "Outfitter — browse / attach / detach garments"
 
-# Run when the shelf button is pressed. First purge every cached ``snap_on_clothing``
+# Run when the shelf button is pressed. First purge every cached ``outfitter``
 # module so edits on disk (e.g. a live repo checkout on sys.path) take effect without
 # restarting Maya, then (re)import and launch — ``show()`` rebuilds the window and
 # re-scans the library, so one click = reload code + refresh assets. Imports lazily so
@@ -19,10 +19,10 @@ BUTTON_ANNOTATION = "Outfitter — browse / attach / detach garments"
 BUTTON_COMMAND = (
     "import sys\n"
     "for _name in [n for n in list(sys.modules) "
-    "if n == 'snap_on_clothing' or n.startswith('snap_on_clothing.')]:\n"
+    "if n == 'outfitter' or n.startswith('outfitter.')]:\n"
     "    del sys.modules[_name]\n"
     "try:\n"
-    "    import snap_on_clothing.launch as scl\n"
+    "    import outfitter.launch as scl\n"
     "    scl.run()\n"
     "except Exception as exc:\n"
     "    import maya.cmds as cmds\n"

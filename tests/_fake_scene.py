@@ -13,7 +13,7 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401
 
-from snap_on_clothing.core import ma_parse
+from outfitter.core import ma_parse
 
 _TRANSFORM_TYPES = {"joint", "transform"}
 _DEFAULT_ATTRS = {"translate", "rotate", "scale"}
@@ -160,7 +160,7 @@ class FakeScene:
         self.matrices[node] = list(matrix)
 
     def resolve_export_group(self, selected_node: str) -> str | None:
-        from snap_on_clothing import config
+        from outfitter import config
 
         marker = config.EXPORT_SKELETON_GROUP
         short = selected_node.rsplit("|", 1)[-1]

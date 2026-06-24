@@ -1,6 +1,6 @@
 """In-scene skinning test — drive the ``cloth_*`` skeleton from the body (Maya-side).
 
-The rigger hits **Load test body** (M14): the tool imports its bundled GenHuman, flips
+The rigger hits **Load test body** (M14): the tool references in its bundled GenHuman, flips
 ``GH_Body_morph`` to match the garment's chosen gender (male = base, female = morph),
 aligns the garment's ``Rig_GRP`` to the rig's export frame, and ``connectAttr``s each
 body joint's ``{translate,rotate,scale}`` onto the matching ``cloth_*`` joint — exactly
@@ -245,13 +245,20 @@ def _set_body_morph(cmds, gender: str) -> float:
 
 
 def load_test_body(gender: str, mesh_group: str = "Mesh_GRP") -> LoadBodyResult:
-    """Import the bundled GenHuman, flip it to ``gender``, and connect it for a skin test.
+    """Reference in the bundled GenHuman, flip it to ``gender``, and connect it for a test.
 
     The tool ships one GenHuman and sets ``GH_Body_morph`` to match the chosen gender
     (male = base, female = full morph), so the rigger skins/poses the garment against the
     correct body without hand-importing one. Refuses if a GenHuman is already in the scene
     (avoid a double body), if there's no cloth skeleton to drive, or if the bundled rig
-    file isn't installed. After import it sets the morph then runs :func:`connect_test_body`.
+    file isn't installed. After loading it sets the morph then runs :func:`connect_test_body`.
+
+    The body is brought in as a *file reference* (not an import) so that 'Remove test body'
+    can drop it with ``removeReference`` — which deletes every node it brought in, including
+    leftover selection sets, plus its namespace, leaving zero remnants for publish. (An
+    import has to be torn down by name-sweeping, which strands sets and blocks publish.)
+    Downstream matching is namespace-insensitive (see ``maya_skeleton._short`` /
+    ``_find_export_root``), so the rig living under its own namespace is transparent.
     """
     cmds = _cmds()
 
@@ -266,15 +273,43 @@ def load_test_body(gender: str, mesh_group: str = "Mesh_GRP") -> LoadBodyResult:
     body_file = config.bundled_genhuman_path()
     if not body_file.is_file():
         raise RuntimeError(
-            f"Bundled GenHuman body not found at {body_file}. It ships with the tool's "
-            "data/genhuman/ folder; reinstall or place the rig file there.")
+            f"Bundled GenHuman body not found at {body_file}. It ships in the tool's "
+            "lib/ folder; reinstall or place the rig file there.")
 
-    # Import at the root namespace so the cloth_<base> -> body <base> name match (and the
-    # godnode/morph attr path) resolve exactly as connect_test_body expects.
-    cmds.file(str(body_file), i=True, preserveReferences=False)
+    # Reference (don't import) under the file-stem namespace, e.g. 'GenHuman_rig_v03' — this
+    # carries the version token so detect_rig_version still reads it, and removeReference
+    # later wipes the rig cleanly. _short strips the namespace, so the cloth_<base> -> body
+    # <base> match and the godnode/morph attr path still resolve as connect expects.
+    cmds.file(str(body_file), reference=True, namespace=config.BUNDLED_GENHUMAN_FILE.rsplit(".", 1)[0])
     morph = _set_body_morph(cmds, gender)
     connect = connect_test_body(mesh_group)
     return LoadBodyResult(gender=gender.strip().lower(), morph=morph, connect=connect)
+
+
+def _remove_genhuman_references(cmds) -> int:
+    """Drop any GenHuman file reference; returns how many references were removed.
+
+    ``removeReference`` deletes every node the reference brought in — joints, shaders,
+    utility nodes *and selection sets* — and removes its now-empty namespace, so nothing
+    is stranded to trip the publish "rig still in scene" gate. Reference nodes are matched
+    by their referenced filename so this survives a save/reopen (we don't rely on a handle
+    captured at load time). Best-effort per reference; a stubborn one never blocks the rest.
+    """
+    stem = config.BUNDLED_GENHUMAN_FILE.rsplit(".", 1)[0]
+    removed = 0
+    for ref in (cmds.ls(type="reference") or []):
+        try:
+            filename = cmds.referenceQuery(ref, filename=True)
+        except Exception:  # noqa: BLE001 — e.g. an unloaded/own-scene reference node
+            continue
+        if "GenHuman" not in filename and stem not in filename:
+            continue
+        try:
+            cmds.file(removeReference=True, referenceNode=ref)
+            removed += 1
+        except Exception:  # noqa: BLE001 — keep going; the name-sweep fallback covers leftovers
+            pass
+    return removed
 
 
 def _delete_genhuman(cmds) -> int:
@@ -310,14 +345,19 @@ def _delete_genhuman(cmds) -> int:
 
 
 def remove_test_body() -> RemoveBodyResult:
-    """Disconnect the test body and delete the imported GenHuman so publish isn't blocked.
+    """Disconnect the test body and remove the GenHuman so publish isn't blocked.
 
     Pairs with :func:`load_test_body`: first breaks the body->cloth connections
-    (:func:`disconnect_test_body`), then deletes the GenHuman rig. Idempotent — safe to
+    (:func:`disconnect_test_body`), then removes the GenHuman rig. The body is removed by
+    dropping its file reference (:func:`_remove_genhuman_references`), which wipes every
+    node it brought in — including selection sets — leaving no remnants. A legacy scene
+    where the rig was *imported* (no reference) falls back to the name-sweep delete. The
+    count returned is references removed plus any swept import nodes. Idempotent — safe to
     run with nothing loaded (it just reports zero).
     """
     cmds = _cmds()
     disc = disconnect_test_body()
-    deleted = _delete_genhuman(cmds)
+    deleted = _remove_genhuman_references(cmds)
+    deleted += _delete_genhuman(cmds)  # fallback: sweep any imported (non-referenced) rig
     cmds.select(clear=True)
     return RemoveBodyResult(deleted=deleted, disconnect=disc)

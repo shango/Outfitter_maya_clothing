@@ -5,7 +5,7 @@ The user sets two folders on the Setup tab:
 * **local**  — their working library. This is the *only* folder the tool scans.
 * **remote** — a shared master library (studio server / drive). It is never
   scanned; it is the source the **Sync** button pulls new/changed assets from
-  into the local folder (see :mod:`snap_on_clothing.core.sync`).
+  into the local folder (see :mod:`outfitter.core.sync`).
 
 Both are written to a small text file as ``key = value`` lines — one for each
 slot — that is read back on launch. That text file is the single source of truth::
@@ -37,7 +37,7 @@ from pathlib import Path
 from .. import config
 
 _HEADER = (
-    "# Snap-On Clothing — asset library locations (managed by the Setup tab).\n"
+    "# Outfitter — asset library locations (managed by the Setup tab).\n"
     "#   local  = your working library (the tool scans this folder)\n"
     "#   remote = shared master library the Sync button pulls new/changed assets from\n"
     "# Blank lines and lines starting with '#' are ignored.\n"
