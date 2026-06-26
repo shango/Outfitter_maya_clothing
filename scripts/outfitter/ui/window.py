@@ -46,6 +46,14 @@ def _rig_label(export_group: str) -> str:
     return short.split(":", 1)[0] if ":" in short else "(root, no namespace)"
 
 
+def _maya_available() -> bool:
+    try:
+        import maya.cmds  # type: ignore  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
 def _maya_main_window() -> QtWidgets.QWidget | None:
     """Return Maya's main window as a QWidget, or None when running standalone."""
     try:
@@ -400,6 +408,20 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._preview.setToolTip("Hover to spin · drag left/right to rotate")
         v.addWidget(self._preview)
 
+        # Recapture this asset's shaded still + turntable in place (no .ma re-save).
+        # Upgrades older assets that still carry a flat wireframe thumbnail.
+        self._refresh_thumb_btn = QtWidgets.QToolButton()
+        self._refresh_thumb_btn.setText("↻ Refresh thumbnails")
+        self._refresh_thumb_btn.setToolTip(
+            "Open this asset in Maya and recapture its shaded thumbnail + turntable, "
+            "overwriting just the images (the .ma and metadata are left untouched).")
+        self._refresh_thumb_btn.setEnabled(False)
+        self._refresh_thumb_btn.clicked.connect(self._refresh_thumbnails)
+        thumb_row = QtWidgets.QHBoxLayout()
+        thumb_row.addStretch(1)
+        thumb_row.addWidget(self._refresh_thumb_btn)
+        v.addLayout(thumb_row)
+
         # --- name + type badge ------------------------------------------------
         header = QtWidgets.QHBoxLayout()
         self._d_name = QtWidgets.QLabel("—")
@@ -570,6 +592,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._current_asset = asset
         meta = asset.metadata
 
+        self._refresh_thumb_btn.setEnabled(True)
         self._set_preview(asset)
         self._d_name.setText(asset.display_name)
         self._set_badge(asset.asset_type if asset.is_valid else "invalid")
@@ -637,6 +660,65 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         folder = Path(asset.ma_path).parent
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(folder)))
 
+    def _refresh_thumbnails(self) -> None:
+        """Recapture the selected asset's still + turntable in place (images only).
+
+        Opens the asset's ``.ma`` in Maya, bakes a fresh shaded turntable (and the still
+        cropped from it), and overwrites just the two PNGs beside the file — the ``.ma``
+        and sidecar are left untouched. The remedy for older assets still carrying a flat
+        wireframe thumbnail.
+        """
+        asset = self._current_asset
+        if asset is None:
+            return
+        if not _maya_available():
+            QtWidgets.QMessageBox.information(
+                self, "Maya required",
+                "Refreshing thumbnails recaptures them from the asset in Maya 2026.\n"
+                "Open this browser inside Maya to use it.")
+            return
+        if QtWidgets.QMessageBox.question(
+                self, "Refresh thumbnails",
+                f"Open '{asset.ma_path.name}' in Maya and recapture its shaded "
+                "thumbnail + turntable?\n\nThis replaces the current Maya scene — save "
+                "any unsaved work first. Only the images are overwritten; the .ma and "
+                "metadata are left as-is.") != QtWidgets.QMessageBox.Yes:
+            return
+
+        from ..core import maya_publish
+        import maya.cmds as cmds  # type: ignore
+
+        # Write the canonical names publish uses, beside the asset's own .ma.
+        still = asset.ma_path.with_suffix(config.THUMB_EXTS[0])           # <name>.png
+        sheet = asset.ma_path.with_name(asset.ma_path.stem + config.TURNTABLE_SUFFIX)
+        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        try:
+            cmds.file(str(asset.ma_path), open=True, force=True)
+            meshes = maya_publish.find_garment_meshes()
+            if not meshes:
+                raise RuntimeError("no garment meshes found under Mesh_GRP")
+            maya_publish.capture_turntable(meshes, str(sheet), still_png=str(still))
+        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+            QtWidgets.QApplication.restoreOverrideCursor()
+            self._status.setText(f"Thumbnail refresh failed: {exc}")
+            QtWidgets.QMessageBox.critical(self, "Refresh failed", str(exc))
+            return
+        finally:
+            QtWidgets.QApplication.restoreOverrideCursor()
+
+        self.refresh()                       # rescan so the new sheet/still are picked up
+        self._select_by_path(asset.ma_path)  # keep the user on the asset they refreshed
+        self._status.setText(f"Refreshed thumbnails for {asset.display_name}.")
+
+    def _select_by_path(self, ma_path: Path) -> None:
+        """Reselect the grid item whose asset matches ``ma_path`` (after a refresh)."""
+        for row in range(self._grid.count()):
+            item = self._grid.item(row)
+            asset = item.data(QtCore.Qt.UserRole)
+            if asset is not None and asset.ma_path == ma_path:
+                self._grid.setCurrentRow(row)
+                return
+
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)  # TurntableView re-scales itself on its own resize
         asset = self._current_asset
@@ -645,6 +727,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
     def _clear_detail(self) -> None:
         self._current_asset = None
+        self._refresh_thumb_btn.setEnabled(False)
         self._preview.clear_content()
         self._d_name.setText("—")
         self._d_badge.setText("")
