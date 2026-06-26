@@ -48,6 +48,12 @@ def _find_thumbnail(ma_path: Path) -> Path | None:
     return None
 
 
+def _find_turntable(ma_path: Path) -> Path | None:
+    """The ``<asset>_turntable.png`` rotatable sprite sheet beside the ``.ma``, if any."""
+    cand = ma_path.with_name(ma_path.stem + config.TURNTABLE_SUFFIX)
+    return cand if cand.is_file() else None
+
+
 def _load_sidecar(sidecar: Path) -> tuple[AssetMetadata | None, list[str]]:
     try:
         raw = json.loads(sidecar.read_text(encoding="utf-8"))
@@ -62,28 +68,34 @@ def load_asset(ma_path: Path) -> ClothingAsset:
     """Resolve one ``.ma`` into a ``ClothingAsset`` (sidecar first, then info node)."""
     ma_path = Path(ma_path)
     thumb = _find_thumbnail(ma_path)
+    turntable = _find_turntable(ma_path)
     sidecar = ma_path.with_suffix(config.SIDECAR_EXT)
 
     if sidecar.is_file():
         meta, errors = _load_sidecar(sidecar)
         if meta is not None:
-            return ClothingAsset(ma_path, meta, thumb, sidecar, source="sidecar")
+            return ClothingAsset(ma_path, meta, thumb, sidecar, source="sidecar",
+                                 turntable=turntable)
         # sidecar present but bad — fall through to the .ma, keep the reason
         info = ma_parse.read_info_attrs(ma_path, config.INFO_NODE)
         meta2, errors2 = AssetMetadata.from_mapping(info)
         if meta2 is not None:
-            return ClothingAsset(ma_path, meta2, thumb, sidecar, source="ma_info")
+            return ClothingAsset(ma_path, meta2, thumb, sidecar, source="ma_info",
+                                 turntable=turntable)
         return ClothingAsset(
             ma_path, None, thumb, sidecar, source="none",
             errors=tuple(f"sidecar: {e}" for e in errors) + tuple(f"cloth_info: {e}" for e in errors2),
+            turntable=turntable,
         )
 
     info = ma_parse.read_info_attrs(ma_path, config.INFO_NODE)
     meta, errors = AssetMetadata.from_mapping(info)
     if meta is not None:
-        return ClothingAsset(ma_path, meta, thumb, None, source="ma_info")
+        return ClothingAsset(ma_path, meta, thumb, None, source="ma_info",
+                             turntable=turntable)
     reason = errors if info else ["no cloth_info node and no sidecar .json"]
-    return ClothingAsset(ma_path, None, thumb, None, source="none", errors=tuple(reason))
+    return ClothingAsset(ma_path, None, thumb, None, source="none",
+                         errors=tuple(reason), turntable=turntable)
 
 
 def scan_library(roots: list[Path] | None = None) -> LibraryScanResult:

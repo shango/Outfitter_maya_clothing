@@ -123,6 +123,15 @@ SIDECAR_EXT: str = ".json"
 THUMB_EXTS: tuple[str, ...] = (".png", ".jpg", ".jpeg")
 ASSET_EXT: str = ".ma"
 
+# --- turntable thumbnail ------------------------------------------------------
+# Publish bakes a rotatable preview as a sprite sheet beside the still <asset>.png:
+# COLS*ROWS frames orbiting the garment, tiled row-major, CELL px each. The grid is
+# full (no blank trailing cells) so the layout is derivable from the image alone.
+TURNTABLE_SUFFIX: str = "_turntable.png"  # <asset>_turntable.png next to <asset>.png
+TURNTABLE_COLS: int = 6
+TURNTABLE_ROWS: int = 4                    # 6*4 = 24 frames = 15° per step
+TURNTABLE_CELL: int = 256                  # px per frame in the sheet
+
 # --- install locations (FR-9) -------------------------------------------------
 USER_ASSET_DIR_ENV: str = "OUTFITTER_ASSETS"
 PATH_FILE_ENV: str = "OUTFITTER_PATH_FILE"

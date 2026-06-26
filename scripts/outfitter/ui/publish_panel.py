@@ -23,6 +23,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from .. import config
 from ..core import publish as _publish
 from ..core import settings as _settings
+from .turntable import TurntableView
 
 _PREVIEW_BOX = 140
 
@@ -52,6 +53,7 @@ class PublishPanel(QtWidgets.QWidget):
         super().__init__(parent)
         self._on_published = on_published
         self._captured_thumb: Path | None = None
+        self._captured_turntable: Path | None = None
         self._build_ui()
         self._refresh_remote_label()
 
@@ -117,7 +119,7 @@ class PublishPanel(QtWidgets.QWidget):
         self._disconnect_btn.clicked.connect(self._remove_test_body)
         self._prune_btn = QtWidgets.QPushButton("Delete unused joints (optional)")
         self._prune_btn.clicked.connect(self._prune_joints)
-        self._capture_btn = QtWidgets.QPushButton("Capture thumbnail")
+        self._capture_btn = QtWidgets.QPushButton("Capture turntable")
         self._capture_btn.clicked.connect(self._capture)
         self._check_btn = QtWidgets.QPushButton("Check scene")
         self._check_btn.clicked.connect(self._check_scene)
@@ -131,11 +133,11 @@ class PublishPanel(QtWidgets.QWidget):
         self._regen_btn.setText("Regenerate skeleton data from rig…")
         self._regen_btn.clicked.connect(self._regen_skeleton)
 
-        # thumbnail preview (Step 4)
-        self._preview = QtWidgets.QLabel("no thumbnail\ncaptured yet")
+        # thumbnail preview (Step 4) — rotatable once a turntable is captured
+        self._preview = TurntableView(hint="no thumbnail\ncaptured yet")
         self._preview.setObjectName("previewImage")
-        self._preview.setAlignment(QtCore.Qt.AlignCenter)
         self._preview.setFixedSize(_PREVIEW_BOX, _PREVIEW_BOX)
+        self._preview.setToolTip("Hover to spin · drag left/right to rotate")
 
         # publish destination read-out (Step 5) + one-line status strip
         self._dest_label = QtWidgets.QLabel("")
@@ -246,8 +248,9 @@ class PublishPanel(QtWidgets.QWidget):
 
         # Step 4 — thumbnail: capture button sits *beneath* the preview image
         card, body = self._step_card(
-            4, "Capture the thumbnail",
-            "Frame the garment in the viewport, then capture a thumbnail.")
+            4, "Capture the turntable",
+            "Frame the garment in the viewport, then capture a shaded turntable "
+            "(hover the preview to spin it).")
         body.addSpacing(2)
         body.addWidget(self._preview, 0, QtCore.Qt.AlignHCenter)
         body.addWidget(self._capture_btn)
@@ -644,19 +647,23 @@ class PublishPanel(QtWidgets.QWidget):
         if not self._require_maya():
             return
         from ..core import maya_publish
-        out = Path(tempfile.gettempdir()) / "outfitter_thumb.png"
-        self._log("Capture thumbnail…", "step")
+        tmp = Path(tempfile.gettempdir())
+        sheet = tmp / "outfitter_turntable.png"
+        still = tmp / "outfitter_thumb.png"
+        self._log("Capture turntable (orbiting the garment)…", "step")
         try:
             with _wait_cursor():
                 meshes = maya_publish.find_garment_meshes()
-                maya_publish.capture_thumbnail(meshes, str(out))
+                maya_publish.capture_turntable(
+                    meshes, str(sheet), still_png=str(still))
         except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
             self._report(f"Capture failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Capture failed", str(exc))
             return
-        self._captured_thumb = out
-        self._show_preview(out)
-        self._report("Thumbnail captured — review, then Publish.", "ok")
+        self._captured_turntable = sheet
+        self._captured_thumb = still
+        self._preview.set_sheet(sheet)
+        self._report("Turntable captured — hover to spin, then Publish.", "ok")
 
     def _check_scene(self) -> None:
         """Run the pre-publish sanity check and log every finding (no side effects)."""
@@ -677,15 +684,6 @@ class PublishPanel(QtWidgets.QWidget):
                 "error")
         else:
             self._report("Pre-publish check passed — ready to Publish.", "ok")
-
-    def _show_preview(self, png: Path) -> None:
-        pm = QtGui.QPixmap(str(png))
-        if pm.isNull():
-            self._preview.setText("preview failed")
-            return
-        self._preview.setPixmap(pm.scaled(
-            self._preview.size(), QtCore.Qt.KeepAspectRatio,
-            QtCore.Qt.SmoothTransformation))
 
     def _gather_spec(self) -> _publish.PublishSpec | None:
         name = self._name.text().strip()
@@ -784,11 +782,17 @@ class PublishPanel(QtWidgets.QWidget):
                 spec.tri_count, spec.vert_count = maya_publish.poly_counts(meshes)
                 paths.folder.mkdir(parents=True, exist_ok=True)
 
-                # thumbnail: reuse a captured one, else grab one now
-                if self._captured_thumb and self._captured_thumb.is_file():
-                    shutil.copyfile(self._captured_thumb, paths.thumbnail)
+                # turntable sheet + still thumbnail: reuse the captured pair, else
+                # bake a fresh turntable now (which also writes the still).
+                if self._captured_turntable and self._captured_turntable.is_file():
+                    shutil.copyfile(self._captured_turntable, paths.turntable)
+                    if self._captured_thumb and self._captured_thumb.is_file():
+                        shutil.copyfile(self._captured_thumb, paths.thumbnail)
+                    else:
+                        maya_publish.capture_thumbnail(meshes, str(paths.thumbnail))
                 else:
-                    maya_publish.capture_thumbnail(meshes, str(paths.thumbnail))
+                    maya_publish.capture_turntable(
+                        meshes, str(paths.turntable), still_png=str(paths.thumbnail))
 
                 # Embed the metadata in the scene (cloth_info) so the saved .ma is
                 # self-describing, then save; the sidecar carries the same data.

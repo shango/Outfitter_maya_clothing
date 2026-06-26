@@ -153,6 +153,7 @@ class ClothingAsset:
     sidecar: Path | None = None
     source: str = "none"  # "sidecar" | "ma_info" | "none"
     errors: tuple[str, ...] = ()
+    turntable: Path | None = None  # rotatable sprite sheet beside the still thumbnail
 
     @property
     def is_valid(self) -> bool:

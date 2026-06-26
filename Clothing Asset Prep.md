@@ -59,7 +59,9 @@ Work straight down the numbered steps:
 2. **Skin the mesh** — bind your garment to the green joints: **Skin ▸ Bind Skin**.
 3. **Remove the test body** — pose the body to confirm the garment follows, then
    **Remove test body** so the joints go static. *(Optional: **Delete unused joints**.)*
-4. **Capture the thumbnail** — frame the garment in the viewport and capture.
+4. **Capture the turntable** — frame the garment in the viewport and capture. The
+   tool orbits it and bakes a clean **shaded** preview you can spin in the browser (it
+   also saves a still for the grid thumbnail — no more flat wireframe shots).
 5. **Publish** — fill in the asset details (name, version, author…), run **Check scene**,
    then **Publish**. It writes the metadata into the `.ma` (a `cloth_info` node) and sends
    the asset to the shared remote library.

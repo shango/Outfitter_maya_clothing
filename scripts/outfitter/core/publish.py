@@ -43,16 +43,17 @@ def today_iso() -> str:
 
 @dataclass(frozen=True)
 class PublishPaths:
-    """Where the three published files for one asset land on disk."""
+    """Where the published files for one asset land on disk."""
 
     folder: Path
     ma: Path
     sidecar: Path
     thumbnail: Path
+    turntable: Path
 
 
 def destination_paths(dest_root: Path | str, asset_name: str) -> PublishPaths:
-    """``<dest_root>/<name>/<name>.{ma,json,png}`` for a sanitized ``asset_name``."""
+    """``<dest_root>/<name>/<name>.{ma,json,png}`` (+ turntable sheet) for a name."""
     name = sanitize_asset_name(asset_name)
     folder = Path(dest_root) / name
     return PublishPaths(
@@ -60,6 +61,7 @@ def destination_paths(dest_root: Path | str, asset_name: str) -> PublishPaths:
         ma=folder / f"{name}.ma",
         sidecar=folder / f"{name}.json",
         thumbnail=folder / f"{name}.png",
+        turntable=folder / f"{name}{config.TURNTABLE_SUFFIX}",
     )
 
 

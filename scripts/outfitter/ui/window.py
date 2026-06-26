@@ -24,6 +24,7 @@ from ..core import sync as _sync
 from ..core.asset import ClothingAsset
 from . import style
 from .publish_panel import PublishPanel
+from .turntable import TurntableView
 
 WINDOW_OBJECT_NAME = "outfitterBrowser"
 WINDOW_TITLE = "Outfitter"
@@ -110,7 +111,6 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
         self._roots = roots
         self._scan: library.LibraryScanResult | None = None
-        self._preview_pixmap: QtGui.QPixmap | None = None
         self._current_asset: ClothingAsset | None = None
         self._sync_thread: QtCore.QThread | None = None
         self._sync_worker: _SyncWorker | None = None
@@ -390,14 +390,14 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         v.setContentsMargins(12, 8, 8, 8)
         v.setSpacing(8)
 
-        # --- preview image ----------------------------------------------------
-        self._preview = QtWidgets.QLabel()
+        # --- preview image (rotatable when the asset shipped a turntable sheet) ----
+        self._preview = TurntableView(hint="no preview")
         self._preview.setObjectName("previewImage")
-        self._preview.setAlignment(QtCore.Qt.AlignCenter)
         self._preview.setMinimumHeight(200)
         self._preview.setMaximumHeight(_PREVIEW_MAX)
         self._preview.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self._preview.setToolTip("Hover to spin · drag left/right to rotate")
         v.addWidget(self._preview)
 
         # --- name + type badge ------------------------------------------------
@@ -608,26 +608,14 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
             "padding: 2px 10px; font-size: 11px; font-weight: 600;")
 
     def _set_preview(self, asset: ClothingAsset) -> None:
-        pm = None
+        """Drive the detail preview: rotatable turntable if shipped, else the still."""
+        if asset.turntable is not None and asset.turntable.is_file() \
+                and self._preview.set_sheet(asset.turntable):
+            return
         if asset.thumbnail is not None and asset.thumbnail.is_file():
-            loaded = QtGui.QPixmap(str(asset.thumbnail))
-            if not loaded.isNull():
-                pm = loaded
-        self._preview_pixmap = pm
-        self._rescale_preview()
-
-    def _rescale_preview(self) -> None:
-        if not hasattr(self, "_preview"):  # resize() can fire before the panel exists
-            return
-        if self._preview_pixmap is None:
-            self._preview.setText("no preview")
-            self._preview.setPixmap(QtGui.QPixmap())
-            return
-        target = self._preview.size()
-        if target.width() < 2 or target.height() < 2:
-            return
-        self._preview.setPixmap(self._preview_pixmap.scaled(
-            target, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+            self._preview.set_still(QtGui.QPixmap(str(asset.thumbnail)))
+        else:
+            self._preview.clear_content()
 
     def _set_path(self, path: Path) -> None:
         text = str(path)
@@ -650,16 +638,14 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(folder)))
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
-        super().resizeEvent(event)
-        self._rescale_preview()
+        super().resizeEvent(event)  # TurntableView re-scales itself on its own resize
         asset = self._current_asset
         if asset is not None and hasattr(self, "_d_path"):
             self._set_path(asset.ma_path)
 
     def _clear_detail(self) -> None:
         self._current_asset = None
-        self._preview_pixmap = None
-        self._rescale_preview()
+        self._preview.clear_content()
         self._d_name.setText("—")
         self._d_badge.setText("")
         self._d_badge.setStyleSheet("")

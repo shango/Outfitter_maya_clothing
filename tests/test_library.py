@@ -3,6 +3,7 @@ import json
 
 import _bootstrap  # noqa: F401
 
+from outfitter import config
 from outfitter.core import library
 
 
@@ -67,6 +68,19 @@ def test_thumbnail_discovered(tmp_path):
     (tmp_path / "thing.png").write_bytes(b"\x89PNG")
     res = library.scan_library([tmp_path])
     assert res.valid[0].thumbnail == tmp_path / "thing.png"
+    assert res.valid[0].turntable is None  # no sheet -> no turntable
+
+
+def test_turntable_discovered(tmp_path):
+    ma = tmp_path / "thing.ma"
+    _write_ma(ma)
+    (tmp_path / "thing.png").write_bytes(b"\x89PNG")
+    sheet = tmp_path / ("thing" + config.TURNTABLE_SUFFIX)
+    sheet.write_bytes(b"\x89PNG")
+    res = library.scan_library([tmp_path])
+    # the still stays the grid thumbnail; the sheet is offered separately as turntable
+    assert res.valid[0].thumbnail == tmp_path / "thing.png"
+    assert res.valid[0].turntable == sheet
 
 
 def test_by_type_filter(tmp_path):

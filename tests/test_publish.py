@@ -20,6 +20,7 @@ def test_destination_paths_layout(tmp_path):
     assert paths.ma == tmp_path / "trench_coat" / "trench_coat.ma"
     assert paths.sidecar == tmp_path / "trench_coat" / "trench_coat.json"
     assert paths.thumbnail == tmp_path / "trench_coat" / "trench_coat.png"
+    assert paths.turntable == tmp_path / "trench_coat" / "trench_coat_turntable.png"
 
 
 # --- sidecar assembly + round-trip -------------------------------------------
