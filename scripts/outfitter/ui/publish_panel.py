@@ -96,6 +96,15 @@ class PublishPanel(QtWidgets.QWidget):
         self._desc.setPlaceholderText("Brief description shown in the browser…")
         self._desc.setFixedHeight(70)
 
+        # Reload the form from a previously-published asset's embedded cloth_info, so
+        # editing one (e.g. re-painting skin weights) and re-publishing doesn't retype it.
+        self._load_details_btn = QtWidgets.QToolButton()
+        self._load_details_btn.setText("Load from open scene")
+        self._load_details_btn.setToolTip(
+            "Fill these fields from the cloth_info embedded in the open asset "
+            "(for editing and re-publishing an existing asset).")
+        self._load_details_btn.clicked.connect(self._load_details_from_scene)
+
         # Type / Gender drive Step 1 (skin-set + body variant). Start unset on purpose
         # so the rigger picks them rather than silently defaulting to the first entry.
         self._type = QtWidgets.QComboBox()
@@ -154,10 +163,16 @@ class PublishPanel(QtWidgets.QWidget):
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(8)
 
+        head_row = QtWidgets.QHBoxLayout()
         heading = QtWidgets.QLabel("ASSET DETAILS")  # QSS can't upper-case; do it here
         heading.setObjectName("sectionHeading")
-        v.addWidget(heading)
-        hint = QtWidgets.QLabel("Fill these out before you publish (Step 5).")
+        head_row.addWidget(heading)
+        head_row.addStretch(1)
+        head_row.addWidget(self._load_details_btn)
+        v.addLayout(head_row)
+        hint = QtWidgets.QLabel(
+            "Fill these out before you publish (Step 5) — or load them from an "
+            "existing asset's open scene.")
         hint.setObjectName("muted")
         hint.setWordWrap(True)
         v.addWidget(hint)
@@ -486,6 +501,40 @@ class PublishPanel(QtWidgets.QWidget):
             self._report(f"Detected rig version: {version}", "ok")
         else:
             self._report("Could not detect a rig version — enter it manually.", "warn")
+
+    def _load_details_from_scene(self) -> None:
+        """Fill the form from the open asset's embedded cloth_info (for re-publishing)."""
+        if not self._require_maya():
+            return
+        from ..core import maya_publish
+        info = maya_publish.read_info_node()
+        if not info:
+            self._report(
+                "No cloth_info found in the open scene — open a published asset, or fill "
+                "the fields in by hand.", "warn")
+            return
+        self._apply_info_to_form(info)
+        name = info.get("assetName", "")
+        self._report(
+            f"Loaded details for '{name}' from the open scene — edit, then re-publish "
+            "(keep the name to overwrite).", "ok")
+
+    def _apply_info_to_form(self, info: dict) -> None:
+        """Map sidecar/cloth_info keys onto the form widgets (blanks left untouched)."""
+        self._name.setText(info.get("assetName", ""))
+        self._version.setText(info.get("clothVersion", "") or "1.0.0")
+        self._compat.setText(info.get("genHumanCompat", ""))
+        self._author.setText(info.get("author", ""))
+        self._rigver.setText(info.get("rigVersion", ""))
+        self._desc.setPlainText(info.get("notes", ""))
+        self._select_combo(self._type, info.get("assetType", ""))
+        self._select_combo(self._gender, info.get("gender", ""))
+
+    @staticmethod
+    def _select_combo(combo: QtWidgets.QComboBox, value: str) -> None:
+        """Select ``value`` in ``combo`` if it's a known entry; else leave it unset."""
+        index = combo.findText(value, QtCore.Qt.MatchFixedString) if value else -1
+        combo.setCurrentIndex(index)
 
     def _create_skeleton(self) -> None:
         """Rebuild the cloth_* skeleton and, in the same click, select the skin joints.

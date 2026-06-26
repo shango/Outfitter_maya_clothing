@@ -432,6 +432,31 @@ def capture_turntable(
 # --------------------------------------------------------------------------- #
 # Embed metadata + save
 # --------------------------------------------------------------------------- #
+def read_info_node(node: str = config.INFO_NODE) -> dict:
+    """Read the ``cloth_info`` node's string attrs from the open scene (``{}`` if absent).
+
+    The inverse of :func:`write_info_node`: lets the Publish form reload the metadata
+    embedded in a previously-published asset (sidecar attr names → values) so editing and
+    re-publishing it doesn't mean retyping every field. Falls back to a namespaced match
+    so a still-referenced asset is found too.
+    """
+    cmds = _cmds()
+    if not cmds.objExists(node):
+        matches = cmds.ls(f"*:{node}") or []
+        if not matches:
+            return {}
+        node = matches[0]
+    out: dict[str, str] = {}
+    for attr in (cmds.listAttr(node, userDefined=True) or []):
+        try:
+            value = cmds.getAttr(f"{node}.{attr}")
+        except Exception:  # noqa: BLE001 — non-readable/compound attr; skip it
+            continue
+        if value is not None:
+            out[attr] = str(value)
+    return out
+
+
 def write_info_node(attrs: dict, node: str = config.INFO_NODE) -> str:
     """Create/refresh the ``cloth_info`` node so the saved ``.ma`` is self-describing.
 

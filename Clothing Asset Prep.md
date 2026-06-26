@@ -68,6 +68,25 @@ Work straight down the numbered steps:
 
 ---
 
+## Editing a published asset (e.g. re-painting skin weights)
+
+A published `.ma` re-opens as a fully editable scene — the mesh, the `cloth_*` joints,
+and the skinCluster all survive the save. To revise one:
+
+1. **Open** the asset's `.ma`.
+2. *(Optional, to pose-test)* **Load test body**, pose, then **Remove test body** so the
+   joints go static again.
+3. Make your edits — e.g. **Paint Skin Weights** on the existing skinCluster.
+4. On the Publish tab, click **Load from open scene** to refill the details from the
+   asset's embedded `cloth_info` (keep the **name** so the re-publish overwrites).
+5. **Check scene** → **Publish ▸** → confirm **Overwrite**.
+
+Re-publish re-saves the `.ma` with your changes and regenerates the sidecar + thumbnails;
+nothing rebuilds the skinCluster, so your weights are preserved exactly. Bump the
+**Version** field if the change is worth tracking.
+
+---
+
 ## Updating an existing asset's thumbnails
 
 Already-published assets keep whatever thumbnail they shipped with. To upgrade one to the
