@@ -203,6 +203,8 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._grid.setMovement(QtWidgets.QListWidget.Static)
         self._grid.setUniformItemSizes(True)
         self._grid.currentItemChanged.connect(self._on_selection)
+        self._grid.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self._grid.customContextMenuRequested.connect(self._grid_context_menu)
         splitter.addWidget(self._grid)
         splitter.addWidget(self._build_detail_panel())
         splitter.setStretchFactor(0, 3)
@@ -407,20 +409,8 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self._preview.setToolTip("Hover to spin · drag left/right to rotate")
         v.addWidget(self._preview)
-
-        # Recapture this asset's shaded still + turntable in place (no .ma re-save).
-        # Upgrades older assets that still carry a flat wireframe thumbnail.
-        self._refresh_thumb_btn = QtWidgets.QToolButton()
-        self._refresh_thumb_btn.setText("↻ Refresh thumbnails")
-        self._refresh_thumb_btn.setToolTip(
-            "Open this asset in Maya and recapture its shaded thumbnail + turntable, "
-            "overwriting just the images (the .ma and metadata are left untouched).")
-        self._refresh_thumb_btn.setEnabled(False)
-        self._refresh_thumb_btn.clicked.connect(self._refresh_thumbnails)
-        thumb_row = QtWidgets.QHBoxLayout()
-        thumb_row.addStretch(1)
-        thumb_row.addWidget(self._refresh_thumb_btn)
-        v.addLayout(thumb_row)
+        # Per-asset actions (Refresh thumbnails, …) live on the grid's right-click menu —
+        # see _grid_context_menu.
 
         # --- name + type badge ------------------------------------------------
         header = QtWidgets.QHBoxLayout()
@@ -592,7 +582,6 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._current_asset = asset
         meta = asset.metadata
 
-        self._refresh_thumb_btn.setEnabled(True)
         self._set_preview(asset)
         self._d_name.setText(asset.display_name)
         self._set_badge(asset.asset_type if asset.is_valid else "invalid")
@@ -659,6 +648,24 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
             return
         folder = Path(asset.ma_path).parent
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(folder)))
+
+    def _grid_context_menu(self, pos: QtCore.QPoint) -> None:
+        """Right-click menu on a grid thumbnail — the home for per-asset actions.
+
+        Selects the clicked item first (so the detail panel and ``_current_asset`` track
+        it), then offers actions that operate on it. New per-asset actions get added here.
+        """
+        item = self._grid.itemAt(pos)
+        if item is None:
+            return  # right-clicked empty space — no asset under the cursor
+        self._grid.setCurrentItem(item)
+
+        menu = QtWidgets.QMenu(self)
+        menu.addAction("↻ Refresh thumbnails", self._refresh_thumbnails)
+        menu.addSeparator()
+        menu.addAction("Open containing folder", self._open_folder)
+        menu.addAction("Copy path", self._copy_path)
+        menu.exec(self._grid.viewport().mapToGlobal(pos))
 
     def _refresh_thumbnails(self) -> None:
         """Recapture the selected asset's still + turntable in place (images only).
@@ -727,7 +734,6 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
     def _clear_detail(self) -> None:
         self._current_asset = None
-        self._refresh_thumb_btn.setEnabled(False)
         self._preview.clear_content()
         self._d_name.setText("—")
         self._d_badge.setText("")

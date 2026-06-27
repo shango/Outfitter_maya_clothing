@@ -90,9 +90,10 @@ nothing rebuilds the skinCluster, so your weights are preserved exactly. Bump th
 ## Updating an existing asset's thumbnails
 
 Already-published assets keep whatever thumbnail they shipped with. To upgrade one to the
-shaded still + spinnable turntable without a full re-publish: select it in the **browser**
-and click **↻ Refresh thumbnails**. It opens the asset in Maya, recaptures, and overwrites
-just the two image files — the `.ma` and its metadata are left untouched. (It replaces the
+shaded still + spinnable turntable without a full re-publish: **right-click its thumbnail**
+in the browser and choose **↻ Refresh thumbnails**. It opens the asset in Maya, recaptures,
+and overwrites just the two image files — the `.ma` and its metadata are left untouched.
+(It replaces the
 current Maya scene, so save any open work first.)
 
 ---
