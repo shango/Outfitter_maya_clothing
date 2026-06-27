@@ -93,8 +93,9 @@ Already-published assets keep whatever thumbnail they shipped with. To upgrade o
 shaded still + spinnable turntable without a full re-publish: **right-click its thumbnail**
 in the browser and choose **↻ Refresh thumbnails**. It opens the asset in Maya, recaptures,
 and overwrites just the two image files — the `.ma` and its metadata are left untouched.
-(It replaces the
-current Maya scene, so save any open work first.)
+The images are written to your local copy **and mirrored to the matching remote folder**
+when a remote library is configured and already holds the asset, so the shared copy stays
+current. (It replaces the current Maya scene, so save any open work first.)
 
 ---
 

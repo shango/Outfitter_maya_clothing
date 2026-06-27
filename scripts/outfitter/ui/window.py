@@ -12,6 +12,7 @@ require a running Maya (they report this clearly if invoked standalone).
 """
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -672,7 +673,9 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
         Opens the asset's ``.ma`` in Maya, bakes a fresh shaded turntable (and the still
         cropped from it), and overwrites just the two PNGs beside the file — the ``.ma``
-        and sidecar are left untouched. The remedy for older assets still carrying a flat
+        and sidecar are left untouched. When a remote library is configured and holds the
+        same asset, the new images are mirrored there too, so the shared copy stays current
+        without a full re-publish. The remedy for older assets still carrying a flat
         wireframe thumbnail.
         """
         asset = self._current_asset
@@ -688,8 +691,9 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
                 self, "Refresh thumbnails",
                 f"Open '{asset.ma_path.name}' in Maya and recapture its shaded "
                 "thumbnail + turntable?\n\nThis replaces the current Maya scene — save "
-                "any unsaved work first. Only the images are overwritten; the .ma and "
-                "metadata are left as-is.") != QtWidgets.QMessageBox.Yes:
+                "any unsaved work first. Only the images are overwritten (local, and the "
+                "remote copy when configured); the .ma and metadata are left as-is."
+                ) != QtWidgets.QMessageBox.Yes:
             return
 
         from ..core import maya_publish
@@ -713,9 +717,32 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
 
+        scope = self._mirror_thumbs_to_remote(asset, still, sheet)
         self.refresh()                       # rescan so the new sheet/still are picked up
         self._select_by_path(asset.ma_path)  # keep the user on the asset they refreshed
-        self._status.setText(f"Refreshed thumbnails for {asset.display_name}.")
+        self._status.setText(f"Refreshed thumbnails for {asset.display_name}{scope}.")
+
+    def _mirror_thumbs_to_remote(self, asset: ClothingAsset, still: Path,
+                                 sheet: Path) -> str:
+        """Copy the refreshed PNGs into the asset's matching remote folder, if any.
+
+        Returns a short suffix describing the scope for the status line. The remote is
+        only touched when it's configured *and* already holds this asset (its ``.ma`` is
+        present in the mirror folder), so we never write into an unrelated folder or push
+        a not-yet-published asset.
+        """
+        remote = _settings.read_locations().remote
+        if remote is None:
+            return " (local — no remote set)"
+        remote_folder = Path(remote) / asset.ma_path.parent.name
+        if not (remote_folder / asset.ma_path.name).is_file():
+            return " (local only — not in remote library)"
+        try:
+            shutil.copyfile(still, remote_folder / still.name)
+            shutil.copyfile(sheet, remote_folder / sheet.name)
+        except OSError:
+            return " (local — remote copy failed)"
+        return " (local + remote)"
 
     def _select_by_path(self, ma_path: Path) -> None:
         """Reselect the grid item whose asset matches ``ma_path`` (after a refresh)."""
