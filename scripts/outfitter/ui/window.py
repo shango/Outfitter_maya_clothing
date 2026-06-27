@@ -661,10 +661,10 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._grid.setCurrentItem(item)
 
         menu = QtWidgets.QMenu(self)
-        menu.addAction("↻ Refresh thumbnails", self._refresh_thumbnails)
-        menu.addSeparator()
         menu.addAction("Open containing folder", self._open_folder)
         menu.addAction("Copy path", self._copy_path)
+        menu.addSeparator()
+        menu.addAction("↻ Refresh thumbnails", self._refresh_thumbnails)
         menu.exec(self._grid.viewport().mapToGlobal(pos))
 
     def _refresh_thumbnails(self) -> None:

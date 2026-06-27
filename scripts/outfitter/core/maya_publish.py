@@ -248,16 +248,15 @@ def _clean_shaded_view(panel: str):
     Thumbnails were capturing whatever display mode the viewport happened to be in —
     wireframe shows only the silhouette. This switches the panel to smooth-shaded with
     textures (and best-effort viewport-2.0 anti-aliasing + ambient occlusion), and hides
-    the grid / wireframe-on-shaded / HUD / selection highlight for a clean shot (the
-    capture also clears the selection, but turning the highlight off is belt-and-braces).
-    Every changed setting is saved and restored, so the rigger's viewport looks the same
-    afterwards.
+    the grid / wireframe-on-shaded / HUD for a clean shot. (The green selection-highlight
+    wireframe is handled by the capture clearing the selection, not here.) Every changed
+    setting is saved and restored, so the rigger's viewport looks the same afterwards.
     """
     cmds = _cmds()
     saved = {
         flag: cmds.modelEditor(panel, query=True, **{flag: True})
         for flag in ("displayAppearance", "displayTextures", "wireframeOnShaded",
-                     "grid", "headsUpDisplay", "selectionHighlighting")
+                     "grid", "headsUpDisplay")
     }
     # Viewport 2.0 quality knobs live on a scene singleton; toggling them is best-effort
     # (attrs vary by Maya build), so each is guarded and only restored if it was read.
@@ -274,7 +273,7 @@ def _clean_shaded_view(panel: str):
         cmds.modelEditor(
             panel, edit=True, displayAppearance="smoothShaded",
             displayTextures=True, wireframeOnShaded=False, grid=False,
-            headsUpDisplay=False, selectionHighlighting=False)
+            headsUpDisplay=False)
         yield
     finally:
         cmds.modelEditor(panel, edit=True, **saved)
