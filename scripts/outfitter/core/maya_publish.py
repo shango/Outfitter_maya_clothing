@@ -248,14 +248,16 @@ def _clean_shaded_view(panel: str):
     Thumbnails were capturing whatever display mode the viewport happened to be in —
     wireframe shows only the silhouette. This switches the panel to smooth-shaded with
     textures (and best-effort viewport-2.0 anti-aliasing + ambient occlusion), and hides
-    the grid / wireframe-on-shaded / HUD for a clean shot. Every changed setting is saved
-    and restored, so the rigger's viewport looks the same afterwards.
+    the grid / wireframe-on-shaded / HUD / selection highlight for a clean shot (the
+    capture also clears the selection, but turning the highlight off is belt-and-braces).
+    Every changed setting is saved and restored, so the rigger's viewport looks the same
+    afterwards.
     """
     cmds = _cmds()
     saved = {
         flag: cmds.modelEditor(panel, query=True, **{flag: True})
         for flag in ("displayAppearance", "displayTextures", "wireframeOnShaded",
-                     "grid", "headsUpDisplay")
+                     "grid", "headsUpDisplay", "selectionHighlighting")
     }
     # Viewport 2.0 quality knobs live on a scene singleton; toggling them is best-effort
     # (attrs vary by Maya build), so each is guarded and only restored if it was read.
@@ -272,7 +274,7 @@ def _clean_shaded_view(panel: str):
         cmds.modelEditor(
             panel, edit=True, displayAppearance="smoothShaded",
             displayTextures=True, wireframeOnShaded=False, grid=False,
-            headsUpDisplay=False)
+            headsUpDisplay=False, selectionHighlighting=False)
         yield
     finally:
         cmds.modelEditor(panel, edit=True, **saved)
@@ -310,6 +312,9 @@ def capture_thumbnail(meshes: list[str], out_png: str, size: int = 512) -> str:
                 # objects and target the panel via panel=, or Maya tries to resolve the
                 # panel name as a scene node ("No object matches name: modelPanel4").
                 cmds.viewFit(meshes, panel=panel, fitFactor=0.9)
+            # Drop the selection so the green selection-highlight wireframe doesn't bake
+            # into the shot; isolateSelect keeps the garment isolated without it.
+            cmds.select(clear=True)
             frame = cmds.currentTime(query=True)
             cmds.playblast(
                 frame=frame, format="image", compression="png",
@@ -402,6 +407,9 @@ def capture_turntable(
             isolated = True
             cmds.viewFit(meshes, panel=panel, fitFactor=0.9)
             eye0 = cmds.xform(camera, query=True, worldSpace=True, translation=True)
+            # Drop the selection so the green selection-highlight wireframe doesn't bake
+            # into the frames; isolateSelect keeps the garment isolated without it.
+            cmds.select(clear=True)
             frame = cmds.currentTime(query=True)
             for i, eye in enumerate(_turntable.orbit_eyes(center, eye0, frames)):
                 cmds.viewPlace(camera, eye=eye, la=center, up=(0, 1, 0))
