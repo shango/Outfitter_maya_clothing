@@ -185,7 +185,10 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._apply_filter)
         self._refresh_btn = QtWidgets.QPushButton("Refresh")
-        self._refresh_btn.clicked.connect(self.refresh)
+        self._refresh_btn.setToolTip(
+            "Pull new/changed assets from the remote (when configured), then rescan the "
+            "library.")
+        self._refresh_btn.clicked.connect(self._refresh_clicked)
         top.addWidget(QtWidgets.QLabel("Gender:"))
         top.addWidget(self._gender_combo)
         top.addWidget(QtWidgets.QLabel("Type:"))
@@ -510,6 +513,20 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         if self._roots is not None:
             return self._roots
         return _settings.effective_library_roots()
+
+    def _refresh_clicked(self) -> None:
+        """Top-bar Refresh: pull from the remote (when configured) then rescan.
+
+        Reuses the Setup-tab sync machinery — its completion handler rescans the library —
+        so one button keeps the local folder current with the shared library. Falls back to
+        a plain local rescan when there's no remote set (or a sync is already running).
+        """
+        loc = _settings.read_locations()
+        if loc.local is not None and loc.remote is not None and self._sync_thread is None:
+            self._status.setText("Syncing from remote…")
+            self._sync_now()  # off-thread; refreshes the library when it finishes
+        else:
+            self.refresh()
 
     def refresh(self) -> None:
         self._scan = library.scan_library(self._effective_roots())
