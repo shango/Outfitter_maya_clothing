@@ -1,9 +1,9 @@
-"""In-scene skinning test — plan the body→``cloth_*`` connections (pure, headless).
+"""In-scene skinning test - plan the body→``cloth_*`` connections (pure, headless).
 
 Before publishing, the rigger needs to confirm the garment deforms correctly. They
 already fit it on the GenHuman body that is *still in the authoring scene*, so the
 test is simply: drive the ``cloth_*`` skeleton from that body, pose it, watch the
-mesh follow — then disconnect so the joints go static and publish-safe again.
+mesh follow - then disconnect so the joints go static and publish-safe again.
 
 This is authoring-time :mod:`core.attach`: the **same** ``connectAttr`` body→cloth
 ``{translate,rotate,scale}`` plugs as production attach, by the **same** name match
@@ -31,7 +31,7 @@ def body_morph_value(gender: str) -> float:
         return config.GENDER_BODY_MORPH[key]
     except KeyError:
         valid = ", ".join(config.GENDER_BODY_MORPH)
-        raise ValueError(f"unknown gender '{gender}' — expected one of: {valid}") from None
+        raise ValueError(f"unknown gender '{gender}' - expected one of: {valid}") from None
 
 
 @dataclass(frozen=True)
@@ -78,7 +78,7 @@ def plan_test_fit(
     ``cloth_nodes`` maps each in-scene cloth joint's short name (``cloth_spine_01``) to
     its node address; ``body_joints`` maps each body joint's *base* name (``spine_01``)
     to its node address. A ``cloth_<base>`` joint is driven iff ``<base>`` is a body
-    joint — identical to attach's matching. ``locked`` / ``driven`` are the cloth plugs
+    joint - identical to attach's matching. ``locked`` / ``driven`` are the cloth plugs
     (``"node.attr"``) to skip: a locked plug can't be connected, an already-driven plug
     must not be stolen (it's how re-running stays idempotent). Cloth joints with no body
     match are helper joints, reported as ``unmatched`` and left animator-accessible.

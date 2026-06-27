@@ -64,7 +64,7 @@ class AssetMetadata:
     author: str = ""
     notes: str = ""
     # Informational extras captured at publish (Maya-side: polycount, date, the
-    # exact rig version authored against). Optional — absent/garbage values default
+    # exact rig version authored against). Optional - absent/garbage values default
     # and never produce a validation error. ``notes`` doubles as the description.
     created: str = ""
     rig_version: str = ""
@@ -77,7 +77,7 @@ class AssetMetadata:
 
         Accepts both spec attr names (``assetName``) and snake_case field names
         (``asset_name``) so a hand-written JSON sidecar works either way. Never
-        raises — invalid input yields ``None`` plus human-readable error strings.
+        raises - invalid input yields ``None`` plus human-readable error strings.
         """
         norm: dict[str, object] = {}
         for key, value in data.items():

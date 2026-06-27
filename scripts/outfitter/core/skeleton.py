@@ -1,10 +1,10 @@
-"""Canonical GenHuman ``cloth_*`` skeleton — pure loader + model.
+"""Canonical GenHuman ``cloth_*`` skeleton - pure loader + model.
 
 There is exactly one GenHuman rig, therefore exactly one ``cloth_*`` export skeleton.
 Rather than make every rigger import the rig and duplicate / rename / prune it by hand,
-that skeleton is persisted once — ``data/cloth_skeleton.json``, extracted from the
+that skeleton is persisted once - ``data/cloth_skeleton.json``, extracted from the
 verified ``assets/trench_coat_A`` asset (body-derived export joints only; garment helper
-joints like ``cloth_coatTail_*`` excluded) — and rebuilt in-scene with one button by
+joints like ``cloth_coatTail_*`` excluded) - and rebuilt in-scene with one button by
 :mod:`core.maya_skeleton`. This module loads and validates that data with no Maya; the
 Maya boundary only replays it.
 
@@ -145,11 +145,11 @@ def write_skeleton(spec: SkeletonSpec, dest: Path | None = None) -> Path:
 
 @dataclass(frozen=True)
 class PrunePlan:
-    """What pruning the unweighted ``cloth_*`` joints would do — computed with no Maya.
+    """What pruning the unweighted ``cloth_*`` joints would do - computed with no Maya.
 
     ``delete`` is in deletion order (a joint always precedes its parent), so replaying it
     only ever removes leaves. ``kept_unweighted`` are the interior joints that carry no
-    skin weight but are kept anyway because they have skinned descendants — deleting and
+    skin weight but are kept anyway because they have skinned descendants - deleting and
     reparenting them would change their children's LOCAL transforms and break the
     body-mirrored chain attach depends on.
     """
@@ -167,7 +167,7 @@ def plan_prune(parents: dict, influences, root_joint: str = config.ROOT_JOINT) -
     """Select the ``cloth_*`` joints that are safe to delete after skinning.
 
     ``parents`` maps each in-scene ``cloth_*`` joint (short name) to its parent's short
-    name; ``influences`` is the set of joints actually bound by a skinCluster. Pure — no
+    name; ``influences`` is the set of joints actually bound by a skinCluster. Pure - no
     Maya: the wrapper in :mod:`core.maya_skeleton` gathers both from the scene and
     replays the returned :class:`PrunePlan`.
 
@@ -175,7 +175,7 @@ def plan_prune(parents: dict, influences, root_joint: str = config.ROOT_JOINT) -
     **leaf** joint that is neither a skin influence nor ``root_joint``; deleting it may
     expose its parent as a new leaf, so repeat until stable. Interior joints are kept
     regardless of weight. A naive "delete everything unweighted" instead would tear holes
-    in the hierarchy — this never does.
+    in the hierarchy - this never does.
     """
     influences = set(influences)
     alive = set(parents)

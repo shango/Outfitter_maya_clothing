@@ -1,11 +1,11 @@
-"""Validation — hard-stop checks before any scene mutation (FR-2).
+"""Validation - hard-stop checks before any scene mutation (FR-2).
 
 Two layers, both pure (the scene layer talks only to a ``SceneGateway``):
 
-  * :func:`validate_asset_summary` — file-only, from an ``MaSummary`` read off
+  * :func:`validate_asset_summary` - file-only, from an ``MaSummary`` read off
     disk by ``ma_parse`` (no Maya, no import). Structure / naming / forbidden
     nodes per the Authoring Spec.
-  * :func:`validate_scene_preconditions` — scene-side, pre-import: rig present,
+  * :func:`validate_scene_preconditions` - scene-side, pre-import: rig present,
     version compatible, target namespace free.
 
 Per FR-2 the caller must treat any ``ERROR`` as a hard stop and leave the scene
@@ -39,7 +39,7 @@ class Issue:
 
     def __str__(self) -> str:
         loc = f" [{self.node}]" if self.node else ""
-        tail = f" — fix: {self.fix}" if self.fix else ""
+        tail = f" - fix: {self.fix}" if self.fix else ""
         return f"{self.severity.value.upper()}: {self.message}{loc}{tail}"
 
 
@@ -135,14 +135,14 @@ def validate_asset_summary(summary: MaSummary, metadata: AssetMetadata | None) -
     # --- unknown / lost-plugin nodes (Authoring Spec §10 / §13) ---
     for node in summary.nodes_of_types(config.UNKNOWN_NODE_TYPES):
         report.error("unknown_node", f"unknown (lost-plugin) node '{node}'", node=node,
-                     fix="delete unknown nodes — Edit ▸ Delete All by Type ▸ Unknown Nodes")
+                     fix="delete unknown nodes - Edit ▸ Delete All by Type ▸ Unknown Nodes")
 
     # --- timeline animation curves (Authoring Spec §10 / §13: assets ship static) ---
     # Time-input curves only; set-driven keys (animCurveU*) are an allowed rig mechanism.
     for node in summary.nodes_of_types(config.TIMELINE_ANIM_CURVE_TYPES):
         report.error("anim_curve", f"timeline animation curve '{node}' in asset", node=node,
                      fix="delete all timeline keyframes; a delivered asset must be static "
-                         "(set-driven keys are fine — only time-based animation is banned)")
+                         "(set-driven keys are fine - only time-based animation is banned)")
 
     # --- display layers other than the default (Authoring Spec §10 / §13) ---
     for node in summary.nodes_of_type(config.DISPLAY_LAYER_TYPE):

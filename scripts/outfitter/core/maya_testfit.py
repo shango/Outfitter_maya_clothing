@@ -1,9 +1,9 @@
-"""In-scene skinning test — drive the ``cloth_*`` skeleton from the body (Maya-side).
+"""In-scene skinning test - drive the ``cloth_*`` skeleton from the body (Maya-side).
 
 The rigger hits **Load test body**: the tool references in its bundled GenHuman, flips
 ``GH_Body_morph`` to match the garment's chosen gender (female = base, male = morph),
 aligns the garment's ``Rig_GRP`` to the rig's export frame, and ``connectAttr``s each
-body joint's ``{translate,rotate,scale}`` onto the matching ``cloth_*`` joint — exactly
+body joint's ``{translate,rotate,scale}`` onto the matching ``cloth_*`` joint - exactly
 production attach, in-scene. They pose the body's controls, confirm the mesh follows,
 then hit **Remove test body** to disconnect and delete the rig so the joints go static
 and the asset is publish-safe again. (``connect_test_body`` / ``disconnect_test_body``
@@ -107,7 +107,7 @@ def _align_rig_group(cmds, export_grp: str) -> None:
     Attach connects only LOCAL transforms, so the garment's joint group must share the
     export group's world frame or the connected joints reproduce in the wrong frame and
     the garment lands rotated off the body (see ``attach._align_root_group``). Best-effort
-    — if either group is missing the connections still drive, just possibly off-frame.
+    - if either group is missing the connections still drive, just possibly off-frame.
     """
     # Rig_GRP is a transform group, not a joint, so match by name across any namespace.
     matches = cmds.ls(config.RIG_GROUP, long=True) or cmds.ls(
@@ -118,7 +118,7 @@ def _align_rig_group(cmds, export_grp: str) -> None:
     try:
         m = cmds.xform(export_grp, query=True, worldSpace=True, matrix=True)
         cmds.xform(rig_group, worldSpace=True, matrix=m)
-    except Exception:  # noqa: BLE001 — alignment is best-effort, never abort the connect
+    except Exception:  # noqa: BLE001 - alignment is best-effort, never abort the connect
         pass
 
 
@@ -158,7 +158,7 @@ def connect_test_body(mesh_group: str = "Mesh_GRP") -> ConnectResult:
                     locked.add(plug)
                 elif cmds.connectionInfo(plug, isDestination=True):
                     driven.add(plug)
-            except Exception:  # noqa: BLE001 — a missing attr just isn't connected
+            except Exception:  # noqa: BLE001 - a missing attr just isn't connected
                 pass
 
     plan = _testfit.plan_test_fit(
@@ -169,7 +169,7 @@ def connect_test_body(mesh_group: str = "Mesh_GRP") -> ConnectResult:
         try:
             cmds.connectAttr(conn.src, conn.dst, force=False)
             connected += 1
-        except Exception:  # noqa: BLE001 — skip a plug Maya refuses, keep going
+        except Exception:  # noqa: BLE001 - skip a plug Maya refuses, keep going
             pass
 
     cmds.select(clear=True)
@@ -187,7 +187,7 @@ def disconnect_test_body() -> DisconnectResult:
 
     Walks every ``cloth_*`` joint and disconnects any incoming ``{translate,rotate,
     scale}`` connection whose source is *outside* the cloth skeleton (i.e. a body
-    joint) — exactly the edges :func:`connect_test_body` makes. Idempotent and tolerant
+    joint) - exactly the edges :func:`connect_test_body` makes. Idempotent and tolerant
     of already-broken edges, so it's safe to run before publishing even if nothing is
     connected.
     """
@@ -211,7 +211,7 @@ def disconnect_test_body() -> DisconnectResult:
                 cmds.disconnectAttr(src, dst)
                 broken += 1
                 joint_touched = True
-            except Exception:  # noqa: BLE001 — best-effort; a stubborn edge isn't fatal
+            except Exception:  # noqa: BLE001 - best-effort; a stubborn edge isn't fatal
                 pass
         if joint_touched:
             touched.append(short)
@@ -232,7 +232,7 @@ def _set_body_morph(cmds, gender: str) -> float:
     the rig afterwards.
 
     Reads the morph back after setting it, so the caller reports what the body is *really*
-    at — not just what we asked for. Tolerates a genuinely-absent node/attr (returns the
+    at - not just what we asked for. Tolerates a genuinely-absent node/attr (returns the
     requested value), but if the plug exists and the set silently doesn't take (the attr is
     locked or driven by the rig), the read-back exposes that instead of masking it.
     """
@@ -244,10 +244,10 @@ def _set_body_morph(cmds, gender: str) -> float:
         node = matches[0] if matches else node
     plug = f"{node}.{config.BODY_MORPH_ATTR}"
     if not cmds.objExists(plug):
-        return value  # attr genuinely absent — nothing to set or read back
+        return value  # attr genuinely absent - nothing to set or read back
     try:
         cmds.setAttr(plug, value)
-    except Exception:  # noqa: BLE001 — locked/driven; the read-back below tells the truth
+    except Exception:  # noqa: BLE001 - locked/driven; the read-back below tells the truth
         pass
     try:
         return float(cmds.getAttr(plug))
@@ -265,7 +265,7 @@ def load_test_body(gender: str, mesh_group: str = "Mesh_GRP") -> LoadBodyResult:
     file isn't installed. After loading it sets the morph then runs :func:`connect_test_body`.
 
     The body is brought in as a *file reference* (not an import) so that 'Remove test body'
-    can drop it with ``removeReference`` — which deletes every node it brought in, including
+    can drop it with ``removeReference`` - which deletes every node it brought in, including
     leftover selection sets, plus its namespace, leaving zero remnants for publish. (An
     import has to be torn down by name-sweeping, which strands sets and blocks publish.)
     Downstream matching is namespace-insensitive (see ``maya_skeleton._short`` /
@@ -287,7 +287,7 @@ def load_test_body(gender: str, mesh_group: str = "Mesh_GRP") -> LoadBodyResult:
             f"Bundled GenHuman body not found at {body_file}. It ships in the tool's "
             "lib/ folder; reinstall or place the rig file there.")
 
-    # Reference (don't import) under the file-stem namespace, e.g. 'GenHuman_rig_v03' — this
+    # Reference (don't import) under the file-stem namespace, e.g. 'GenHuman_rig_v03' - this
     # carries the version token so detect_rig_version still reads it, and removeReference
     # later wipes the rig cleanly. _short strips the namespace, so the cloth_<base> -> body
     # <base> match and the godnode/morph attr path still resolve as connect expects.
@@ -300,8 +300,8 @@ def load_test_body(gender: str, mesh_group: str = "Mesh_GRP") -> LoadBodyResult:
 def _remove_genhuman_references(cmds) -> int:
     """Drop any GenHuman file reference; returns how many references were removed.
 
-    ``removeReference`` deletes every node the reference brought in — joints, shaders,
-    utility nodes *and selection sets* — and removes its now-empty namespace, so nothing
+    ``removeReference`` deletes every node the reference brought in - joints, shaders,
+    utility nodes *and selection sets* - and removes its now-empty namespace, so nothing
     is stranded to trip the publish "rig still in scene" gate. Reference nodes are matched
     by their referenced filename so this survives a save/reopen (we don't rely on a handle
     captured at load time). Best-effort per reference; a stubborn one never blocks the rest.
@@ -311,14 +311,14 @@ def _remove_genhuman_references(cmds) -> int:
     for ref in (cmds.ls(type="reference") or []):
         try:
             filename = cmds.referenceQuery(ref, filename=True)
-        except Exception:  # noqa: BLE001 — e.g. an unloaded/own-scene reference node
+        except Exception:  # noqa: BLE001 - e.g. an unloaded/own-scene reference node
             continue
         if "GenHuman" not in filename and stem not in filename:
             continue
         try:
             cmds.file(removeReference=True, referenceNode=ref)
             removed += 1
-        except Exception:  # noqa: BLE001 — keep going; the name-sweep fallback covers leftovers
+        except Exception:  # noqa: BLE001 - keep going; the name-sweep fallback covers leftovers
             pass
     return removed
 
@@ -343,7 +343,7 @@ def _delete_genhuman(cmds) -> int:
         try:
             cmds.delete(node)
             deleted += 1
-        except Exception:  # noqa: BLE001 — keep deleting the rest
+        except Exception:  # noqa: BLE001 - keep deleting the rest
             pass
     # Sweep stray GenHuman-named DG nodes left behind (materials/utility/etc.).
     for node in cmds.ls("*GenHuman*", "*GH_*", "god_m_*") or []:
@@ -361,9 +361,9 @@ def remove_test_body() -> RemoveBodyResult:
     Pairs with :func:`load_test_body`: first breaks the body->cloth connections
     (:func:`disconnect_test_body`), then removes the GenHuman rig. The body is removed by
     dropping its file reference (:func:`_remove_genhuman_references`), which wipes every
-    node it brought in — including selection sets — leaving no remnants. A legacy scene
+    node it brought in - including selection sets - leaving no remnants. A legacy scene
     where the rig was *imported* (no reference) falls back to the name-sweep delete. The
-    count returned is references removed plus any swept import nodes. Idempotent — safe to
+    count returned is references removed plus any swept import nodes. Idempotent - safe to
     run with nothing loaded (it just reports zero).
     """
     cmds = _cmds()

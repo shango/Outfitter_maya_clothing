@@ -2,13 +2,13 @@
 
 The user sets two folders on the Setup tab:
 
-* **local**  — their working library. This is the *only* folder the tool scans.
-* **remote** — a shared master library (studio server / drive). It is never
+* **local**  - their working library. This is the *only* folder the tool scans.
+* **remote** - a shared master library (studio server / drive). It is never
   scanned; it is the source the **Sync** button pulls new/changed assets from
   into the local folder (see :mod:`outfitter.core.sync`).
 
-Both are written to a small text file as ``key = value`` lines — one for each
-slot — that is read back on launch. That text file is the single source of truth::
+Both are written to a small text file as ``key = value`` lines - one for each
+slot - that is read back on launch. That text file is the single source of truth::
 
     local  = /mnt/work/clothing_assets
     remote = //studio-nas/genhuman/clothing
@@ -17,13 +17,13 @@ Location: ``scripts/path.txt``, beside the package (``config.path_file()``). Eas
 to find and hand-edit, ships with a studio install, and survives installer
 upgrades (the installer overwrites the package dir, never ``path.txt``).
 
-Pure logic (filesystem only, no Maya). Reads are defensive — a missing or garbled
+Pure logic (filesystem only, no Maya). Reads are defensive - a missing or garbled
 file yields empty slots rather than raising, so a bad file can never stop the tool
 opening.
 
 **Backward compatibility:** older path files listed bare folder lines (no key),
-one library root per line. Those are still read — the first bare folder becomes
-``local`` — so an existing install keeps working and is migrated to the keyed
+one library root per line. Those are still read - the first bare folder becomes
+``local`` - so an existing install keeps working and is migrated to the keyed
 format on the next write.
 
 :func:`effective_library_roots` returns ``[local]`` when a local folder is set,
@@ -37,7 +37,7 @@ from pathlib import Path
 from .. import config
 
 _HEADER = (
-    "# Outfitter — asset library locations (managed by the Setup tab).\n"
+    "# Outfitter - asset library locations (managed by the Setup tab).\n"
     "#   local  = your working library (the tool scans this folder)\n"
     "#   remote = shared master library the Sync button pulls new/changed assets from\n"
     "# Blank lines and lines starting with '#' are ignored.\n"
@@ -133,7 +133,7 @@ def is_configured(path: Path | None = None) -> bool:
 def effective_library_roots(path: Path | None = None) -> list[Path]:
     """Folders to scan: the local working folder, else the built-in defaults.
 
-    The remote folder is deliberately excluded — it is a sync source, not a scan
+    The remote folder is deliberately excluded - it is a sync source, not a scan
     root (the user works from the local copy).
     """
     local = read_locations(path).local

@@ -1,4 +1,4 @@
-"""Pure turntable geometry — orbit-camera positions + sprite-sheet cell layout.
+"""Pure turntable geometry - orbit-camera positions + sprite-sheet cell layout.
 
 No Maya, no Qt, so it runs in the headless suite. Two consumers:
 
@@ -32,7 +32,7 @@ def orbit_eyes(
 
     Frame 0 is ``eye0`` itself; the rest sweep a full 360° at even steps, so the last
     frame leads seamlessly back into the first. ``eye0``'s height (Y) and its horizontal
-    distance from ``center`` are preserved — only the azimuth changes.
+    distance from ``center`` are preserved - only the azimuth changes.
     """
     cx, cy, cz = center
     ex, ey, ez = eye0

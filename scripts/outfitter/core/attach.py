@@ -1,4 +1,4 @@
-"""Attach / detach lifecycle — ``connectAttr`` only, transactional (FR-3 / FR-5).
+"""Attach / detach lifecycle - ``connectAttr`` only, transactional (FR-3 / FR-5).
 
 Attach is the one place that mutates the scene to bind a garment, and it does so
 through exactly one mechanism: ``connectAttr`` from each GenHuman export-skeleton
@@ -11,7 +11,7 @@ import, any failure rolls back (break applied edges, delete the namespace),
 honouring FR-2's "scene unchanged on failure".
 
 Joint matching: a ``cloth_<name>`` joint connects iff ``<name>`` resolves to a
-joint under the export-skeleton group (full DAG path — dual-skeleton safe, PRD §4).
+joint under the export-skeleton group (full DAG path - dual-skeleton safe, PRD §4).
 Joints that don't resolve are treated as helper/secondary joints and left
 unconnected and animator-accessible (Authoring Spec §5).
 """
@@ -136,7 +136,7 @@ class AttachEngine:
         report = ValidationReport()
         namespace = sanitize_namespace(namespace)
 
-        # 1) pre-scene validation — failure here means the scene is untouched
+        # 1) pre-scene validation - failure here means the scene is untouched
         summary = ma_parse.summarize_file(asset.ma_path)
         report.extend(validate_asset_summary(summary, asset.metadata))
         report.extend(validate_scene_preconditions(
@@ -150,7 +150,7 @@ class AttachEngine:
         # 2) import into the instance namespace
         try:
             self.scene.import_asset(str(asset.ma_path), namespace)
-        except Exception as exc:  # noqa: BLE001 — surface any Maya import error
+        except Exception as exc:  # noqa: BLE001 - surface any Maya import error
             report.error("import_failed", f"import failed: {exc}", node=str(asset.ma_path))
             return AttachResult(False, report)
 
@@ -196,7 +196,7 @@ class AttachEngine:
         LOCAL joint transforms, so unless the garment's ``Rig_GRP`` shares that group's
         world frame, every connected joint is reproduced in the wrong frame and the
         whole garment lands rotated off the body. Matching the frame once, here, makes
-        the local-transform connections reproduce the body pose exactly — and adapts to
+        the local-transform connections reproduce the body pose exactly - and adapts to
         wherever this particular rig instance sits in the scene.
         """
         rig_group = f"{namespace}:{config.RIG_GROUP}"
@@ -222,7 +222,7 @@ class AttachEngine:
             try:
                 if self.scene.is_connected(pc.src, pc.dst):
                     self.scene.disconnect(pc.src, pc.dst)
-            except Exception:  # noqa: BLE001 — best-effort cleanup
+            except Exception:  # noqa: BLE001 - best-effort cleanup
                 pass
         try:
             self.scene.remove_namespace(namespace)

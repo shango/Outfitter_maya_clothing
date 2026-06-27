@@ -1,4 +1,4 @@
-"""Maya-side capture for publish — the half that needs a live scene.
+"""Maya-side capture for publish - the half that needs a live scene.
 
 Everything here imports ``maya.cmds`` lazily and only runs inside Maya: count the
 garment polys, playblast a thumbnail, sniff the rig version, and save the ``.ma``.
@@ -26,7 +26,7 @@ def _cmds():
 
 
 def _qt():
-    """PySide6 image classes — ships with Maya 2026 (lazy, like ``_cmds``).
+    """PySide6 image classes - ships with Maya 2026 (lazy, like ``_cmds``).
 
     Only the playblast compositor needs Qt; importing it lazily keeps this module's
     top level free of the Maya/Qt boundary, consistent with the rest of ``core``.
@@ -77,7 +77,7 @@ def poly_counts(meshes: list[str]) -> tuple[int, int]:
         try:
             tris += int(cmds.polyEvaluate(m, triangle=True) or 0)
             verts += int(cmds.polyEvaluate(m, vertex=True) or 0)
-        except Exception:  # noqa: BLE001 — non-poly or empty selection
+        except Exception:  # noqa: BLE001 - non-poly or empty selection
             continue
     return tris, verts
 
@@ -103,7 +103,7 @@ def scene_has_rig() -> bool:
 def detect_rig_version() -> str:
     """Best-effort exact rig version (e.g. ``v03``) from the scene; ``""`` if unknown.
 
-    Prefilled into the Publish form for the rigger to confirm/override — never an
+    Prefilled into the Publish form for the rigger to confirm/override - never an
     authority. Looks at GenHuman namespaces first (imports name them, e.g.
     ``GenHuman_rig_v03``), then the export group's own namespace token.
     """
@@ -142,14 +142,14 @@ def _cleanliness_facts(cmds) -> tuple[tuple[str, ...], ...]:
     """Scan the scene for the §10/§13/§11 hard-"no" node types.
 
     Returns ``(unknown, anim_curves, display_layers, renderer_materials)`` as tuples
-    of short names. ``defaultLayer`` is excluded — every scene has it. ``ls(type=…)``
+    of short names. ``defaultLayer`` is excluded - every scene has it. ``ls(type=…)``
     tolerates a missing renderer type, so the renderer denylist is queried as a batch.
     """
     def _ls_types(types) -> tuple[str, ...]:
         """Short names of nodes of any of ``types``, tolerating unregistered types.
 
         A renderer-specific type isn't registered unless its plugin is loaded, and
-        ``cmds.ls(type=…)`` raises on an unknown type — so query type-by-type and skip
+        ``cmds.ls(type=…)`` raises on an unknown type - so query type-by-type and skip
         the ones Maya doesn't know in this session.
         """
         found: set[str] = set()
@@ -157,7 +157,7 @@ def _cleanliness_facts(cmds) -> tuple[tuple[str, ...], ...]:
             try:
                 found.update(_short(n) for n in (cmds.ls(type=t, long=True) or []))
             except (RuntimeError, ValueError):
-                continue  # type not registered in this session — nothing of it can exist
+                continue  # type not registered in this session - nothing of it can exist
         return tuple(sorted(found))
 
     unknown = _ls_types(config.UNKNOWN_NODE_TYPES)
@@ -173,7 +173,7 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
     """Collect the facts the pure preflight needs from the open scene.
 
     Presence is tested by *short* name (namespace-insensitive) so a namespaced asset
-    isn't also reported as "missing groups" — the namespace itself is flagged separately.
+    isn't also reported as "missing groups" - the namespace itself is flagged separately.
     """
     cmds = _cmds()
     nodes = ((cmds.ls(type="transform", long=True) or [])
@@ -245,7 +245,7 @@ def _panel_camera(cmds, panel: str) -> str:
 def _clean_shaded_view(panel: str):
     """Force a clean *shaded* look on ``panel`` for the block, restoring it after.
 
-    Thumbnails were capturing whatever display mode the viewport happened to be in —
+    Thumbnails were capturing whatever display mode the viewport happened to be in -
     wireframe shows only the silhouette. This switches the panel to smooth-shaded with
     textures (and best-effort viewport-2.0 anti-aliasing + ambient occlusion), and hides
     the grid / wireframe-on-shaded / HUD for a clean shot. (The green selection-highlight
@@ -267,7 +267,7 @@ def _clean_shaded_view(panel: str):
         try:
             hw_saved[attr] = cmds.getAttr(plug)
             cmds.setAttr(plug, 1)
-        except Exception:  # noqa: BLE001 — attr absent on this build; skip it
+        except Exception:  # noqa: BLE001 - attr absent on this build; skip it
             continue
     try:
         cmds.modelEditor(
@@ -307,7 +307,7 @@ def capture_thumbnail(meshes: list[str], out_png: str, size: int = 512) -> str:
                 cmds.isolateSelect(panel, state=1)
                 cmds.isolateSelect(panel, addSelected=True)
                 isolated = True
-                # panel is a flag, not the object to frame — pass the meshes as the
+                # panel is a flag, not the object to frame - pass the meshes as the
                 # objects and target the panel via panel=, or Maya tries to resolve the
                 # panel name as a scene node ("No object matches name: modelPanel4").
                 cmds.viewFit(meshes, panel=panel, fitFactor=0.9)
@@ -376,7 +376,7 @@ def capture_turntable(
     Captures ``cols * rows`` smooth-shaded frames evenly around the asset (about Y) and
     tiles them row-major into one PNG (see :mod:`core.turntable` for the layout the
     browser scrub widget reads back). When ``still_png`` is given, frame 0 is also written
-    there as the single representative thumbnail — the backward-compatible ``<asset>.png``
+    there as the single representative thumbnail - the backward-compatible ``<asset>.png``
     that the grid icon and older viewers use. Restores the camera and selection afterwards.
     Returns the sheet path. Raises if there is no model panel or no meshes.
     """
@@ -457,7 +457,7 @@ def read_info_node(node: str = config.INFO_NODE) -> dict:
     for attr in (cmds.listAttr(node, userDefined=True) or []):
         try:
             value = cmds.getAttr(f"{node}.{attr}")
-        except Exception:  # noqa: BLE001 — non-readable/compound attr; skip it
+        except Exception:  # noqa: BLE001 - non-readable/compound attr; skip it
             continue
         if value is not None:
             out[attr] = str(value)
@@ -470,7 +470,7 @@ def write_info_node(attrs: dict, node: str = config.INFO_NODE) -> str:
     ``attrs`` is the published metadata as ``cloth_info`` attribute names → values (use
     :meth:`core.publish.PublishSpec.to_sidecar`, so the embedded node mirrors the sidecar
     exactly). Every value is stored as a string ``addAttr`` (the browser's ``ma_parse``
-    reads string attrs and coerces numbers). Idempotent — re-publishing refreshes the same
+    reads string attrs and coerces numbers). Idempotent - re-publishing refreshes the same
     node's attributes rather than duplicating it.
     """
     cmds = _cmds()
@@ -489,7 +489,7 @@ def save_ma(out_path: str) -> str:
 
     A whole-scene save round-trips skin + lattice deformer chains cleanly (where
     ``exportSelected`` corrupts them). The garment scene should already be clean of
-    the rig/namespaces/references — :func:`core.publish.validate_published_ma` is run
+    the rig/namespaces/references - :func:`core.publish.validate_published_ma` is run
     on the result to enforce that.
     """
     cmds = _cmds()

@@ -1,4 +1,4 @@
-"""Lightweight Maya-ASCII (.ma) reader — NO maya.cmds.
+"""Lightweight Maya-ASCII (.ma) reader - NO maya.cmds.
 
 The browser needs to read an asset's ``cloth_info`` metadata and do cheap
 structure pre-checks *without importing the file into Maya* (PRD M1). A full
@@ -9,7 +9,7 @@ MEL/.ma parser is out of scope; we only need to:
   * read string ``setAttr`` values inside a named node block.
 
 This is read-only and tolerant: it never raises on malformed input, it returns
-best-effort results. It is NOT a validator — structural validation runs in
+best-effort results. It is NOT a validator - structural validation runs in
 ``core.validate``; authoritative node-type checking runs in Maya.
 
 Maya ASCII shapes we rely on:
@@ -41,7 +41,7 @@ def iter_statements(text: str) -> Iterator[str]:
     Newlines inside a statement are normalized to single spaces so multi-line
     ``createNode``/``setAttr`` commands match the single-line regexes above.
 
-    ``//`` line comments (outside string literals) are stripped — Maya ASCII files
+    ``//`` line comments (outside string literals) are stripped - Maya ASCII files
     use them as section dividers between nodes, and without stripping they would
     merge into the following statement and hide its ``createNode`` prefix. ``//``
     inside a quoted string (e.g. a path or URL in a notes attr) is preserved.

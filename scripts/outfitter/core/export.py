@@ -12,14 +12,14 @@ the rest of the core.
 
 Audited (each failure is an ERROR unless noted):
 
-  * **Genie node names preserved** — every name in ``required_nodes`` still
+  * **Genie node names preserved** - every name in ``required_nodes`` still
     exists. Empty list (the current default) ⇒ a single INFO note, no failure.
-  * **Export skeleton intact** — ``export_group`` resolves to ≥1 joint.
-  * **Connections are clothing-only** — every recorded edge has both attrs in
+  * **Export skeleton intact** - ``export_group`` resolves to ≥1 joint.
+  * **Connections are clothing-only** - every recorded edge has both attrs in
     ``CONNECT_ATTRS``, a destination inside its own instance namespace, and a
     source that is *not* inside any instance namespace (the rig drives clothing,
     never the reverse). Anything else means attach touched the rig.
-  * **Namespace isolation** — no instance references a node living in another
+  * **Namespace isolation** - no instance references a node living in another
     instance's namespace (multi-asset independence, FR-6).
 """
 from __future__ import annotations
@@ -72,7 +72,7 @@ def audit_export_readiness(
     # 1) required Genie node names preserved
     if not required_nodes:
         report.info("genie_names_unset",
-                    "no Genie-required node list configured — name-preservation "
+                    "no Genie-required node list configured - name-preservation "
                     "check skipped (GENIE_REQUIRED_NODES is empty)")
     else:
         for name in required_nodes:

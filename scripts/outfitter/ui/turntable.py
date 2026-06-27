@@ -1,11 +1,11 @@
-"""Interactive turntable preview — a shaded thumbnail you can spin.
+"""Interactive turntable preview - a shaded thumbnail you can spin.
 
 ``TurntableView`` is a ``QLabel`` that loads a turntable sprite sheet (the layout from
 :mod:`core.turntable`), slices it into frames, and lets the user rotate the garment:
 it auto-spins while the cursor is over it and scrubs to an exact angle as the cursor
 moves left↔right. With only a single still it behaves like a plain image label.
 
-UI only — verified by ``py_compile`` (PySide6 ships with Maya 2026, not the headless
+UI only - verified by ``py_compile`` (PySide6 ships with Maya 2026, not the headless
 test env), like the rest of ``outfitter.ui``.
 """
 from __future__ import annotations
@@ -44,7 +44,7 @@ class TurntableView(QtWidgets.QLabel):
         self.setText(self._hint)
 
     def set_still(self, pixmap: QtGui.QPixmap | None) -> None:
-        """Show a single (non-rotatable) image — used when no turntable sheet exists."""
+        """Show a single (non-rotatable) image - used when no turntable sheet exists."""
         self._frames = []
         self._still = pixmap if pixmap is not None and not pixmap.isNull() else None
         self._index = 0

@@ -76,7 +76,7 @@ def load_asset(ma_path: Path) -> ClothingAsset:
         if meta is not None:
             return ClothingAsset(ma_path, meta, thumb, sidecar, source="sidecar",
                                  turntable=turntable)
-        # sidecar present but bad — fall through to the .ma, keep the reason
+        # sidecar present but bad - fall through to the .ma, keep the reason
         info = ma_parse.read_info_attrs(ma_path, config.INFO_NODE)
         meta2, errors2 = AssetMetadata.from_mapping(info)
         if meta2 is not None:

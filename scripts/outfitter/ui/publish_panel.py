@@ -1,4 +1,4 @@
-"""Publish tab — finalize a hand-authored garment into the library (Maya-side).
+"""Publish tab - finalize a hand-authored garment into the library (Maya-side).
 
 The rigger opens their authored garment scene, fills in the identity/version fields,
 captures a thumbnail, and hits Publish. This widget is the thin Qt shell: every
@@ -7,7 +7,7 @@ assembly + validation) and the Maya-only :mod:`core.maya_publish` (polycount,
 playblast, rig-version sniff, save). Outside Maya it still renders so the layout can
 be previewed; Capture/Publish report that they need a running Maya.
 
-UI only — verified by ``py_compile`` (PySide6 ships with Maya 2026, not the headless
+UI only - verified by ``py_compile`` (PySide6 ships with Maya 2026, not the headless
 test env).
 """
 from __future__ import annotations
@@ -110,11 +110,11 @@ class PublishPanel(QtWidgets.QWidget):
         self._type = QtWidgets.QComboBox()
         self._type.addItems(list(config.ASSET_TYPES))
         self._type.setCurrentIndex(-1)
-        self._type.setPlaceholderText("— set clothing type —")
+        self._type.setPlaceholderText("- set clothing type -")
         self._gender = QtWidgets.QComboBox()
         self._gender.addItems(list(config.GENDERS))
         self._gender.setCurrentIndex(-1)
-        self._gender.setPlaceholderText("— set body variant —")
+        self._gender.setPlaceholderText("- set body variant -")
         # keep both dropdowns a comfortable height so they aren't squeezed flat
         for combo in (self._type, self._gender):
             combo.setMinimumHeight(28)
@@ -142,7 +142,7 @@ class PublishPanel(QtWidgets.QWidget):
         self._regen_btn.setText("Regenerate skeleton data from rig…")
         self._regen_btn.clicked.connect(self._regen_skeleton)
 
-        # thumbnail preview (Step 4) — rotatable once a turntable is captured
+        # thumbnail preview (Step 4) - rotatable once a turntable is captured
         self._preview = TurntableView(hint="no thumbnail\ncaptured yet")
         self._preview.setObjectName("previewImage")
         self._preview.setFixedSize(_PREVIEW_BOX, _PREVIEW_BOX)
@@ -171,7 +171,7 @@ class PublishPanel(QtWidgets.QWidget):
         head_row.addWidget(self._load_details_btn)
         v.addLayout(head_row)
         hint = QtWidgets.QLabel(
-            "Fill these out before you publish (Step 5) — or load them from an "
+            "Fill these out before you publish (Step 5) - or load them from an "
             "existing asset's open scene.")
         hint.setObjectName("muted")
         hint.setWordWrap(True)
@@ -199,15 +199,15 @@ class PublishPanel(QtWidgets.QWidget):
         return box
 
     def _build_left_column(self) -> QtWidgets.QWidget:
-        """Left column: steps 1–3 — build the rig, skin it, strip the test body."""
+        """Left column: steps 1–3 - build the rig, skin it, strip the test body."""
         col = QtWidgets.QVBoxLayout()
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(10)
         # The right column (form + steps 4/5) is taller, so this column is stretched to
         # match. Rather than pool that slack into gaps *between* the cards, steps 2 and 3
-        # grow to absorb it — uniform card spacing, and step 3 bottom-aligns with steps 4/5.
+        # grow to absorb it - uniform card spacing, and step 3 bottom-aligns with steps 4/5.
 
-        # Step 1 — set up the rig (Type + Gender live here, with the build buttons)
+        # Step 1 - set up the rig (Type + Gender live here, with the build buttons)
         card, body = self._step_card(
             1, "Set up the cloth rig",
             "Choose the garment Type and Gender, build the cloth rig, then load a "
@@ -225,7 +225,7 @@ class PublishPanel(QtWidgets.QWidget):
         body.addWidget(self._connect_btn)
         col.addWidget(card, 0)  # step 1 keeps its natural height (most content)
 
-        # Step 2 — skin (instruction only, no buttons); grows to share the slack
+        # Step 2 - skin (instruction only, no buttons); grows to share the slack
         card, _ = self._step_card(
             2, "Skin the mesh",
             "Bind the garment mesh to the highlighted (green) joints: "
@@ -234,7 +234,7 @@ class PublishPanel(QtWidgets.QWidget):
                            QtWidgets.QSizePolicy.MinimumExpanding)
         col.addWidget(card, 1)
 
-        # Step 3 — remove the test body (+ optional joint prune); grows, content centered
+        # Step 3 - remove the test body (+ optional joint prune); grows, content centered
         card, body = self._step_card(
             3, "Remove the test body",
             "Delete the test body so the cloth joints go static and the asset is "
@@ -261,7 +261,7 @@ class PublishPanel(QtWidgets.QWidget):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(10)
 
-        # Step 4 — thumbnail: capture button sits *beneath* the preview image
+        # Step 4 - thumbnail: capture button sits *beneath* the preview image
         card, body = self._step_card(
             4, "Capture the turntable",
             "Frame the garment in the viewport, then capture a shaded turntable "
@@ -271,7 +271,7 @@ class PublishPanel(QtWidgets.QWidget):
         body.addWidget(self._capture_btn)
         row.addWidget(card, 1)
 
-        # Step 5 — publish (always to the remote library)
+        # Step 5 - publish (always to the remote library)
         card, body = self._step_card(
             5, "Publish",
             "Fill out the asset details below, run a final scene check, then "
@@ -298,7 +298,7 @@ class PublishPanel(QtWidgets.QWidget):
 
         With ``center=True`` the number and the body content (title, instruction, and any
         buttons the caller appends) sit in the vertical middle of the card, so a card taller
-        than its content keeps balanced top/bottom padding. Default top-aligns — steps 4 & 5
+        than its content keeps balanced top/bottom padding. Default top-aligns - steps 4 & 5
         rely on that for their preview image and bottom-pinned Publish button.
         """
         card = QtWidgets.QFrame()
@@ -376,7 +376,7 @@ class PublishPanel(QtWidgets.QWidget):
         title.setObjectName("sectionHeading")
         header.addWidget(title)
         header.addStretch(1)
-        # rare maintenance action — parked here, out of the numbered step flow
+        # rare maintenance action - parked here, out of the numbered step flow
         header.addWidget(self._regen_btn)
         clear = QtWidgets.QToolButton()
         clear.setText("Clear")
@@ -437,7 +437,7 @@ class PublishPanel(QtWidgets.QWidget):
 
     # --- destination ----------------------------------------------------------
     def _remote_dir(self) -> Path | None:
-        """The configured remote library — the one and only publish target."""
+        """The configured remote library - the one and only publish target."""
         return _settings.read_locations().remote
 
     def _refresh_remote_label(self) -> None:
@@ -448,7 +448,7 @@ class PublishPanel(QtWidgets.QWidget):
             self._dest_label.setProperty("warn", False)
         else:
             self._dest_label.setText(
-                "⚠ No remote library set — configure it on the Setup tab before "
+                "⚠ No remote library set - configure it on the Setup tab before "
                 "publishing.")
             self._dest_label.setProperty("warn", True)
         # re-polish so the dynamic 'warn' property restyles the label
@@ -462,7 +462,7 @@ class PublishPanel(QtWidgets.QWidget):
         self._log("This action needs a running Maya 2026.", "error")
         QtWidgets.QMessageBox.warning(
             self, "Outfitter",
-            "Publishing needs a running Maya 2026 — it captures the thumbnail and "
+            "Publishing needs a running Maya 2026 - it captures the thumbnail and "
             "polycount from the open garment scene.")
         return False
 
@@ -474,7 +474,7 @@ class PublishPanel(QtWidgets.QWidget):
         self._report("Set the clothing Type first (the dropdown in the form).", "warn")
         QtWidgets.QMessageBox.warning(
             self, "Set clothing type",
-            "Choose the garment Type in the form before this step — it decides which "
+            "Choose the garment Type in the form before this step - it decides which "
             "skin joints get highlighted.")
         return None
 
@@ -487,7 +487,7 @@ class PublishPanel(QtWidgets.QWidget):
         QtWidgets.QMessageBox.warning(
             self, "Set gender",
             "Choose the body variant (male / female) the garment is pre-fit to before "
-            "publishing — every asset must declare its gender.")
+            "publishing - every asset must declare its gender.")
         return None
 
     # --- actions --------------------------------------------------------------
@@ -500,7 +500,7 @@ class PublishPanel(QtWidgets.QWidget):
             self._rigver.setText(version)
             self._report(f"Detected rig version: {version}", "ok")
         else:
-            self._report("Could not detect a rig version — enter it manually.", "warn")
+            self._report("Could not detect a rig version - enter it manually.", "warn")
 
     def _load_details_from_scene(self) -> None:
         """Fill the form from the open asset's embedded cloth_info (for re-publishing)."""
@@ -510,13 +510,13 @@ class PublishPanel(QtWidgets.QWidget):
         info = maya_publish.read_info_node()
         if not info:
             self._report(
-                "No cloth_info found in the open scene — open a published asset, or fill "
+                "No cloth_info found in the open scene - open a published asset, or fill "
                 "the fields in by hand.", "warn")
             return
         self._apply_info_to_form(info)
         name = info.get("assetName", "")
         self._report(
-            f"Loaded details for '{name}' from the open scene — edit, then re-publish "
+            f"Loaded details for '{name}' from the open scene - edit, then re-publish "
             "(keep the name to overwrite).", "ok")
 
     def _apply_info_to_form(self, info: dict) -> None:
@@ -558,7 +558,7 @@ class PublishPanel(QtWidgets.QWidget):
                 self._log(groups.summary(),
                           "warn" if groups.mesh_group_empty else "ok")
                 skin = maya_skeleton.build_skin_set(asset_type)
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Create cloth skeleton failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Create cloth skeleton failed", str(exc))
             return
@@ -567,7 +567,7 @@ class PublishPanel(QtWidgets.QWidget):
             self._log(
                 "Not in this skeleton (skip): " + ", ".join(skin.missing), "info")
         self._log(
-            "Next: bind the mesh to the selected (green) joints — Skin > Bind Skin.",
+            "Next: bind the mesh to the selected (green) joints - Skin > Bind Skin.",
             "info")
 
     def _load_test_body(self) -> None:
@@ -581,7 +581,7 @@ class PublishPanel(QtWidgets.QWidget):
         try:
             with _wait_cursor():
                 result = maya_testfit.load_test_body(gender)
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Load test body failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Load test body failed", str(exc))
             return
@@ -600,7 +600,7 @@ class PublishPanel(QtWidgets.QWidget):
         try:
             with _wait_cursor():
                 result = maya_testfit.remove_test_body()
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Remove test body failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Remove test body failed", str(exc))
             return
@@ -625,7 +625,7 @@ class PublishPanel(QtWidgets.QWidget):
         try:
             with _wait_cursor():
                 result = maya_skeleton.capture_cloth_skeleton_from_rig()
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Regenerate skeleton failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Regenerate skeleton failed", str(exc))
             return
@@ -650,7 +650,7 @@ class PublishPanel(QtWidgets.QWidget):
         try:
             with _wait_cursor():
                 plan = maya_skeleton.plan_prune_unskinned()
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Delete unused joints failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Delete unused joints failed", str(exc))
             return
@@ -659,7 +659,7 @@ class PublishPanel(QtWidgets.QWidget):
             QtWidgets.QMessageBox.information(
                 self, "Nothing to delete",
                 "Every cloth_* joint is skinned, an interior joint with skinned "
-                "children, or the root — there's nothing safe to prune.")
+                "children, or the root - there's nothing safe to prune.")
             self._report("No unused joints to delete.", "info")
             return
 
@@ -673,7 +673,7 @@ class PublishPanel(QtWidgets.QWidget):
             f"{self._joint_preview(list(plan.delete))}\n\n")
         if plan.kept_unweighted:
             body += (
-                "KEEP (unweighted, but have skinned children — required to mirror the "
+                "KEEP (unweighted, but have skinned children - required to mirror the "
                 "body):\n"
                 f"{self._joint_preview(list(plan.kept_unweighted))}\n\n")
         body += "Skinned joints and cloth_root are always kept. Continue?"
@@ -686,7 +686,7 @@ class PublishPanel(QtWidgets.QWidget):
         try:
             with _wait_cursor():
                 result = maya_skeleton.apply_prune(plan)
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Delete unused joints failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Delete unused joints failed", str(exc))
             return
@@ -705,14 +705,14 @@ class PublishPanel(QtWidgets.QWidget):
                 meshes = maya_publish.find_garment_meshes()
                 maya_publish.capture_turntable(
                     meshes, str(sheet), still_png=str(still))
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Capture failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Capture failed", str(exc))
             return
         self._captured_turntable = sheet
         self._captured_thumb = still
         self._preview.set_sheet(sheet)
-        self._report("Turntable captured — hover to spin, then Publish.", "ok")
+        self._report("Turntable captured - hover to spin, then Publish.", "ok")
 
     def _check_scene(self) -> None:
         """Run the pre-publish sanity check and log every finding (no side effects)."""
@@ -723,16 +723,16 @@ class PublishPanel(QtWidgets.QWidget):
         try:
             with _wait_cursor():
                 issues = maya_publish.preflight_scene()
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Pre-publish check failed: {exc}", "error")
             return
         errors = self._log_issues(issues)
         if errors:
             self._report(
-                f"Pre-publish check: {errors} blocking issue(s) — fix before Publish.",
+                f"Pre-publish check: {errors} blocking issue(s) - fix before Publish.",
                 "error")
         else:
-            self._report("Pre-publish check passed — ready to Publish.", "ok")
+            self._report("Pre-publish check passed - ready to Publish.", "ok")
 
     def _gather_spec(self) -> _publish.PublishSpec | None:
         name = self._name.text().strip()
@@ -769,7 +769,7 @@ class PublishPanel(QtWidgets.QWidget):
         remote = self._remote_dir()
         if remote is None:
             self._report(
-                "No remote library set — configure it on the Setup tab, then publish "
+                "No remote library set - configure it on the Setup tab, then publish "
                 "again.", "error")
             QtWidgets.QMessageBox.warning(
                 self, "No remote library set",
@@ -786,7 +786,7 @@ class PublishPanel(QtWidgets.QWidget):
         if meta is None:
             for err in errors:
                 self._log(err, "error")
-            self._report("Incomplete metadata — fix the fields above and Publish again.",
+            self._report("Incomplete metadata - fix the fields above and Publish again.",
                          "error")
             QtWidgets.QMessageBox.warning(
                 self, "Incomplete metadata",
@@ -796,7 +796,7 @@ class PublishPanel(QtWidgets.QWidget):
         from ..core import maya_publish
 
         # Pre-publish sanity check: rig still in scene, namespaces, garment skinned to
-        # non-cloth_* joints, missing groups — surface them all (with fixes) and block,
+        # non-cloth_* joints, missing groups - surface them all (with fixes) and block,
         # rather than silently writing a rig-bloated, validation-failing .ma.
         self._log("Publish: pre-publish scene check…", "step")
         try:
@@ -808,7 +808,7 @@ class PublishPanel(QtWidgets.QWidget):
         n_errors = self._log_issues(issues)
         if n_errors:
             self._report(
-                f"Publish blocked — {n_errors} issue(s) to fix (see log).", "error")
+                f"Publish blocked - {n_errors} issue(s) to fix (see log).", "error")
             QtWidgets.QMessageBox.warning(
                 self, "Fix these before publishing",
                 "The scene isn't publish-ready:\n\n"
@@ -862,7 +862,7 @@ class PublishPanel(QtWidgets.QWidget):
             for issue in report.errors:
                 self._log(str(issue), "error")
             self._report(
-                f"Published with issues — {report.summary_line()}.", "warn")
+                f"Published with issues - {report.summary_line()}.", "warn")
             QtWidgets.QMessageBox.warning(
                 self, "Published with validation errors",
                 "The files were written, but the asset failed structure validation "

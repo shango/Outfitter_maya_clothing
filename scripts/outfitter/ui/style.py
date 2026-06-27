@@ -2,7 +2,7 @@
 
 Returns a QSS string applied to the ``OutfitterBrowser`` instance only (set on the
 window, not the QApplication), so it styles the tool without bleeding into Maya's
-other UI. No external image assets — all chrome is drawn by Qt from these rules.
+other UI. No external image assets - all chrome is drawn by Qt from these rules.
 
 Conventions used by the widgets:
   * a primary action button sets ``button.setProperty("accent", True)``,
@@ -12,7 +12,7 @@ Conventions used by the widgets:
 from __future__ import annotations
 
 
-# Palette — tuned to sit comfortably next to Maya 2026's dark theme.
+# Palette - tuned to sit comfortably next to Maya 2026's dark theme.
 _BG = "#2b2b2b"          # window background
 _SURFACE = "#323335"     # panels / inputs at rest
 _SURFACE_HI = "#3c3d40"  # hover / raised
@@ -39,18 +39,18 @@ def stylesheet(accent: str = "#4a90d9") -> str:
         border-bottom: 1px solid {_BORDER};
     }}
     QLabel#appName {{
-        color: #ff6d7a;  /* salmon — matches the shirt body in the shelf icon */
+        color: #ff6d7a;  /* salmon - matches the shirt body in the shelf icon */
         font-family: "Segoe UI", "SF Pro Display", "Helvetica Neue", "Roboto", Arial;
         font-size: 32px;
         font-weight: 900;
     }}
     QLabel#appVersion {{
-        color: #fff0a6;  /* yellow — matches the flowers in the shelf icon */
+        color: #fff0a6;  /* yellow - matches the flowers in the shelf icon */
         font-size: 13px; font-weight: 600; padding-bottom: 6px;
     }}
 
     QLabel#assetName {{ font-size: 17px; font-weight: 600; color: #ffffff; }}
-    /* Section headings: pass the caption already upper-cased — Qt's QSS engine
+    /* Section headings: pass the caption already upper-cased - Qt's QSS engine
        implements neither text-transform nor letter-spacing, so they're set in code. */
     QLabel#sectionHeading {{
         font-size: 11px; font-weight: 600; color: {_MUTED};
@@ -59,7 +59,7 @@ def stylesheet(accent: str = "#4a90d9") -> str:
     QLabel#muted {{ color: {_MUTED}; }}
     QLabel#description {{ color: #c4c4c4; }}
 
-    /* Publish tab — numbered step cards down the right column */
+    /* Publish tab - numbered step cards down the right column */
     QFrame#stepCard {{
         background: {_SURFACE};
         border: 1px solid {_BORDER};
@@ -75,7 +75,7 @@ def stylesheet(accent: str = "#4a90d9") -> str:
     QLabel#stepDest {{ color: {_MUTED}; }}
     QLabel#stepDest[warn="true"] {{ color: #e0b057; font-weight: 600; }}
 
-    /* Type badge — a rounded accent chip */
+    /* Type badge - a rounded accent chip */
     QLabel#typeBadge {{
         background: {accent_dim};
         color: #ffffff;
@@ -92,7 +92,7 @@ def stylesheet(accent: str = "#4a90d9") -> str:
         border-radius: 8px;
     }}
 
-    /* Publish log — a console-style read-out of each action's result */
+    /* Publish log - a console-style read-out of each action's result */
     QPlainTextEdit#logView {{
         background: #1f1f21;
         border: 1px solid {_BORDER};

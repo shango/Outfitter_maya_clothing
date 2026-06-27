@@ -1,9 +1,9 @@
-"""Per-asset-type recommended skin-joint sets — the data behind "which joints do I bind to?".
+"""Per-asset-type recommended skin-joint sets - the data behind "which joints do I bind to?".
 
 Pure: no Maya, no I/O. The full ``cloth_*`` skeleton is a body export of ~89 joints, most
 of which no garment ever skins to: ~40 are finger joints, plus the ``cloth_ik_*`` helpers,
 ``cloth_interaction`` and ``cloth_center_of_mass``. Worse, the ``*_twist_*`` joints *look*
-like skippable sub-joints but actually drive limb silhouette — exactly the ones a rigger
+like skippable sub-joints but actually drive limb silhouette - exactly the ones a rigger
 unfamiliar with the skeleton tends to miss. This module names, per garment type, the joints
 a rigger should bind to.
 
@@ -70,7 +70,7 @@ _NECK = ("cloth_neck_01", "cloth_neck_02")
 _HEAD = ("cloth_head",)
 
 
-# Ordered recommended skin joints per asset type. Twist joints are in on purpose — they are
+# Ordered recommended skin joints per asset type. Twist joints are in on purpose - they are
 # the silhouette sub-joints riggers miss. Anything absent here (fingers, cloth_ik_*,
 # cloth_interaction, cloth_center_of_mass) is intentionally excluded: garments don't skin to
 # it. Keep keys aligned with config.ASSET_TYPES.
@@ -134,7 +134,7 @@ def plan_skin_set(asset_type: str, present_joints, set_name: str | None = None) 
 
     ``present_joints`` is any iterable of the ``cloth_*`` joint short names currently in the
     scene. Returns a :class:`SkinSetPlan` listing the recommended joints that exist (to put
-    in the set, in canonical order) and those that don't (informational — the skeleton was
+    in the set, in canonical order) and those that don't (informational - the skeleton was
     pruned or revised). Pure: the Maya side passes in the scene joints and replays the result.
     """
     present = set(present_joints)

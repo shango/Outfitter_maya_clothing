@@ -10,7 +10,7 @@ Semantics (locked with the user, 2026-06-09):
 * **Additive / update-changed, never delete.** Every file under ``remote`` is
   copied to the matching path under ``local`` when it is missing there, or when
   it differs by a fast *size + modified-time* check (``rsync``-style quick scan).
-  Files that exist only locally — assets the artist authored locally — are always
+  Files that exist only locally - assets the artist authored locally - are always
   left untouched. Nothing is ever deleted.
 * **Remote-newer wins.** An existing local file is overwritten only when the
   remote copy is a different size or is *newer* (beyond a small filesystem
@@ -18,7 +18,7 @@ Semantics (locked with the user, 2026-06-09):
   older remote copy of the same size.
 
 ``shutil.copy2`` preserves the source modified-time, so a file copied in one sync
-compares equal on the next and is skipped — repeated syncs only move real changes.
+compares equal on the next and is skipped - repeated syncs only move real changes.
 
 Pure logic: filesystem only, no Maya. Safe to run headless / in CI.
 """
@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from .. import config
+
 # Filesystem mtime resolution varies (FAT rounds to 2s); treat times within this
 # many seconds as equal so we don't re-copy unchanged files forever.
 _MTIME_TOLERANCE_S = 2.0
@@ -38,7 +40,7 @@ _MTIME_TOLERANCE_S = 2.0
 class SyncProgress:
     """A single progress update emitted during :func:`sync_remote_to_local`.
 
-    ``phase`` is one of ``"scanning"`` (walking the remote tree — ``total`` is
+    ``phase`` is one of ``"scanning"`` (walking the remote tree - ``total`` is
     not yet known), ``"copying"`` (processing file ``done`` of ``total``), or
     ``"done"`` (finished). ``current`` is the local-relative path being handled,
     when applicable. The callback is invoked synchronously on the calling thread;
@@ -62,23 +64,29 @@ class SyncResult:
 
     added: list[Path] = field(default_factory=list)      # newly copied files
     updated: list[Path] = field(default_factory=list)    # changed files overwritten
-    skipped: int = 0                                       # up-to-date, left alone
+    skipped: int = 0                                       # up-to-date files, left alone
     errors: list[str] = field(default_factory=list)       # per-file copy failures
     ok: bool = True                                        # False if the run could not start
+    # Asset-package counts (one asset = its folder of files: .ma + sidecar + thumbnails).
+    # These - not the file lists above - drive the human summary, so the count matches the
+    # number of assets the user sees rather than the file total.
+    assets_added: int = 0
+    assets_updated: int = 0
+    assets_current: int = 0
 
     @property
     def changed(self) -> bool:
         return bool(self.added or self.updated)
 
     def summary(self) -> str:
-        """One-line human summary for the Setup tab status."""
+        """One-line human summary for the Setup tab status, counted in asset packages."""
         if not self.ok:
             return self.errors[0] if self.errors else "Sync could not run."
-        parts = [f"{len(self.added)} added", f"{len(self.updated)} updated",
-                 f"{self.skipped} up to date"]
+        parts = [f"{self.assets_added} added", f"{self.assets_updated} updated",
+                 f"{self.assets_current} up to date"]
         if self.errors:
-            parts.append(f"{len(self.errors)} failed")
-        return "Sync complete — " + ", ".join(parts) + "."
+            parts.append(f"{len(self.errors)} file(s) failed")
+        return "Sync complete - " + ", ".join(parts) + " (assets)."
 
 
 def _needs_copy(src: Path, dst: Path) -> bool:
@@ -132,6 +140,16 @@ def sync_remote_to_local(remote: Path | str, local: Path | str,
     files = [src for src in sorted(remote.rglob("*")) if src.is_file()]
     total = len(files)
 
+    # Asset packages = folders containing a .ma (published layout: one folder per asset).
+    # Record which already exist locally *before* copying anything, so a folder we create
+    # mid-sync isn't mistaken for pre-existing - that's what separates "added" from
+    # "updated" at the asset level.
+    asset_folders = {
+        src.relative_to(remote).parent for src in files
+        if src.suffix == config.ASSET_EXT}
+    preexisting = {k for k in asset_folders if (local / k).is_dir()}
+    changed_folders: set[Path] = set()
+
     for index, src in enumerate(files, start=1):
         rel = src.relative_to(remote)
         dst = local / rel
@@ -145,8 +163,14 @@ def sync_remote_to_local(remote: Path | str, local: Path | str,
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
             (result.updated if existed else result.added).append(rel)
+            changed_folders.add(rel.parent)
         except OSError as exc:
             result.errors.append(f"{rel}: {exc}")
+
+    changed_assets = asset_folders & changed_folders
+    result.assets_added = len(changed_assets - preexisting)
+    result.assets_updated = len(changed_assets & preexisting)
+    result.assets_current = len(asset_folders - changed_assets)
 
     _emit("done", done=total, total=total)
     return result

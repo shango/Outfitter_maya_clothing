@@ -2,14 +2,14 @@
 
 The validation rules, connection planning, transactional attach, and detach in
 ``validate.py`` / ``attach.py`` are valuable and must be unit-testable without
-Maya. They therefore never call ``maya.cmds`` directly — they go through the
+Maya. They therefore never call ``maya.cmds`` directly - they go through the
 ``SceneGateway`` Protocol defined here. ``MayaScene`` is the real implementation
 (imports ``maya.cmds`` lazily); tests substitute an in-memory fake.
 
 Addressing convention: methods take a node name and an attribute name separately;
 attribute strings (``node.attr``) are only assembled where a DG edge is created.
 Node names may be namespaced (``coat:cloth_spine_03``) and/or full DAG paths
-(``|GenHuman|...|spine_03``) — the gateway is responsible for resolving them.
+(``|GenHuman|...|spine_03``) - the gateway is responsible for resolving them.
 """
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ class SceneGateway(Protocol):
 
         Multi-rig disambiguation (PRD §4): a scene may hold several GenHuman rigs,
         each imported under its own namespace. Given *any* node of a rig (the top
-        group, the godnode, a joint — whatever the user selected), return the full
+        group, the godnode, a joint - whatever the user selected), return the full
         DAG path of that rig's ``EXPORT_SKELETON_GROUP``, so attach binds to the
         intended rig. Returns ``None`` if no such group is found in the node's
         namespace (caller falls back to a root-level rig / surfaces an error).

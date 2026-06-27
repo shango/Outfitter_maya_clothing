@@ -97,17 +97,37 @@ def test_same_folder_is_error(tmp_path):
 
 
 def test_summary_counts(tmp_path):
+    # One folder per asset (the published layout). file-level: 1 added, 1 updated,
+    # 1 skipped; asset-level mirrors it since each asset here is a single .ma.
     remote, local = tmp_path / "remote", tmp_path / "local"
-    _write(remote / "new.ma", "n")
-    _write(remote / "changed.ma", "longer now", mtime=2000)
-    _write(remote / "same.ma", "s", mtime=1000)
-    _write(local / "changed.ma", "x", mtime=1000)
-    _write(local / "same.ma", "s", mtime=1000)
+    _write(remote / "new" / "new.ma", "n")
+    _write(remote / "changed" / "changed.ma", "longer now", mtime=2000)
+    _write(remote / "same" / "same.ma", "s", mtime=1000)
+    _write(local / "changed" / "changed.ma", "x", mtime=1000)
+    _write(local / "same" / "same.ma", "s", mtime=1000)
 
     result = sync.sync_remote_to_local(remote, local)
 
     assert len(result.added) == 1 and len(result.updated) == 1 and result.skipped == 1
+    assert result.assets_added == 1 and result.assets_updated == 1
+    assert result.assets_current == 1
     assert "1 added" in result.summary() and "1 updated" in result.summary()
+
+
+def test_summary_counts_assets_not_files(tmp_path):
+    # A multi-file asset (the real case: .ma + sidecar + still + turntable) that is fully
+    # up to date must report ONE asset up to date, not four files.
+    remote, local = tmp_path / "remote", tmp_path / "local"
+    for ext in (".ma", ".json", ".png", "_turntable.png"):
+        name = "coat_A" + ext
+        _write(remote / "coat_A" / name, ext, mtime=1000)
+        _write(local / "coat_A" / name, ext, mtime=1000)
+
+    result = sync.sync_remote_to_local(remote, local)
+
+    assert result.skipped == 4  # four files unchanged
+    assert result.assets_current == 1 and result.assets_added == 0
+    assert "1 up to date (assets)" in result.summary()
 
 
 def test_progress_reports_scan_then_each_file_then_done(tmp_path):

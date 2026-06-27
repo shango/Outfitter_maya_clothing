@@ -1,6 +1,6 @@
 """Static configuration + small enums shared across the tool.
 
-Pure data only — no Maya, no PySide6, no I/O at import. The installer (FR-9) is
+Pure data only - no Maya, no PySide6, no I/O at import. The installer (FR-9) is
 responsible for writing the user's library roots; until then ``default_library_roots``
 returns the bundled ``assets/`` dir if present plus the per-user install location.
 """
@@ -27,7 +27,7 @@ CLOTH_PREFIX: str = "cloth_"
 
 # Selection set the authoring tool fills with a garment's recommended skin joints, so the
 # rigger selects it and binds instead of guessing which of the ~89 body joints to skin to.
-# A *set* (+ outliner colour), never a rename — attach matches cloth_ joints by name.
+# A *set* (+ outliner colour), never a rename - attach matches cloth_ joints by name.
 SKIN_SET: str = "cloth_skin_SET"
 
 # --- connection contract (PRD §4 / Authoring Spec §15, LOCKED 2026-06-04) ------
@@ -44,7 +44,7 @@ EXPORT_SKELETON_GROUP: str = "GenHuman_Joint_GRP"  # verify-in-Maya (PRD §4 ope
 # (GenHuman_Joint_GRP has rotate -90 X) and attach only connects LOCAL joint transforms.
 
 # Any of these existing in the scene identifies the GenHuman rig as present.
-# (Post-rename names; verify-in-Maya which is most stable — PRD §9 open task.)
+# (Post-rename names; verify-in-Maya which is most stable - PRD §9 open task.)
 RIG_MARKERS: tuple[str, ...] = (
     "god_m_godnode_anim",
     EXPORT_SKELETON_GROUP,
@@ -54,7 +54,7 @@ RIG_MARKERS: tuple[str, ...] = (
 # --- gendered test body (M14) -------------------------------------------------
 # The tool ships ONE GenHuman and flips the male/female switch to match the chosen
 # gender, because the two genders are the SAME rig differing only by this morph value
-# (it moves the body MESH, not the joints — hence one shared cloth_* skeleton).
+# (it moves the body MESH, not the joints - hence one shared cloth_* skeleton).
 # The switch is `GH_Body_morph` (0-1) on the godnode. Verified in Maya 2026-06-24:
 # female = base (0), male = full morph (1).
 BODY_MORPH_NODE: str = "god_m_godnode_anim"
@@ -68,7 +68,7 @@ BUNDLED_GENHUMAN_FILE: str = "GenHuman_rig_v03.ma"
 # Namespace the test body is referenced under (the file stem, version token kept).
 BUNDLED_GENHUMAN_NAMESPACE: str = BUNDLED_GENHUMAN_FILE.rsplit(".", 1)[0]
 
-# Genie export may require specific node names present (PRD §9 open task — TBD).
+# Genie export may require specific node names present (PRD §9 open task - TBD).
 # Empty = check is a no-op until the export team supplies the list.
 GENIE_REQUIRED_NODES: tuple[str, ...] = ()
 
@@ -80,11 +80,11 @@ DISALLOWED_ASSET_NODE_TYPES: tuple[str, ...] = ("blendShape", "nCloth", "nucleus
 # and requires generic shaders only. These are enforced at publish/export time on
 # the saved .ma (validate_asset_summary) so a non-compliant asset never ships.
 
-# Unknown / lost-plugin nodes — Maya parks them as these types when a plugin that
+# Unknown / lost-plugin nodes - Maya parks them as these types when a plugin that
 # created a node is missing; they bloat the file and break a clean re-open.
 UNKNOWN_NODE_TYPES: tuple[str, ...] = ("unknown", "unknownDag", "unknownTransform")
 
-# Timeline animation curves — keyframes driven by *time* (animCurveT*). Assets ship
+# Timeline animation curves - keyframes driven by *time* (animCurveT*). Assets ship
 # static, so these are banned. Set-driven keys (animCurveU*, driven by another attr)
 # are NOT included: they're a legitimate control-rig mechanism the spec allows ("any
 # Maya node types within the control rig"), and the example asset drives its fit
@@ -100,7 +100,7 @@ DEFAULT_DISPLAY_LAYERS: tuple[str, ...] = ("defaultLayer",)
 # §11 Materials: generic shaders only (e.g. lambert / standardSurface). Render-engine-
 # specific shaders don't survive a clean .ma export into the pipeline, so a curated
 # denylist of the renderer materials studios actually use is flagged at export time.
-# Extensible — add a type string here as new renderers appear. (A denylist of exact
+# Extensible - add a type string here as new renderers appear. (A denylist of exact
 # types is used rather than prefix matching to avoid false positives like aimConstraint.)
 RENDERER_SHADER_TYPES: tuple[str, ...] = (
     # Arnold

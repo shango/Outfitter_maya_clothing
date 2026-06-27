@@ -1,4 +1,4 @@
-"""Maya-side rebuild of the canonical ``cloth_*`` skeleton — one button, no rig import.
+"""Maya-side rebuild of the canonical ``cloth_*`` skeleton - one button, no rig import.
 
 Replays the persisted skeleton (:mod:`core.skeleton`) into the open scene: a framed
 ``Rig_GRP`` plus the full body-derived ``cloth_*`` joint hierarchy, at the rig's real
@@ -19,7 +19,7 @@ from . import maya_publish
 from . import skeleton as _skeleton
 from . import skin_sets as _skin_sets
 
-# Maya draw-override colour index for highlighted skin joints — a clear green that reads as
+# Maya draw-override colour index for highlighted skin joints - a clear green that reads as
 # "bind to these" against the default joint colour.
 _SKIN_JOINT_COLOR = 14
 
@@ -70,10 +70,10 @@ class ScaffoldGroupsResult:
             parts.append(
                 f"moved {n} object{'' if n == 1 else 's'} into Mesh_GRP "
                 f"({', '.join(self.grouped_meshes)})")
-        body = ("Asset groups ready — " + "; ".join(parts) + "."
+        body = ("Asset groups ready - " + "; ".join(parts) + "."
                 if parts else "Asset groups already in place.")
         if self.mesh_group_empty:
-            body += " Mesh_GRP is empty — put your garment mesh inside it."
+            body += " Mesh_GRP is empty - put your garment mesh inside it."
         return body
 
 
@@ -92,7 +92,7 @@ class PruneResult:
         if kept:
             msg += (
                 f" Kept {kept} unweighted interior joint{'' if kept == 1 else 's'} "
-                "(they have skinned children — the chain must mirror the body).")
+                "(they have skinned children - the chain must mirror the body).")
         return msg
 
 
@@ -138,7 +138,7 @@ def capture_cloth_skeleton_from_rig(dest=None) -> SkeletonCaptureResult:
 
     Walks ``EXPORT_SKELETON_GROUP``'s joint tree, recording each joint's LOCAL transform
     under a ``cloth_<body name>`` identity (the root's parent becomes ``Rig_GRP``, whose
-    frame is the export group's own rotation — so a later rebuild reproduces this pose).
+    frame is the export group's own rotation - so a later rebuild reproduces this pose).
     Helper joints never exist on the rig, so they're naturally excluded. Overwrites the
     shipped data by default; pass ``dest`` to write elsewhere. Requires the rig in scene.
     """
@@ -150,7 +150,7 @@ def capture_cloth_skeleton_from_rig(dest=None) -> SkeletonCaptureResult:
     def _vec(path: str, attr: str, default):
         try:
             return tuple(cmds.getAttr(f"{path}.{attr}")[0])
-        except Exception:  # noqa: BLE001 — missing attr -> default
+        except Exception:  # noqa: BLE001 - missing attr -> default
             return default
 
     def walk(joint_path: str, parent_cloth: str) -> None:
@@ -202,7 +202,7 @@ def build_cloth_skeleton(spec: _skeleton.SkeletonSpec | None = None) -> Skeleton
 
     if cmds.objExists(spec.root_joint):
         raise RuntimeError(
-            f"{spec.root_joint!r} already exists — the scene already has a cloth_* "
+            f"{spec.root_joint!r} already exists - the scene already has a cloth_* "
             "skeleton. Delete it before rebuilding.")
 
     # Rig_GRP carries the export-group frame; joints are LOCAL beneath it.
@@ -258,7 +258,7 @@ def scaffold_asset_groups(
 
     Run straight after the skeleton build (which already makes Rig_GRP) so a single click
     leaves the three-group asset skeleton the publish preflight requires. Mesh grouping is
-    skipped when a GenHuman rig is in the scene — its body mesh would be ambiguous — so then
+    skipped when a GenHuman rig is in the scene - its body mesh would be ambiguous - so then
     Mesh_GRP is left empty for the rigger to fill. Parenting preserves world position, so the
     garment stays at its authored height.
     """
@@ -310,7 +310,7 @@ def plan_prune_unskinned(mesh_group: str = "Mesh_GRP") -> _skeleton.PrunePlan:
 
     Gathers the in-scene joint hierarchy and the garment's skin influences, then defers
     the selection to the pure :func:`core.skeleton.plan_prune`. Refuses if there are no
-    joints (nothing built yet) or no influences at all — pruning a *zero-influence* scene
+    joints (nothing built yet) or no influences at all - pruning a *zero-influence* scene
     would delete the whole skeleton, exactly the foot-gun this button must never trigger,
     so the rigger is told to skin first. Call :func:`apply_prune` to replay the plan.
     """
@@ -325,7 +325,7 @@ def plan_prune_unskinned(mesh_group: str = "Mesh_GRP") -> _skeleton.PrunePlan:
     if not influences:
         raise RuntimeError(
             "No skinned influences found on the garment. Skin the mesh to the cloth_* "
-            "joints before pruning — otherwise every joint would count as unused and be "
+            "joints before pruning - otherwise every joint would count as unused and be "
             "deleted.")
 
     return _skeleton.plan_prune(parents, influences)
@@ -336,7 +336,7 @@ def apply_prune(plan: _skeleton.PrunePlan) -> PruneResult:
 
     Deletes in plan order (children before parents) and tolerates already-gone nodes, so
     re-applying a stale plan is harmless. Pair with :func:`plan_prune_unskinned` and a
-    user confirmation between the two — this function is the destructive half.
+    user confirmation between the two - this function is the destructive half.
     """
     cmds = _cmds()
     deleted: list[str] = []
@@ -392,14 +392,14 @@ def _set_skin_highlight(cmds, joint: str, on: bool) -> None:
     disable the override: Maya inherits draw-override colour *down* the DAG, so a joint
     with ``overrideEnabled = 0`` shows its parent's colour rather than the default. With
     the override left disabled, every non-member under a green member (head under neck,
-    fingers under hand, feet under calf) bled green — the whole skeleton looked selected.
+    fingers under hand, feet under calf) bled green - the whole skeleton looked selected.
     Holding the override on with colour 0 breaks that inheritance so non-members read as
     default-coloured.
     """
     try:
         cmds.setAttr(f"{joint}.overrideEnabled", 1)
         cmds.setAttr(f"{joint}.overrideColor", _SKIN_JOINT_COLOR if on else 0)
-    except Exception:  # noqa: BLE001 — a locked/connected override attr must not abort
+    except Exception:  # noqa: BLE001 - a locked/connected override attr must not abort
         pass
 
 
@@ -410,11 +410,11 @@ def build_skin_set(asset_type: str) -> SkinSetResult:
     recommendation (:mod:`core.skin_sets`) against the joints actually in the scene, drops
     them into a Maya selection set, clears any prior highlight off every ``cloth_*`` joint
     and paints the recommended ones green, then leaves them selected so the next action is
-    Bind Skin. Non-destructive — the set + colour never touch joint names, so attach is
+    Bind Skin. Non-destructive - the set + colour never touch joint names, so attach is
     unaffected, and the rigger can still add/remove influences by hand.
 
     Raises if no skeleton is present, or if none of the type's recommended joints exist
-    (e.g. a hat skeleton asked for a coat's set) — nothing to select would only confuse.
+    (e.g. a hat skeleton asked for a coat's set) - nothing to select would only confuse.
     """
     cmds = _cmds()
     parents = _scene_cloth_joints(cmds)

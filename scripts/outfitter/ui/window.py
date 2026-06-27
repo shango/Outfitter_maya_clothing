@@ -1,4 +1,4 @@
-"""PySide6 main window — clothing-asset browser + attach/detach.
+"""PySide6 main window - clothing-asset browser + attach/detach.
 
 The window scans the configured library roots and shows a filterable thumbnail
 grid with a read-only detail panel (M1), plus an action bar that drives the real
@@ -6,7 +6,7 @@ grid with a read-only detail panel (M1), plus an action bar that drives the real
 live instance (M2).
 
 Runs both inside Maya 2026 (parented to the main window, dockable-ready) and
-standalone for dev preview (``python -m`` with PySide6 only — no Maya needed).
+standalone for dev preview (``python -m`` with PySide6 only - no Maya needed).
 Maya is imported lazily, so a standalone launch still browses; only Attach/Detach
 require a running Maya (they report this clearly if invoked standalone).
 """
@@ -244,7 +244,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         v.setContentsMargins(8, 8, 8, 8)
 
         intro = QtWidgets.QLabel(
-            "Set two library folders. You work from the local folder — the tool "
+            "Set two library folders. You work from the local folder - the tool "
             "scans only that. The remote folder is a shared master library; press "
             "Sync to pull new and changed assets down into your local folder."
         )
@@ -276,7 +276,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         v.addStretch(1)
         note = QtWidgets.QLabel(
             "Sync copies new and changed assets from the remote into the local "
-            "folder. It never deletes — assets you authored locally are always kept. "
+            "folder. It never deletes - assets you authored locally are always kept. "
             "Leave the local folder unset to fall back to the default library."
         )
         note.setWordWrap(True)
@@ -343,7 +343,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
             _settings.set_remote(folder)
         else:
             _settings.set_remote(None)
-        self._reload_setup_fields()  # remote isn't scanned — no library refresh needed
+        self._reload_setup_fields()  # remote isn't scanned - no library refresh needed
 
     def _sync_now(self) -> None:
         if self._sync_thread is not None:
@@ -413,12 +413,12 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self._preview.setToolTip("Hover to spin · drag left/right to rotate")
         v.addWidget(self._preview)
-        # Per-asset actions (Refresh thumbnails, …) live on the grid's right-click menu —
+        # Per-asset actions (Refresh thumbnails, …) live on the grid's right-click menu -
         # see _grid_context_menu.
 
         # --- name + type badge ------------------------------------------------
         header = QtWidgets.QHBoxLayout()
-        self._d_name = QtWidgets.QLabel("—")
+        self._d_name = QtWidgets.QLabel("-")
         self._d_name.setObjectName("assetName")
         self._d_name.setWordWrap(True)
         self._d_badge = QtWidgets.QLabel("")
@@ -466,7 +466,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         v.addWidget(self._hline())
         path_row = QtWidgets.QHBoxLayout()
         path_row.setSpacing(4)
-        self._d_path = QtWidgets.QLabel("—")
+        self._d_path = QtWidgets.QLabel("-")
         self._d_path.setObjectName("muted")
         self._d_path.setMinimumWidth(0)
         self._d_path.setSizePolicy(
@@ -503,7 +503,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         return lbl
 
     def _value_label(self) -> QtWidgets.QLabel:
-        lbl = QtWidgets.QLabel("—")
+        lbl = QtWidgets.QLabel("-")
         lbl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         return lbl
 
@@ -517,7 +517,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
     def _refresh_clicked(self) -> None:
         """Top-bar Refresh: pull from the remote (when configured) then rescan.
 
-        Reuses the Setup-tab sync machinery — its completion handler rescans the library —
+        Reuses the Setup-tab sync machinery - its completion handler rescans the library -
         so one button keeps the local folder current with the shared library. Falls back to
         a plain local rescan when there's no remote set (or a sync is already running).
         """
@@ -562,7 +562,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         invalid = len(self._scan.invalid)
         roots = ", ".join(str(r) for r in self._scan.scanned_roots) or "(no readable roots)"
         suffix = f" · {invalid} invalid" if invalid else ""
-        self._status.setText(f"Showing {shown}/{total} assets{suffix}  —  roots: {roots}")
+        self._status.setText(f"Showing {shown}/{total} assets{suffix}  -  roots: {roots}")
 
     def _make_item(self, asset: ClothingAsset) -> QtWidgets.QListWidgetItem:
         label = asset.display_name if asset.is_valid else f"⚠ {asset.display_name}"
@@ -606,13 +606,13 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._d_desc.setText((meta.notes if meta and meta.notes else ""))
         self._d_desc.setVisible(bool(meta and meta.notes))
 
-        self._d_gender.setText((meta.gender or "—") if meta else "—")
-        self._d_version.setText(meta.cloth_version if meta else "—")
-        self._d_compat.setText(", ".join(meta.genhuman_compat) if meta and meta.genhuman_compat else "—")
+        self._d_gender.setText((meta.gender or "-") if meta else "-")
+        self._d_version.setText(meta.cloth_version if meta else "-")
+        self._d_compat.setText(", ".join(meta.genhuman_compat) if meta and meta.genhuman_compat else "-")
         self._d_polys.setText(self._poly_text(meta))
-        self._d_created.setText((meta.created or "—") if meta else "—")
-        self._d_rigver.setText((meta.rig_version or "—") if meta else "—")
-        self._d_author.setText((meta.author or "—") if meta else "—")
+        self._d_created.setText((meta.created or "-") if meta else "-")
+        self._d_rigver.setText((meta.rig_version or "-") if meta else "-")
+        self._d_author.setText((meta.author or "-") if meta else "-")
         self._d_source.setText(asset.source)
 
         self._set_path(asset.ma_path)
@@ -622,7 +622,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
     @staticmethod
     def _poly_text(meta) -> str:
         if meta is None or (meta.tri_count is None and meta.vert_count is None):
-            return "—"
+            return "-"
         parts = []
         if meta.tri_count is not None:
             parts.append(f"{meta.tri_count:,} tris")
@@ -668,14 +668,14 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(folder)))
 
     def _grid_context_menu(self, pos: QtCore.QPoint) -> None:
-        """Right-click menu on a grid thumbnail — the home for per-asset actions.
+        """Right-click menu on a grid thumbnail - the home for per-asset actions.
 
         Selects the clicked item first (so the detail panel and ``_current_asset`` track
         it), then offers actions that operate on it. New per-asset actions get added here.
         """
         item = self._grid.itemAt(pos)
         if item is None:
-            return  # right-clicked empty space — no asset under the cursor
+            return  # right-clicked empty space - no asset under the cursor
         self._grid.setCurrentItem(item)
 
         menu = QtWidgets.QMenu(self)
@@ -689,7 +689,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         """Recapture the selected asset's still + turntable in place (images only).
 
         Opens the asset's ``.ma`` in Maya, bakes a fresh shaded turntable (and the still
-        cropped from it), and overwrites just the two PNGs beside the file — the ``.ma``
+        cropped from it), and overwrites just the two PNGs beside the file - the ``.ma``
         and sidecar are left untouched. When a remote library is configured and holds the
         same asset, the new images are mirrored there too, so the shared copy stays current
         without a full re-publish. The remedy for older assets still carrying a flat
@@ -707,7 +707,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         if QtWidgets.QMessageBox.question(
                 self, "Refresh thumbnails",
                 f"Open '{asset.ma_path.name}' in Maya and recapture its shaded "
-                "thumbnail + turntable?\n\nThis replaces the current Maya scene — save "
+                "thumbnail + turntable?\n\nThis replaces the current Maya scene - save "
                 "any unsaved work first. Only the images are overwritten (local, and the "
                 "remote copy when configured); the .ma and metadata are left as-is."
                 ) != QtWidgets.QMessageBox.Yes:
@@ -726,7 +726,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
             if not meshes:
                 raise RuntimeError("no garment meshes found under Mesh_GRP")
             maya_publish.capture_turntable(meshes, str(sheet), still_png=str(still))
-        except Exception as exc:  # noqa: BLE001 — surface the Maya error in the UI
+        except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             QtWidgets.QApplication.restoreOverrideCursor()
             self._status.setText(f"Thumbnail refresh failed: {exc}")
             QtWidgets.QMessageBox.critical(self, "Refresh failed", str(exc))
@@ -750,15 +750,15 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         """
         remote = _settings.read_locations().remote
         if remote is None:
-            return " (local — no remote set)"
+            return " (local - no remote set)"
         remote_folder = Path(remote) / asset.ma_path.parent.name
         if not (remote_folder / asset.ma_path.name).is_file():
-            return " (local only — not in remote library)"
+            return " (local only - not in remote library)"
         try:
             shutil.copyfile(still, remote_folder / still.name)
             shutil.copyfile(sheet, remote_folder / sheet.name)
         except OSError:
-            return " (local — remote copy failed)"
+            return " (local - remote copy failed)"
         return " (local + remote)"
 
     def _select_by_path(self, ma_path: Path) -> None:
@@ -779,15 +779,15 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
     def _clear_detail(self) -> None:
         self._current_asset = None
         self._preview.clear_content()
-        self._d_name.setText("—")
+        self._d_name.setText("-")
         self._d_badge.setText("")
         self._d_badge.setStyleSheet("")
         self._d_desc.setText("")
         self._d_desc.setVisible(False)
         for lbl in (self._d_gender, self._d_version, self._d_compat, self._d_polys,
                     self._d_created, self._d_rigver, self._d_author, self._d_source):
-            lbl.setText("—")
-        self._d_path.setText("—")
+            lbl.setText("-")
+        self._d_path.setText("-")
         self._d_path.setToolTip("")
         self._d_errors.setText("")
         self._d_errors.setVisible(False)
@@ -829,7 +829,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         namespace, ok = QtWidgets.QInputDialog.getText(
             self, "Attach clothing",
             f"Target rig: {rig_label}\n\n"
-            "Instance name (namespace) — use a unique name per garment:",
+            "Instance name (namespace) - use a unique name per garment:",
             text=suggested)
         if not ok or not namespace.strip():
             return
@@ -842,13 +842,13 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
         if result.ok and result.instance is not None:
             self._status.setText(
-                f"Attached '{result.instance.namespace}' — {asset.display_name} "
+                f"Attached '{result.instance.namespace}' - {asset.display_name} "
                 f"({len(result.instance.connections)} connection(s)).")
             self._refresh_attached(select=result.instance.namespace)
         else:
             QtWidgets.QMessageBox.critical(
                 self, "Attach failed",
-                "Attach was rejected — the scene is unchanged:\n\n"
+                "Attach was rejected - the scene is unchanged:\n\n"
                 + "\n".join(str(i) for i in result.report.errors))
 
     def _detach_selected(self) -> None:
@@ -867,7 +867,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
         if result.ok:
             self._status.setText(
-                f"Detached '{namespace}' — broke {result.broken} connection(s).")
+                f"Detached '{namespace}' - broke {result.broken} connection(s).")
             self._refresh_attached()
         else:
             QtWidgets.QMessageBox.critical(
@@ -899,7 +899,7 @@ _engine_singleton = None  # type: ignore[var-annotated]  # core.attach.AttachEng
 def _existing_engine():
     """Return the live engine if one was already created this session, else None.
 
-    Never constructs one (so opening the browser standalone — no Maya — and just
+    Never constructs one (so opening the browser standalone - no Maya - and just
     browsing doesn't trip the ``maya.cmds`` import). Used to populate the UI.
     """
     return _engine_singleton
@@ -913,7 +913,7 @@ def _ensure_engine(parent: QtWidgets.QWidget):
             from ..core.attach import AttachEngine
             from ..core.scene import MayaScene
             _engine_singleton = AttachEngine(MayaScene())
-        except Exception as exc:  # noqa: BLE001 — no Maya / cmds unavailable
+        except Exception as exc:  # noqa: BLE001 - no Maya / cmds unavailable
             QtWidgets.QMessageBox.warning(
                 parent, WINDOW_TITLE,
                 "Attach and Detach must run inside Maya 2026 (they need a live "
@@ -927,7 +927,7 @@ def _delete_existing_windows() -> None:
 
     The module-level ``_window_singleton`` is the fast path, but the shelf button purges
     all ``outfitter`` modules on each click (to hot-reload code), which resets that
-    global to ``None`` and orphans the previous window — leaving it parented to Maya and
+    global to ``None`` and orphans the previous window - leaving it parented to Maya and
     visible. Sweeping top-level widgets by :data:`WINDOW_OBJECT_NAME` survives the reload,
     so repeated clicks replace the window instead of stacking new ones.
     """
@@ -940,7 +940,7 @@ def _delete_existing_windows() -> None:
                 w.close()
                 w.deleteLater()
         except RuntimeError:
-            # already-deleted C++ object — ignore
+            # already-deleted C++ object - ignore
             pass
 
 
@@ -955,7 +955,7 @@ def show(roots: list[Path] | None = None) -> OutfitterBrowser:
     # Keep the tool above Maya. On Windows a parented top-level already stacks
     # above the main window with the plain Qt.Window flag. On macOS (Cocoa) that
     # same window falls *behind* Maya whenever Maya takes focus, so use Qt.Tool
-    # instead — a utility window that floats above its parent without pinning
+    # instead - a utility window that floats above its parent without pinning
     # itself over every other app the way WindowStaysOnTopHint would.
     if sys.platform == "darwin" and parent is not None:
         _window_singleton.setWindowFlag(QtCore.Qt.Tool, True)

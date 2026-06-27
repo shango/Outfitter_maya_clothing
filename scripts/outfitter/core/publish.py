@@ -5,7 +5,7 @@ it writes the ``.ma`` plus the ``<asset>.json`` sidecar (the published metadata
 file the browser reads) and an ``<asset>.png`` thumbnail into the library, laid out
 as ``<dest>/<name>/<name>.{ma,json,png}`` to match the scanner's expectations.
 
-This module is the **pure** half — it assembles the sidecar payload, computes the
+This module is the **pure** half - it assembles the sidecar payload, computes the
 destination paths, sanitizes the asset name, and validates a saved ``.ma`` by reusing
 the existing file validator. Everything that needs a live Maya scene (polycount,
 playblast thumbnail, rig-version detection, saving the file) lives in
@@ -123,7 +123,7 @@ def write_sidecar(paths: PublishPaths, spec: PublishSpec) -> Path:
 # --------------------------------------------------------------------------- #
 # The published .ma is validated *after* it's written (validate_published_ma), but by
 # then a bad scene has already cost a save. The preflight catches the common authoring
-# mistakes up front, in-scene, with an actionable fix for each — the live-Maya half
+# mistakes up front, in-scene, with an actionable fix for each - the live-Maya half
 # (core.maya_publish.gather_scene_facts) gathers the facts, this pure half decides.
 
 @dataclass(frozen=True)
@@ -172,7 +172,7 @@ def split_influences(influences, cloth_prefix: str) -> tuple[list[str], list[str
     """``(cloth_* influences, other influences)`` by short name.
 
     "Other" means the garment is skinned to joints outside the cloth skeleton (typically
-    the rig's own deform joints) — those vanish when the rig is deleted and break attach,
+    the rig's own deform joints) - those vanish when the rig is deleted and break attach,
     so they're the single most important thing the preflight flags.
     """
     cloth: list[str] = []
@@ -184,7 +184,7 @@ def split_influences(influences, cloth_prefix: str) -> tuple[list[str], list[str
 
 
 def _sample(names, limit: int = 6) -> str:
-    """``"a, b, c (+N more)"`` — a short, sorted, de-duped preview of node names."""
+    """``"a, b, c (+N more)"`` - a short, sorted, de-duped preview of node names."""
     uniq = sorted(set(names))
     head = ", ".join(uniq[:limit])
     return head if len(uniq) <= limit else f"{head} (+{len(uniq) - limit} more)"
@@ -213,7 +213,7 @@ def assemble_preflight(
     if roots:
         issues.append(PreflightIssue(
             "error", f"Asset is inside namespace(s): {', '.join(roots)}.",
-            "Remove all namespaces (Window ▸ Namespace Editor) so node names are bare — "
+            "Remove all namespaces (Window ▸ Namespace Editor) so node names are bare - "
             "e.g. 'Mesh_GRP', not 'jacket_A:Mesh_GRP'."))
 
     missing = [g for g in required_groups if g not in facts.present_groups]
@@ -254,20 +254,20 @@ def assemble_preflight(
             "warn",
             f"{n} {cloth_prefix}* joint(s) are still driven by the test body: "
             f"{sample}{more}.",
-            "Click 'Disconnect test body' so the joints go static before publishing — "
+            "Click 'Disconnect test body' so the joints go static before publishing - "
             "the connections (and the body that drives them) must not ship in the asset."))
 
-    # §10/§13/§11 cleanliness — the same hard "no" list validate_asset_summary enforces
+    # §10/§13/§11 cleanliness - the same hard "no" list validate_asset_summary enforces
     # on the saved .ma, surfaced here in-scene so the author fixes it before the save.
     if facts.unknown_nodes:
         issues.append(PreflightIssue(
             "error", f"Unknown (lost-plugin) node(s): {_sample(facts.unknown_nodes)}.",
-            "Delete unknown nodes — Edit ▸ Delete All by Type ▸ Unknown Nodes."))
+            "Delete unknown nodes - Edit ▸ Delete All by Type ▸ Unknown Nodes."))
 
     if facts.anim_curves:
         issues.append(PreflightIssue(
             "error", f"Animation curve(s) in the scene: {_sample(facts.anim_curves)}.",
-            "Delete all keyframes/animation — a delivered asset must be static."))
+            "Delete all keyframes/animation - a delivered asset must be static."))
 
     if facts.display_layers:
         issues.append(PreflightIssue(
@@ -295,7 +295,7 @@ def validate_published_ma(ma_path: Path | str) -> ValidationReport:
 
     Run after the scene is saved so publish enforces the structure contract
     (info node, required groups, cloth_root, clean of refs/namespaces/forbidden
-    nodes). Reuses :func:`validate_asset_summary` — no publish-specific rules.
+    nodes). Reuses :func:`validate_asset_summary` - no publish-specific rules.
     """
     summary = ma_parse.summarize_file(ma_path)
     meta, _ = AssetMetadata.from_mapping(summary.info_attrs)
