@@ -17,4 +17,4 @@ scope, so the validation core runs headlessly in CI. Maya-dependent code lives i
 ``ui`` and (later) ``core.attach`` behind guarded imports.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
