@@ -187,7 +187,7 @@ class RigSelector(QtWidgets.QWidget):
                 self._combo.setPlaceholderText("- no rig registered -")
         finally:
             self._loading = False
-        self._refresh_status()
+        self.refresh_status()
 
     def select(self, rig_id: str) -> bool:
         """Switch to ``rig_id`` as if the user had picked it (persists, emits, restatuses).
@@ -220,7 +220,7 @@ class RigSelector(QtWidgets.QWidget):
         rig_id = self.rig_id()
         if rig_id:
             _settings.set_rig(rig_id)
-        self._refresh_status()
+        self.refresh_status()
         self.rigChanged.emit(rig_id)
 
     def refresh_status(self) -> None:
@@ -255,6 +255,6 @@ class RigSelector(QtWidgets.QWidget):
         def done(path, error: str) -> None:
             if error:
                 QtWidgets.QMessageBox.warning(self, "Fetch rig failed", error)
-            self._refresh_status()
+            self.refresh_status()
 
         fetch_rig_file(self, profile, self.variant(), done)
