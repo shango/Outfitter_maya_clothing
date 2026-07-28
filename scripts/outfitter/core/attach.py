@@ -1,7 +1,7 @@
 """Attach / detach lifecycle - ``connectAttr`` only, transactional (FR-3 / FR-5).
 
 Attach is the one place that mutates the scene to bind a garment, and it does so
-through exactly one mechanism: ``connectAttr`` from each GenHuman export-skeleton
+through exactly one mechanism: ``connectAttr`` from each body-rig export-skeleton
 joint to the asset's matching ``cloth_*`` joint (PRD §4/§10). No constraints,
 utility, matrix, expression, or driven-key nodes are ever created.
 
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from .. import config
 from . import ma_parse
@@ -30,6 +31,9 @@ from .validate import (
     validate_asset_summary,
     validate_scene_preconditions,
 )
+
+if TYPE_CHECKING:  # import for typing only - core.rigs is data, not a runtime dependency
+    from .rigs import RigProfile
 
 
 @dataclass(frozen=True)
@@ -131,10 +135,21 @@ class AttachEngine:
         asset: ClothingAsset,
         namespace: str,
         *,
-        export_group: str = config.EXPORT_SKELETON_GROUP,
+        profile: "RigProfile | None" = None,
+        export_group: str | None = None,
     ) -> AttachResult:
+        """Attach ``asset`` onto the chosen rig, transactionally.
+
+        ``profile`` is the registered rig being dressed; ``export_group`` is that rig's
+        export-skeleton group resolved in this scene (a namespaced full DAG path when the
+        user selected one of several rigs). Both default to the tool's original
+        single-rig behaviour so an existing caller keeps working.
+        """
         report = ValidationReport()
         namespace = sanitize_namespace(namespace)
+        if export_group is None:
+            export_group = (profile.export_group if profile is not None
+                            else config.EXPORT_SKELETON_GROUP)
 
         # 1) pre-scene validation - failure here means the scene is untouched
         summary = ma_parse.summarize_file(asset.ma_path)
@@ -142,6 +157,7 @@ class AttachEngine:
         report.extend(validate_scene_preconditions(
             self.scene, namespace, asset.metadata,
             registered_namespaces=tuple(self.registry.namespaces()),
+            profile=profile,
             export_group=export_group,
         ))
         if not report.ok:

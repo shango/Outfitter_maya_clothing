@@ -168,3 +168,57 @@ def test_sync_works_without_progress_callback(tmp_path):
     # Default (no callback) path must stay identical.
     result = sync.sync_remote_to_local(remote, local)
     assert result.ok and len(result.added) == 1
+
+
+# --- rig profiles sync; rig bodies do not -------------------------------------
+def test_pulls_rig_profiles(tmp_path):
+    """Registering a rig must make it visible to every artist on their next sync."""
+    remote, local = tmp_path / "remote", tmp_path / "local"
+    _write(remote / "_rigs" / "acme_biped.json", '{"rigId": "acme_biped"}')
+    local.mkdir()
+
+    result = sync.sync_remote_to_local(remote, local)
+
+    assert result.ok
+    assert (local / "_rigs" / "acme_biped.json").is_file()
+
+
+def test_does_not_pull_rig_bodies(tmp_path):
+    """A rig .ma is 25-30 MB. Pushing every registered rig at every artist on every sync
+    would be wasteful, so the bodies are fetched on demand instead (rigs.ensure_rig_file).
+    """
+    remote, local = tmp_path / "remote", tmp_path / "local"
+    _write(remote / "_rigs" / "acme_biped.json", '{"rigId": "acme_biped"}')
+    _write(remote / "_rigs" / "acme_biped" / "acme_v01.ma", "a very large rig")
+    local.mkdir()
+
+    result = sync.sync_remote_to_local(remote, local)
+
+    assert (local / "_rigs" / "acme_biped.json").is_file()
+    assert not (local / "_rigs" / "acme_biped" / "acme_v01.ma").exists()
+    assert len(result.added) == 1
+
+
+def test_rig_files_are_never_counted_as_assets(tmp_path):
+    """The asset-package counts drive the user-facing summary; a registered rig must not
+    inflate them or be reported as a piece of clothing."""
+    remote, local = tmp_path / "remote", tmp_path / "local"
+    _write(remote / "coat_A" / "coat_A.ma", "geo")
+    _write(remote / "_rigs" / "acme_biped.json", '{"rigId": "acme_biped"}')
+    _write(remote / "_rigs" / "acme_biped" / "acme_v01.ma", "rig")
+    local.mkdir()
+
+    result = sync.sync_remote_to_local(remote, local)
+
+    assert result.assets_added == 1
+    assert "1 added" in result.summary()
+
+
+def test_is_syncable_rules():
+    from pathlib import Path
+
+    assert sync.is_syncable(Path("coat_A/coat_A.ma"))
+    assert sync.is_syncable(Path("coat_A/coat_A.json"))
+    assert sync.is_syncable(Path("_rigs/acme_biped.json"))
+    assert not sync.is_syncable(Path("_rigs/acme_biped/acme_v01.ma"))
+    assert not sync.is_syncable(Path("_rigs/acme_biped/thumb.png"))

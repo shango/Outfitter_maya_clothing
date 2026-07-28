@@ -17,10 +17,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
+from typing import TYPE_CHECKING
+
 from .. import config
 from .asset import AssetMetadata
 from .ma_parse import MaSummary
 from .scene import SceneGateway
+
+if TYPE_CHECKING:  # import for typing only - core.rigs is data, not a runtime dependency
+    from .rigs import RigProfile
 
 
 class Severity(Enum):
@@ -177,39 +182,63 @@ def validate_scene_preconditions(
     metadata: AssetMetadata | None,
     *,
     registered_namespaces: tuple[str, ...] = (),
-    export_group: str = config.EXPORT_SKELETON_GROUP,
+    profile: "RigProfile | None" = None,
+    export_group: str | None = None,
 ) -> ValidationReport:
     """Checks that must pass against the live scene *before* importing the asset.
 
-    ``export_group`` is the resolved export-skeleton group of the *chosen* rig
-    (multi-rig: derived from the user's selection). The rig-present gate keys off
-    it directly, so a namespaced rig validates iff the user actually targeted it.
+    ``profile`` is the registered rig the user chose to dress. ``export_group`` is that
+    rig's export-skeleton group as resolved in *this* scene (multi-rig: derived from the
+    user's selection, so it may be a namespaced full DAG path); it defaults to the
+    profile's own group name for a root-level rig. The rig-present gate keys off it
+    directly, so a namespaced rig validates iff the user actually targeted it.
     """
     report = ValidationReport()
+    rig_label = profile.label if profile is not None else "rig"
+    if export_group is None:
+        export_group = (profile.export_group if profile is not None
+                        else config.EXPORT_SKELETON_GROUP)
 
-    # --- GenHuman rig present (FR-2) ---
+    # --- rig present (FR-2) ---
     # The chosen rig is identified by its export-skeleton group; if that resolves,
     # the rig is present and is the one attach will bind to (multi-rig safe, §4).
     if not scene.exists(export_group):
         report.error(
-            "no_rig", "GenHuman rig not found in scene",
+            "no_rig", f"{rig_label} rig not found in scene",
             node=export_group,
-            fix="select any node of the target GenHuman rig, then Attach "
+            fix=f"select any node of the target {rig_label} rig, then Attach "
                 f"(looked for export group '{export_group}')",
         )
 
-    # --- version compatibility (FR-2; detection is best-effort, PRD §9) ---
     if metadata is not None:
-        scene_version = scene.genhuman_version()
+        # --- rig identity (the gate that makes multi-rig libraries safe) ---
+        # A garment is skinned to one rig's skeleton. Attaching it to a different rig
+        # would either match nothing or - worse, when two rigs share joint names - match
+        # a skeleton with different proportions and deform the garment into nonsense.
+        # Metadata is the authority here precisely because names alone can't tell them
+        # apart.
+        if profile is not None and metadata.rig_id != profile.rig_id:
+            report.error(
+                "rig_mismatch",
+                f"asset is built for rig '{metadata.rig_id}' but the selected rig is "
+                f"'{profile.rig_id}'",
+                fix=f"pick an asset built for {rig_label}, or convert this one with "
+                    "'Retarget to rig' (which needs the fit checked afterwards)",
+            )
+
+        # --- version compatibility (FR-2; detection is best-effort, PRD §9) ---
+        markers = profile.markers if profile is not None else config.RIG_MARKERS
+        scene_version = scene.rig_version(markers)
         if scene_version is None:
             report.warn("version_unknown",
-                        "could not detect the scene's GenHuman version; skipping compat check",
-                        fix="set a genHumanVersion attr on a rig marker node")
-        elif not metadata.supports(scene_version):
+                        f"could not detect the scene's {rig_label} version; skipping "
+                        "compat check",
+                        fix="set a rigVersion attr on a rig marker node")
+        elif not metadata.supports(metadata.rig_id, scene_version):
             report.error(
                 "version_incompat",
-                f"asset supports {', '.join(metadata.genhuman_compat)} but scene is {scene_version}",
-                fix="use an asset whose genHumanCompat includes the scene version",
+                f"asset supports {', '.join(metadata.rig_versions)} but scene is {scene_version}",
+                fix="use an asset whose rigVersions includes the scene version",
             )
 
     # --- target namespace must be free (FR-2 / §4) ---

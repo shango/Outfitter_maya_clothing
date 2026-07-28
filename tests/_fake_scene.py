@@ -145,7 +145,7 @@ class FakeScene:
         }
         self.namespaces.discard(namespace)
 
-    def genhuman_version(self) -> str | None:
+    def rig_version(self, markers: tuple[str, ...] = ()) -> str | None:
         return self.version
 
     def selected_nodes(self) -> list[str]:
@@ -159,10 +159,9 @@ class FakeScene:
     def set_world_matrix(self, node: str, matrix: list[float]) -> None:
         self.matrices[node] = list(matrix)
 
-    def resolve_export_group(self, selected_node: str) -> str | None:
-        from outfitter import config
-
-        marker = config.EXPORT_SKELETON_GROUP
+    def resolve_export_group(self, selected_node: str,
+                             export_group: str = "GenHuman_Joint_GRP") -> str | None:
+        marker = export_group
         short = selected_node.rsplit("|", 1)[-1]
         top_ns = short.split(":", 1)[0] if ":" in short else ""
         for addr, node in self.nodes.items():

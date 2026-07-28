@@ -1,7 +1,8 @@
 """Outfitter Rig System - Maya 2026 tool package.
 
-Browse local clothing assets, snap a chosen asset onto the animated GenHuman rig
-via direct ``connectAttr`` only, and detach cleanly. See ``prd.md`` and
+Browse local clothing assets, snap a chosen asset onto an animated body rig
+via direct ``connectAttr`` only, and detach cleanly. Any rig can be registered
+with the tool (see ``core/rigs.py``). See ``prd.md`` and
 ``Clothing Asset Authoring Spec.md`` at the repo root.
 
 Layout:
@@ -17,4 +18,4 @@ scope, so the validation core runs headlessly in CI. Maya-dependent code lives i
 ``ui`` and (later) ``core.attach`` behind guarded imports.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"

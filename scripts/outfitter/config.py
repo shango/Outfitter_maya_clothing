@@ -14,7 +14,14 @@ ASSET_TYPES: tuple[str, ...] = ("shoes", "pants", "shirt", "dress", "coat", "hat
 
 # Body variant each garment is pre-fit to (M12: two fixed body states, no unisex).
 # Each garment ships as a male and a female asset; gender is a required metadata field.
+# These are the variant names GenHuman offers - a registered rig declares its own
+# (core.rigs.Variants), and these seed the bundled profile.
 GENDERS: tuple[str, ...] = ("male", "female")
+
+# A rig with a *single* body (variants mode "none") has no gender to offer. Its assets
+# record this instead of a body variant, so 'gender' stays required and explicit for every
+# asset rather than being silently blank on some rigs.
+GENDER_NONE: str = "none"
 
 # --- asset structure contract (Authoring Spec §3) -----------------------------
 MESH_GROUP: str = "Mesh_GRP"   # holds the garment meshes
@@ -35,38 +42,48 @@ SKIN_SET: str = "cloth_skin_SET"
 # jointOrient and visibility are deliberately NOT connected.
 CONNECT_ATTRS: tuple[str, ...] = ("translate", "rotate", "scale")
 
+# --- GenHuman seed values (NOT the runtime authority) -------------------------
+# Everything in this block used to be how the tool knew what a rig was. It is now the
+# *seed* the bundled GenHuman profile (``data/rigs/genhuman.json``) was generated from,
+# kept for two narrow purposes: as the fallback when no rig is registered at all (a fresh
+# install with an empty library), and as documentation of the values that were verified in
+# Maya. At runtime the authority is the registered rig's profile
+# (:class:`core.rigs.RigProfile`) - read ``profile.export_group`` / ``profile.markers`` /
+# ``profile.variants``, never these constants, from any code that must work with a rig the
+# tool has never seen.
+
 # Export skeleton lives under this group; attach must resolve by full DAG path,
 # never short name, because a rig-internal deform skeleton shares short names.
-EXPORT_SKELETON_GROUP: str = "GenHuman_Joint_GRP"  # verify-in-Maya (PRD §4 open task)
+EXPORT_SKELETON_GROUP: str = "GenHuman_Joint_GRP"  # seed: profile.export_group
 
 # RIG_GROUP frame note (defined above): at attach the garment's Rig_GRP is aligned to the
-# rig's EXPORT_SKELETON_GROUP world frame, because that group carries a transform
+# rig's export-skeleton group world frame, because that group carries a transform
 # (GenHuman_Joint_GRP has rotate -90 X) and attach only connects LOCAL joint transforms.
 
 # Any of these existing in the scene identifies the GenHuman rig as present.
-# (Post-rename names; verify-in-Maya which is most stable - PRD §9 open task.)
-RIG_MARKERS: tuple[str, ...] = (
+RIG_MARKERS: tuple[str, ...] = (  # seed: profile.markers
     "god_m_godnode_anim",
     EXPORT_SKELETON_GROUP,
     "GenHuman",
 )
 
 # --- gendered test body (M14) -------------------------------------------------
-# The tool ships ONE GenHuman and flips the male/female switch to match the chosen
-# gender, because the two genders are the SAME rig differing only by this morph value
-# (it moves the body MESH, not the joints - hence one shared cloth_* skeleton).
-# The switch is `GH_Body_morph` (0-1) on the godnode. Verified in Maya 2026-06-24:
-# female = base (0), male = full morph (1).
-BODY_MORPH_NODE: str = "god_m_godnode_anim"
-BODY_MORPH_ATTR: str = "GH_Body_morph"
-GENDER_BODY_MORPH: dict[str, float] = {"male": 1.0, "female": 0.0}
+# GenHuman ships ONE rig and flips the male/female switch to match the chosen gender,
+# because the two genders are the SAME rig differing only by this morph value (it moves
+# the body MESH, not the joints - hence one shared cloth_* skeleton). The switch is
+# `GH_Body_morph` (0-1) on the godnode. Verified in Maya 2026-06-24: female = base (0),
+# male = full morph (1). Another rig may switch bodies differently, or not at all, so
+# these are seeds for profile.variants - see core.rigs.Variants.
+BODY_MORPH_NODE: str = "god_m_godnode_anim"     # seed: profile.variants.node
+BODY_MORPH_ATTR: str = "GH_Body_morph"          # seed: profile.variants.attr
+GENDER_BODY_MORPH: dict[str, float] = {"male": 1.0, "female": 0.0}  # seed: .values
 
-# The bundled GenHuman the "Load test body" action references. Lives in the package's
-# lib/ dir so the installer copytree ships it alongside the code; kept OUT of git (large
-# rig, like the root *.ma files) and dropped in at package/release time.
-BUNDLED_GENHUMAN_FILE: str = "GenHuman_rig_v03.ma"
-# Namespace the test body is referenced under (the file stem, version token kept).
-BUNDLED_GENHUMAN_NAMESPACE: str = BUNDLED_GENHUMAN_FILE.rsplit(".", 1)[0]
+# The bundled GenHuman body. Lives in the package's lib/ dir so the installer copytree
+# ships it alongside the code; kept OUT of git (large rig, like the root *.ma files) and
+# dropped in at package/release time. Seed for the bundled profile's ``bundledFile`` -
+# 'Load test body' resolves the file through the rig profile (core.rigs.bundled_rig_file),
+# so a registered rig's body is found the same way, in the shared library.
+BUNDLED_GENHUMAN_FILE: str = "GenHuman_rig_v03.ma"  # seed: profile.bundled_file
 
 # Genie export may require specific node names present (PRD §9 open task - TBD).
 # Empty = check is a no-op until the export team supplies the list.
@@ -165,17 +182,6 @@ def path_file() -> Path:
 def bundled_asset_dir() -> Path:
     """The starter library shipped in the repo / installer bundle."""
     return _repo_root() / "assets"
-
-
-def bundled_genhuman_path() -> Path:
-    """The GenHuman rig the 'Load test body' action references (under the package lib dir).
-
-    Ships inside the package's ``lib/`` dir so the installer's package copytree carries it
-    alongside the code, but kept out of git (large rig). May not exist in a fresh checkout
-    until the file is dropped in / the bundle is built; callers must handle absence with a
-    clear message.
-    """
-    return package_dir() / "lib" / BUNDLED_GENHUMAN_FILE
 
 
 def user_config_dir() -> Path:

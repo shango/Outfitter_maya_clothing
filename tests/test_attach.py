@@ -230,3 +230,73 @@ def test_sanitize_namespace():
     assert sanitize_namespace("Trench Coat #2") == "Trench_Coat__2"
     assert sanitize_namespace("3coat")[0] == "_"
     assert sanitize_namespace("  ") == "clothing"
+
+
+# --- rig-aware attach ---------------------------------------------------------
+def _profile(rig_id="genhuman", version="v03"):
+    from outfitter.core import rigs
+    from outfitter.core import skeleton as sk
+
+    return rigs.RigProfile(
+        rig_id=rig_id, display_name=rig_id.title(), version=version,
+        export_group=GROUP, markers=(GROUP,),
+        skeleton=sk.SkeletonSpec(
+            root_group="Rig_GRP", root_group_rotate=(-90.0, 0.0, 0.0),
+            root_joint="cloth_root",
+            joints=(sk.JointSpec(name="cloth_root", parent="Rig_GRP"),)))
+
+
+def _acme_coat(tmp_path):
+    """A garment published for a different rig (Acme), not GenHuman."""
+    p = _assets.write_asset_ma(
+        tmp_path / "acme_coat.ma",
+        joints=["cloth_root", "cloth_pelvis", "cloth_spine_01"],
+        asset_name="acme_coat_A", asset_type="coat")
+    # rewrite the sidecar-free .ma metadata by publishing a matching sidecar
+    import json
+    p.with_suffix(".json").write_text(json.dumps({
+        "assetName": "acme_coat_A", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigId": "acme_biped", "rigVersions": "v01"}))
+    return _assets.load(p)
+
+
+def test_attach_succeeds_when_the_asset_matches_the_selected_rig(tmp_path):
+    scene = _scene()
+    engine = AttachEngine(scene)
+    result = engine.attach(_coat(tmp_path), "coat", profile=_profile("genhuman", "v03"))
+    assert result.ok, [str(i) for i in result.report.errors]
+
+
+def test_attach_refuses_an_asset_built_for_another_rig(tmp_path):
+    scene = _scene(version="v01")
+    engine = AttachEngine(scene)
+    result = engine.attach(
+        _acme_coat(tmp_path), "coat", profile=_profile("genhuman", "v01"))
+    assert not result.ok
+    assert "rig_mismatch" in {i.code for i in result.report.errors}
+
+
+def test_a_rejected_cross_rig_attach_leaves_the_scene_untouched(tmp_path):
+    """FR-2's hard guarantee, on the new gate: the rig check runs *before* the import,
+    so a wrong-rig asset never gets as far as adding nodes or a namespace."""
+    scene = _scene(version="v01")
+    before_nodes = set(scene.nodes)
+    before_conns = set(scene.connections)
+    before_ns = set(scene.namespaces)
+
+    engine = AttachEngine(scene)
+    result = engine.attach(
+        _acme_coat(tmp_path), "coat", profile=_profile("genhuman", "v01"))
+
+    assert not result.ok
+    assert set(scene.nodes) == before_nodes
+    assert set(scene.connections) == before_conns
+    assert set(scene.namespaces) == before_ns
+    assert engine.registry.namespaces() == []
+
+
+def test_attach_without_a_profile_still_works(tmp_path):
+    """The pre-rig-agnostic call shape keeps working, so nothing silently broke."""
+    engine = AttachEngine(_scene())
+    result = engine.attach(_coat(tmp_path), "coat")
+    assert result.ok, [str(i) for i in result.report.errors]

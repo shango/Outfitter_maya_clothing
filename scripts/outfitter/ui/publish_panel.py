@@ -22,7 +22,9 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from .. import config
 from ..core import publish as _publish
+from ..core import rigs as _rigs
 from ..core import settings as _settings
+from .rig_bar import RigSelector, fetch_rig_file
 from .turntable import TurntableView
 
 _PREVIEW_BOX = 140
@@ -64,6 +66,11 @@ class PublishPanel(QtWidgets.QWidget):
         root.setSpacing(10)
 
         self._build_widgets()
+        # The rig governs everything below it - which skeleton is built, which body
+        # variants exist, what the published asset is tagged with - so it sits above the
+        # steps rather than inside the details form.
+        root.addWidget(self._rig, 0)
+
         top = QtWidgets.QWidget()
         outer = QtWidgets.QHBoxLayout(top)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -87,8 +94,11 @@ class PublishPanel(QtWidgets.QWidget):
         self._name = QtWidgets.QLineEdit()
         self._name.setPlaceholderText("e.g. trench_coat_A")
         self._version = QtWidgets.QLineEdit("1.0.0")
-        self._compat = QtWidgets.QLineEdit("v03")
+        self._compat = QtWidgets.QLineEdit()
         self._compat.setPlaceholderText("comma-separated, e.g. v03, v04")
+        self._compat.setToolTip(
+            "The rig versions this garment fits. It is only ever attached to the rig "
+            "selected above - these say which builds of that rig it works on.")
         self._rigver = QtWidgets.QLineEdit()
         self._rigver.setPlaceholderText("e.g. v03")
         self._author = QtWidgets.QLineEdit()
@@ -107,14 +117,13 @@ class PublishPanel(QtWidgets.QWidget):
 
         # Type / Gender drive Step 1 (skin-set + body variant). Start unset on purpose
         # so the rigger picks them rather than silently defaulting to the first entry.
+        # Gender's entries come from the selected rig - a rig with a single body has none.
         self._type = QtWidgets.QComboBox()
         self._type.addItems(list(config.ASSET_TYPES))
         self._type.setCurrentIndex(-1)
         self._type.setPlaceholderText("- set clothing type -")
         self._gender = QtWidgets.QComboBox()
-        self._gender.addItems(list(config.GENDERS))
         self._gender.setCurrentIndex(-1)
-        self._gender.setPlaceholderText("- set body variant -")
         # keep both dropdowns a comfortable height so they aren't squeezed flat
         for combo in (self._type, self._gender):
             combo.setMinimumHeight(28)
@@ -137,7 +146,7 @@ class PublishPanel(QtWidgets.QWidget):
         self._publish_btn.clicked.connect(self._publish)
 
         # rare maintenance: re-capture the canonical skeleton data from the rig in-scene
-        # (e.g. after a new rig generation). Overwrites the shipped cloth_skeleton.json.
+        # (e.g. after a new rig generation). Overwrites the rig profile's stored skeleton.
         self._regen_btn = QtWidgets.QToolButton()
         self._regen_btn.setText("Regenerate skeleton data from rig…")
         self._regen_btn.clicked.connect(self._regen_skeleton)
@@ -155,6 +164,56 @@ class PublishPanel(QtWidgets.QWidget):
         self._status = QtWidgets.QLabel("")
         self._status.setObjectName("muted")
         self._status.setWordWrap(True)
+
+        # The rig this whole tab authors for. Built last: it reads the Gender choice to
+        # know which body variant to fetch, so that combo has to exist first.
+        self._rig = RigSelector(
+            show_register=True, variant_provider=self._chosen_variant)
+        self._rig.rigChanged.connect(self._on_rig_changed)
+        self._rig.registerRequested.connect(self._register_rig)
+        self._apply_rig_to_form()
+
+    # --- the selected rig drives the form -------------------------------------
+    def _profile(self):
+        """The rig profile being authored for, or ``None`` when none is registered."""
+        return self._rig.profile()
+
+    def _chosen_variant(self) -> str:
+        """The gender picked in the form, or ``""`` - what body to fetch/load."""
+        return self._gender.currentText().strip()
+
+    def _apply_rig_to_form(self) -> None:
+        """Re-point the rig-dependent fields at the selected rig.
+
+        Body variants are a per-rig fact: GenHuman offers male/female through a morph,
+        another rig may ship one body and no choice at all. Rather than always showing the
+        tool's old fixed male/female list, the Gender field offers exactly what this rig
+        declares - and disables itself, saying so, when the rig has a single body.
+        """
+        profile = self._profile()
+        variants = profile.variants.names if profile is not None else ()
+        current = self._gender.currentText().strip()
+
+        self._gender.clear()
+        self._gender.addItems(list(variants))
+        self._gender.setEnabled(bool(variants))
+        if variants:
+            self._select_combo(self._gender, current)
+            self._gender.setPlaceholderText("- set body variant -")
+        else:
+            self._gender.setCurrentIndex(-1)
+            self._gender.setPlaceholderText(
+                "- single body -" if profile is not None else "- no rig registered -")
+
+        if profile is not None and not self._compat.text().strip():
+            # Sensible default: the version this rig is registered at.
+            self._compat.setText(profile.version)
+
+    def _on_rig_changed(self, _rig_id: str) -> None:
+        self._apply_rig_to_form()
+        profile = self._profile()
+        if profile is not None:
+            self._report(f"Authoring for {profile.label}.", "info")
 
     def _build_details_form(self) -> QtWidgets.QWidget:
         """Right column: asset identity / metadata, filled out during Step 4."""
@@ -191,7 +250,7 @@ class PublishPanel(QtWidgets.QWidget):
 
         form.addRow("Asset name", self._name)
         form.addRow("Version", self._version)
-        form.addRow("GenHuman compat", self._compat)
+        form.addRow("Rig versions", self._compat)
         form.addRow("Rig version built-for", self._wrap(rig_row))
         form.addRow("Author", self._author)
         form.addRow("Description", self._desc)
@@ -344,10 +403,13 @@ class PublishPanel(QtWidgets.QWidget):
         return card, body
 
     def showEvent(self, event: QtGui.QShowEvent) -> None:
-        # The remote folder may be changed on the Setup tab after this panel is built;
-        # refresh the Step 5 destination read-out each time the tab is shown.
+        # The remote folder may be changed on the Setup tab, and a Sync may have brought
+        # in rigs registered by someone else, after this panel was built - so refresh the
+        # destination read-out and the rig list each time the tab is shown.
         super().showEvent(event)
         self._refresh_remote_label()
+        self._rig.reload()
+        self._apply_rig_to_form()
 
     @staticmethod
     def _wrap(layout: QtWidgets.QLayout) -> QtWidgets.QWidget:
@@ -479,15 +541,23 @@ class PublishPanel(QtWidgets.QWidget):
         return None
 
     def _require_gender(self) -> str | None:
-        """Return the chosen gender variant, or warn and return None if still unset."""
+        """Return the chosen body variant, or warn and return None if still unset.
+
+        A rig with a single body has nothing to choose, so the asset records
+        ``config.GENDER_NONE`` rather than blocking on a dropdown with no entries.
+        """
+        profile = self._profile()
+        if profile is not None and not profile.variants.is_gendered:
+            return config.GENDER_NONE
         gender = self._gender.currentText().strip()
         if gender:
             return gender
-        self._report("Set the Gender first (the dropdown in the form).", "warn")
+        offered = " / ".join(profile.variants.names) if profile is not None else "male / female"
+        self._report("Set the Gender first (the dropdown in Step 1).", "warn")
         QtWidgets.QMessageBox.warning(
             self, "Set gender",
-            "Choose the body variant (male / female) the garment is pre-fit to before "
-            "publishing - every asset must declare its gender.")
+            f"Choose the body variant ({offered}) the garment is pre-fit to before "
+            "publishing - every asset must declare its variant.")
         return None
 
     # --- actions --------------------------------------------------------------
@@ -520,10 +590,22 @@ class PublishPanel(QtWidgets.QWidget):
             "(keep the name to overwrite).", "ok")
 
     def _apply_info_to_form(self, info: dict) -> None:
-        """Map sidecar/cloth_info keys onto the form widgets (blanks left untouched)."""
+        """Map sidecar/cloth_info keys onto the form widgets (blanks left untouched).
+
+        The rig is applied first: it repopulates the Gender list, so the asset's own
+        variant can only be selected once the right rig is active. Assets published before
+        the tool went rig-agnostic carry ``genHumanCompat`` and no ``rigId`` - they are
+        GenHuman assets, and read as such.
+        """
+        rig_id = info.get("rigId", "") or _rigs.DEFAULT_RIG_ID
+        if rig_id != self._rig.rig_id() and not self._rig.select(rig_id):
+            self._log(
+                f"This asset is built for rig '{rig_id}', which isn't registered here - "
+                "the fields below are loaded, but publishing needs that rig.", "warn")
+
         self._name.setText(info.get("assetName", ""))
         self._version.setText(info.get("clothVersion", "") or "1.0.0")
-        self._compat.setText(info.get("genHumanCompat", ""))
+        self._compat.setText(info.get("rigVersions", "") or info.get("genHumanCompat", ""))
         self._author.setText(info.get("author", ""))
         self._rigver.setText(info.get("rigVersion", ""))
         self._desc.setPlainText(info.get("notes", ""))
@@ -536,6 +618,49 @@ class PublishPanel(QtWidgets.QWidget):
         index = combo.findText(value, QtCore.Qt.MatchFixedString) if value else -1
         combo.setCurrentIndex(index)
 
+    def _precheck_clean_scene(self) -> bool:
+        """Scan the scene for anything besides the garment geo before the cloth rig is built.
+
+        Riggers commonly import the body rig to fit the garment to height, then delete
+        it - leaving namespaces, unknown nodes, empty groups and orphaned joints behind.
+        Building the cloth rig on top of that junk bakes it into the asset. This checks
+        first: a clean scene proceeds silently; a dirty one is logged and the rigger is
+        prompted to clean up (recommended) or rig anyway. Returns True to proceed.
+        """
+        from ..core import maya_publish
+        issues = maya_publish.precheck_scene()
+        findings = [i for i in issues if i.level != "ok"]
+        if not findings:
+            self._log("Scene check: only the garment geo is present.", "ok")
+            return True
+
+        self._log("Scene isn't clean yet - found items besides the garment geo:", "warn")
+        self._log_issues(findings)
+
+        box = QtWidgets.QMessageBox(self)
+        box.setIcon(QtWidgets.QMessageBox.Warning)
+        box.setWindowTitle("Clean the scene first")
+        box.setText("The scene contains items besides the garment geometry:\n\n"
+                    + "\n".join(f"  •  {i.message}" for i in findings))
+        box.setInformativeText(
+            "Before building the cloth rig, the scene should hold only the asset geo. "
+            "Either delete every node except the garment mesh, or export the garment mesh "
+            "to a new empty scene and restart Step 1 there.\n\n"
+            "Tip: to fit the garment to the body, reference the rig in (File > Reference) "
+            "and remove the reference when done - importing and then deleting the rig is "
+            "what leaves the artifacts listed above.")
+        clean_btn = box.addButton("Cancel and clean up", QtWidgets.QMessageBox.RejectRole)
+        rig_btn = box.addButton("Rig anyway", QtWidgets.QMessageBox.AcceptRole)
+        box.setDefaultButton(clean_btn)
+        box.exec()
+        if box.clickedButton() is rig_btn:
+            self._log("Rigging anyway despite scene warnings.", "warn")
+            return True
+        self._report(
+            "Create cloth skeleton cancelled - clean the scene and try Step 1 again.",
+            "warn")
+        return False
+
     def _create_skeleton(self) -> None:
         """Rebuild the cloth_* skeleton and, in the same click, select the skin joints.
 
@@ -547,6 +672,8 @@ class PublishPanel(QtWidgets.QWidget):
             return
         asset_type = self._require_type()
         if asset_type is None:
+            return
+        if not self._precheck_clean_scene():
             return
         from ..core import maya_skeleton
         self._log(f"Create cloth skeleton ({asset_type})…", "step")
@@ -570,17 +697,78 @@ class PublishPanel(QtWidgets.QWidget):
             "Next: bind the mesh to the selected (green) joints - Skin > Bind Skin.",
             "info")
 
+    def _register_rig(self) -> None:
+        """Register the rig in the current scene, then select it."""
+        if not self._require_maya():
+            return
+        from .rig_dialog import RegisterRigDialog
+
+        self._log("Register rig: reading the scene…", "step")
+        try:
+            dialog = RegisterRigDialog(self)
+        except Exception as exc:  # noqa: BLE001 - surface a scene-read failure
+            self._report(f"Register rig failed: {exc}", "error")
+            QtWidgets.QMessageBox.critical(self, "Register rig failed", str(exc))
+            return
+        if dialog.exec() != QtWidgets.QDialog.Accepted:
+            self._log("Register rig cancelled.", "info")
+            return
+
+        result = dialog.registered
+        self._rig.reload(select=result.profile.rig_id)
+        self._apply_rig_to_form()
+        self._report(result.summary(), "ok")
+        for path in result.profile_paths:
+            self._log(f"profile → {path}", "info")
+        for path in result.rig_file_paths:
+            self._log(f"rig file → {path}", "info")
+        for warning in result.warnings:
+            self._log(warning, "warn")
+
     def _load_test_body(self) -> None:
         if not self._require_maya():
             return
         gender = self._require_gender()
         if gender is None:
             return
+        profile = self._profile()
+        if profile is None:
+            self._report("No rig is registered - register one first.", "warn")
+            return
+
+        # The body may still be sitting on the shared library (rig files aren't synced).
+        # Fetching 30 MB on the UI thread would freeze Maya, so it runs on a worker and
+        # the load continues in the callback.
+        loc = _settings.read_locations()
+        local = loc.local or _settings.effective_library_roots()[0]
+        variant = self._chosen_variant() if profile.variants.mode == _rigs.VARIANT_FILES else ""
+        status = _rigs.rig_file_status(profile, local, loc.remote, variant)
+        if status == _rigs.STATUS_REMOTE_ONLY:
+            self._log(f"Fetching the {profile.label} body from the shared library…", "step")
+
+            def fetched(path, error: str) -> None:
+                self._rig.refresh_status()
+                if error:
+                    self._report(f"Load test body failed: {error}", "error")
+                    QtWidgets.QMessageBox.critical(self, "Fetch rig failed", error)
+                    return
+                if path is None:
+                    self._report("Fetch cancelled - test body not loaded.", "warn")
+                    return
+                self._do_load_test_body(gender, profile)
+
+            fetch_rig_file(self, profile, variant, fetched)
+            return
+
+        self._do_load_test_body(gender, profile)
+
+    def _do_load_test_body(self, gender: str, profile) -> None:
+        """Reference and connect the body (its file is already local by this point)."""
         from ..core import maya_testfit
         self._log(f"Load test body ({gender})…", "step")
         try:
             with _wait_cursor():
-                result = maya_testfit.load_test_body(gender)
+                result = maya_testfit.load_test_body(gender, profile=profile)
         except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Load test body failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Load test body failed", str(exc))
@@ -599,7 +787,7 @@ class PublishPanel(QtWidgets.QWidget):
         self._log("Remove test body…", "step")
         try:
             with _wait_cursor():
-                result = maya_testfit.remove_test_body()
+                result = maya_testfit.remove_test_body(self._profile())
         except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             self._report(f"Remove test body failed: {exc}", "error")
             QtWidgets.QMessageBox.critical(self, "Remove test body failed", str(exc))
@@ -609,12 +797,17 @@ class PublishPanel(QtWidgets.QWidget):
     def _regen_skeleton(self) -> None:
         if not self._require_maya():
             return
-        from ..core import skeleton as _skeleton
+        profile = self._profile()
+        if profile is None:
+            self._report(
+                "No rig is registered - use 'Register rig' before re-capturing a "
+                "skeleton.", "warn")
+            return
         ok = QtWidgets.QMessageBox.question(
             self, "Regenerate skeleton data?",
-            "This captures the cloth_* skeleton from the GenHuman rig in the current "
-            "scene and OVERWRITES the canonical skeleton data:\n\n"
-            f"{_skeleton.skeleton_file()}\n\n"
+            f"This captures the cloth_* skeleton from the {profile.label} rig in the "
+            "current scene and OVERWRITES that rig's registered skeleton:\n\n"
+            f"{profile.source}\n\n"
             "Every future 'Create cloth skeleton' will rebuild this captured pose. "
             "Make sure the rig is the intended build and posed correctly. Continue?")
         if ok != QtWidgets.QMessageBox.Yes:
@@ -745,6 +938,12 @@ class PublishPanel(QtWidgets.QWidget):
         gender = self._require_gender()
         if gender is None:
             return None
+        profile = self._profile()
+        if profile is None:
+            self._report(
+                "No rig is registered - register the rig this garment was built for "
+                "before publishing.", "error")
+            return None
         compat = tuple(
             t.strip() for t in self._compat.text().replace(";", ",").split(",")
             if t.strip())
@@ -753,7 +952,8 @@ class PublishPanel(QtWidgets.QWidget):
             asset_type=asset_type,
             gender=gender,
             cloth_version=self._version.text().strip() or "1.0.0",
-            genhuman_compat=compat,
+            rig_id=profile.rig_id,
+            rig_versions=compat,
             author=self._author.text().strip(),
             description=self._desc.toPlainText().strip(),
             rig_version=self._rigver.text().strip(),
@@ -781,6 +981,9 @@ class PublishPanel(QtWidgets.QWidget):
         spec = self._gather_spec()
         if spec is None:
             return
+        self._log(
+            f"Publishing for rig '{spec.rig_id}', versions "
+            + (", ".join(spec.rig_versions) or "(none set)"), "info")
 
         meta, errors = spec.metadata()
         if meta is None:

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .. import config
 from . import ma_parse
+from . import rigs
 from .asset import AssetMetadata, ClothingAsset
 
 
@@ -38,6 +39,10 @@ class LibraryScanResult:
 
     def by_gender(self, gender: str) -> list[ClothingAsset]:
         return [a for a in self.valid if a.gender == gender]
+
+    def for_rig(self, rig_id: str, version: str = "") -> list[ClothingAsset]:
+        """Assets that can be attached to a rig - what the browser shows when it's selected."""
+        return [a for a in self.valid if a.fits_rig(rig_id, version)]
 
 
 def _find_thumbnail(ma_path: Path) -> Path | None:
@@ -99,7 +104,12 @@ def load_asset(ma_path: Path) -> ClothingAsset:
 
 
 def scan_library(roots: list[Path] | None = None) -> LibraryScanResult:
-    """Walk ``roots`` recursively for ``*.ma`` assets and resolve each one."""
+    """Walk ``roots`` recursively for ``*.ma`` assets and resolve each one.
+
+    The ``_rigs`` folder is skipped: it holds registered rig profiles and the rig ``.ma``
+    files themselves, and a body rig is emphatically not a garment - scanning it would
+    fill the browser with 30 MB "invalid asset" entries.
+    """
     if roots is None:
         roots = config.default_library_roots()
 
@@ -112,6 +122,8 @@ def scan_library(roots: list[Path] | None = None) -> LibraryScanResult:
             continue
         result.scanned_roots.append(root)
         for ma_path in sorted(root.rglob(f"*{config.ASSET_EXT}")):
+            if rigs.RIGS_DIRNAME in ma_path.relative_to(root).parts:
+                continue  # a registered rig, not a clothing asset
             resolved = ma_path.resolve()
             if resolved in seen:
                 continue  # same asset reachable from two roots

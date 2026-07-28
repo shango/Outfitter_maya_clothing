@@ -182,3 +182,86 @@ def test_namespace_conflict_errors():
     scene.namespaces.add("coat")
     report = V.validate_scene_preconditions(scene, "coat", _meta("v03"))
     assert "ns_exists" in _codes(report)
+
+
+# --- rig identity (multi-rig safety) -----------------------------------------
+def _rig_profile(rig_id="acme_biped", version="v01", export_group="GenHuman_Joint_GRP"):
+    """A minimal registered rig, reusing the fake scene's export-group name so the
+    rig-present gate passes and the rig-identity gate is what's under test."""
+    from outfitter.core import rigs
+    from outfitter.core import skeleton as sk
+
+    return rigs.RigProfile(
+        rig_id=rig_id, display_name=rig_id.title(), version=version,
+        export_group=export_group, markers=(export_group,),
+        skeleton=sk.SkeletonSpec(
+            root_group="Rig_GRP", root_group_rotate=(-90.0, 0.0, 0.0),
+            root_joint="cloth_root",
+            joints=(sk.JointSpec(name="cloth_root", parent="Rig_GRP"),)))
+
+
+def _rig_meta(rig_id="genhuman", versions="v03"):
+    m, _ = AssetMetadata.from_mapping({
+        "assetName": "x", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigId": rig_id, "rigVersions": versions,
+    })
+    return m
+
+
+def test_asset_for_another_rig_is_rejected():
+    """The gate that makes a multi-rig library safe: a GenHuman garment must not attach
+    to an Acme rig even though both scenes look structurally identical to the tool."""
+    scene = FakeScene()
+    scene.build_genhuman(["root"])
+    scene.version = "v01"
+    report = V.validate_scene_preconditions(
+        scene, "coat", _rig_meta("genhuman", "v01"), profile=_rig_profile("acme_biped"))
+    assert "rig_mismatch" in _codes(report)
+    assert not report.ok
+
+
+def test_matching_rig_passes_the_identity_gate():
+    scene = FakeScene()
+    scene.build_genhuman(["root"])
+    scene.version = "v01"
+    report = V.validate_scene_preconditions(
+        scene, "coat", _rig_meta("acme_biped", "v01"), profile=_rig_profile("acme_biped"))
+    assert "rig_mismatch" not in _codes(report)
+    assert report.ok, [str(i) for i in report.errors]
+
+
+def test_rig_mismatch_message_names_both_rigs():
+    """The artist needs to know which rig the asset wants, not just that it failed."""
+    scene = FakeScene()
+    scene.build_genhuman(["root"])
+    scene.version = "v01"
+    report = V.validate_scene_preconditions(
+        scene, "coat", _rig_meta("genhuman", "v01"), profile=_rig_profile("acme_biped"))
+    issue = next(i for i in report.issues if i.code == "rig_mismatch")
+    assert "genhuman" in issue.message and "acme_biped" in issue.message
+    assert "Retarget" in issue.fix
+
+
+def test_missing_rig_message_names_the_selected_rig():
+    report = V.validate_scene_preconditions(
+        FakeScene(), "coat", _rig_meta(), profile=_rig_profile("acme_biped"))
+    issue = next(i for i in report.issues if i.code == "no_rig")
+    assert "Acme_Biped" in issue.message
+
+
+def test_version_gate_still_applies_within_the_same_rig():
+    scene = FakeScene()
+    scene.build_genhuman(["root"])
+    scene.version = "v02"
+    report = V.validate_scene_preconditions(
+        scene, "coat", _rig_meta("acme_biped", "v01"), profile=_rig_profile("acme_biped"))
+    assert "version_incompat" in _codes(report)
+
+
+def test_no_profile_keeps_the_original_single_rig_behaviour():
+    """Called without a profile (the pre-rig-agnostic path), validation behaves as before."""
+    scene = FakeScene()
+    scene.build_genhuman(["root"])
+    scene.version = "v03"
+    report = V.validate_scene_preconditions(scene, "coat", _meta("v03"))
+    assert report.ok, [str(i) for i in report.errors]

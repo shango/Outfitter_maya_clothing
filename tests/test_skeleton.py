@@ -1,9 +1,10 @@
-"""Headless tests for the persisted canonical cloth_* skeleton (core.skeleton).
+"""Headless tests for a rig's cloth_* skeleton model (core.skeleton).
 
-The Maya-side rebuild (core.maya_skeleton) is a smoke check, but the data it replays —
-the one-and-only GenHuman cloth_* skeleton — is fully verifiable here: it loads, it is
-structurally valid (parents resolve in build order, names prefixed), it carries the
-real export joints, and it excludes garment-specific helper joints.
+The Maya-side rebuild (core.maya_skeleton) is a smoke check, but the data it replays is
+fully verifiable here. The subject is the skeleton carried by the bundled GenHuman rig
+profile: it loads, it is structurally valid (parents resolve in build order, names
+prefixed), it carries the real export joints, and it excludes garment-specific helper
+joints. Profile file I/O itself is covered in test_rigs.py.
 """
 import os
 import sys
@@ -13,16 +14,15 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from outfitter import config
+from outfitter.core import rigs
 from outfitter.core import skeleton as sk
 
 
 @pytest.fixture(scope="module")
 def spec():
-    return sk.load_cloth_skeleton()
-
-
-def test_data_file_ships_in_the_package():
-    assert sk.skeleton_file().is_file(), sk.skeleton_file()
+    # roots=[] pins the lookup to the bundled profile, so a developer's own library
+    # can't change what this suite is testing.
+    return rigs.load_profile("genhuman", roots=[]).skeleton
 
 
 def test_loads_the_full_body_skeleton(spec):
@@ -89,55 +89,29 @@ def test_scale_defaults_to_unit_when_absent(spec):
         assert all(abs(s) > 1e-6 for s in j.scale), j.name
 
 
-def test_load_is_cached(spec):
-    assert sk.load_cloth_skeleton() is spec
-
-
 # --- serializer (regen) round-trip -------------------------------------------
-def test_to_json_dict_round_trips_through_load(tmp_path, spec):
-    dest = tmp_path / "regen.json"
-    written = sk.write_skeleton(spec, dest)
-    assert written == dest and dest.is_file()
-
-    # load the freshly-written file by pointing the loader's source at it
-    import json
-    data = json.loads(dest.read_text())
+def test_to_json_dict_round_trips(spec):
+    # A captured skeleton must survive the write/read cycle byte-for-byte in meaning,
+    # or a 'Regenerate skeleton data' click would silently alter the rest pose.
+    data = sk.to_json_dict(spec)
     assert data["root_joint"] == spec.root_joint
     assert data["root_group_rotate"] == list(spec.root_group_rotate)
     assert len(data["joints"]) == len(spec.joints)
-
-    # rebuild a spec from the written dict and compare field-for-field
-    reloaded = sk.SkeletonSpec(
-        root_group=data["root_group"],
-        root_group_rotate=tuple(data["root_group_rotate"]),
-        root_joint=data["root_joint"],
-        joints=tuple(
-            sk.JointSpec(
-                name=j["name"], parent=j["parent"],
-                translate=tuple(j["t"]), rotate=tuple(j["r"]),
-                joint_orient=tuple(j["jo"]), scale=tuple(j["s"]),
-                radius=j["radi"], segment_scale_compensate=j["ssc"],
-                rotate_order=j["ro"])
-            for j in data["joints"]),
-    )
-    assert reloaded == spec
+    assert sk.from_json_dict(data) == spec
 
 
-def test_write_skeleton_refuses_invalid_data(tmp_path):
-    bad = sk.SkeletonSpec(
-        root_group="Rig_GRP", root_group_rotate=(-90.0, 0.0, 0.0),
-        root_joint="cloth_root",
-        joints=(sk.JointSpec(name="cloth_x", parent="cloth_missing"),))
-    with pytest.raises(ValueError):
-        sk.write_skeleton(bad, tmp_path / "bad.json")
-    assert not (tmp_path / "bad.json").exists()
-
-
-def test_write_skeleton_clears_the_load_cache(tmp_path, spec):
-    # writing should invalidate the cache so a later load re-reads the shipped file
-    sk.load_cloth_skeleton()  # prime
-    sk.write_skeleton(spec, tmp_path / "x.json")
-    assert sk.load_cloth_skeleton() == spec  # re-reads shipped file, still valid
+def test_from_json_dict_fills_omitted_defaults():
+    # A hand-written or older skeleton may omit zero translate/rotate and unit scale.
+    spec = sk.from_json_dict({
+        "root_group": "Rig_GRP",
+        "root_joint": "cloth_root",
+        "joints": [{"name": "cloth_root", "parent": "Rig_GRP"}],
+    })
+    joint = spec.joints[0]
+    assert joint.translate == (0.0, 0.0, 0.0)
+    assert joint.rotate == (0.0, 0.0, 0.0)
+    assert joint.scale == (1.0, 1.0, 1.0)
+    assert joint.rotate_order == 0
 
 
 # --- prune planning (Delete unused joints) -----------------------------------

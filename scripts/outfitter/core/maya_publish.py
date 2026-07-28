@@ -82,45 +82,68 @@ def poly_counts(meshes: list[str]) -> tuple[int, int]:
     return tris, verts
 
 
-def scene_has_rig() -> bool:
-    """True if a GenHuman rig is still in the scene.
+def _active_profile():
+    """The rig the user is working with, or ``None`` when nothing is registered."""
+    from . import rigs as _rigs
+
+    return _rigs.resolve_profile()
+
+
+def _markers(profile) -> tuple[str, ...]:
+    return profile.markers if profile is not None else config.RIG_MARKERS
+
+
+def scene_has_rig(markers: tuple[str, ...] | None = None) -> bool:
+    """True if a body rig is still in the scene.
 
     The published asset must contain only the garment (no rig / namespaces / refs),
     but the rigger authors *with* the rig in scene (to duplicate its skeleton and fit
     the mesh). Publish uses this to warn them to delete the rig first rather than
-    silently writing a bloated, validation-failing ``.ma``. Matches any node carrying
-    the GenHuman name or a leftover GenHuman namespace.
+    silently writing a bloated, validation-failing ``.ma``.
+
+    ``markers`` are the rig's identifying node names - the active rig profile's by
+    default. Matching is deliberately loose: any node whose name *contains* a marker, in
+    any namespace (``ls -recursive`` searches them all, per the Maya command reference),
+    or a leftover namespace token - a hand-deleted import usually leaves one behind. A
+    false positive here costs a warning; a false negative ships a rig inside an asset.
     """
     cmds = _cmds()
-    if any("GenHuman" in n.rsplit("|", 1)[-1] for n in (cmds.ls(long=True) or [])):
-        return True
-    return any(
-        "GenHuman" in ns
-        for ns in (cmds.namespaceInfo(":", listOnlyNamespaces=True, recurse=True) or [])
-    )
+    markers = _markers(_active_profile()) if markers is None else markers
+    for marker in markers:
+        if cmds.ls(f"*{marker}*", recursive=True):
+            return True
+    namespaces = cmds.namespaceInfo(":", listOnlyNamespaces=True, recurse=True) or []
+    return any(marker in ns for ns in namespaces for marker in markers)
 
 
-def detect_rig_version() -> str:
+def detect_rig_version(profile=None) -> str:
     """Best-effort exact rig version (e.g. ``v03``) from the scene; ``""`` if unknown.
 
     Prefilled into the Publish form for the rigger to confirm/override - never an
-    authority. Looks at GenHuman namespaces first (imports name them, e.g.
-    ``GenHuman_rig_v03``), then the export group's own namespace token.
+    authority. Looks for a version token in a rig namespace first (a referenced or
+    imported rig names one after its file, e.g. ``GenHuman_rig_v03``), then in the export
+    group's own namespace token, and finally falls back to the version the rig was
+    registered at - which is the right default when the rig in the scene carries no
+    version in its names at all.
     """
     cmds = _cmds()
+    if profile is None:
+        profile = _active_profile()
+    markers = _markers(profile)
+
     for ns in (cmds.namespaceInfo(":", listOnlyNamespaces=True, recurse=True) or []):
-        if "GenHuman" in ns:
+        if any(marker in ns for marker in markers):
             m = re.search(r"v\d+", ns)
             if m:
                 return m.group(0)
-    marker = config.EXPORT_SKELETON_GROUP
+    group = profile.export_group if profile is not None else config.EXPORT_SKELETON_GROUP
     for t in (cmds.ls(type="transform", long=True) or []):
         short = t.rsplit("|", 1)[-1]
-        if short.rsplit(":", 1)[-1] == marker and ":" in short:
+        if short.rsplit(":", 1)[-1] == group and ":" in short:
             m = re.search(r"v\d+", short.split(":", 1)[0])
             if m:
                 return m.group(0)
-    return ""
+    return profile.version if profile is not None else ""
 
 
 # --------------------------------------------------------------------------- #
@@ -218,6 +241,60 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
 def preflight_scene(mesh_group: str = "Mesh_GRP") -> list:
     """Run the pre-publish sanity check on the open scene. List of ``PreflightIssue``."""
     return _publish.assemble_preflight(gather_scene_facts(mesh_group))
+
+
+# --------------------------------------------------------------------------- #
+# Step-1 "clean room" pre-check (gather live facts; pure decision in core.publish)
+# --------------------------------------------------------------------------- #
+# Top-level DAG transforms Maya always creates; never flagged as leftover junk.
+_DEFAULT_CAMERAS: tuple[str, ...] = ("persp", "top", "front", "side")
+
+
+def _extra_root_nodes(cmds) -> tuple[str, ...]:
+    """Short names of world-level nodes that are neither the garment geo nor asset scaffold.
+
+    Before the cloth rig is built the scene should hold only the garment. This lists the
+    top-level DAG transforms (``ls(assemblies=True)``) that aren't a default camera, one of
+    the asset's own ``*_GRP`` groups, a ``cloth_*`` node, or a transform holding renderable
+    garment mesh - i.e. the loose groups, orphaned joints, locators and constraints a
+    deleted rig import tends to leave parked at the scene root.
+    """
+    extra: list[str] = []
+    for node in (cmds.ls(assemblies=True, long=True) or []):
+        short = _short(node)
+        if (short in _DEFAULT_CAMERAS or short in config.REQUIRED_GROUPS
+                or short.startswith(config.CLOTH_PREFIX)):
+            continue
+        shapes = cmds.listRelatives(
+            node, allDescendents=True, type="mesh", fullPath=True) or []
+        if any(not cmds.getAttr(f"{s}.intermediateObject") for s in shapes):
+            continue  # holds garment mesh - it's the asset, not junk
+        extra.append(short)
+    return tuple(sorted(set(extra)))
+
+
+def gather_precheck_facts() -> "_publish.ScenePrecheckFacts":
+    """Collect the facts the Step-1 clean-room pre-check needs from the open scene."""
+    cmds = _cmds()
+    namespaces = [
+        ns for ns in (cmds.namespaceInfo(
+            ":", listOnlyNamespaces=True, recurse=True) or [])
+        if ns not in ("UI", "shared")
+    ]
+    unknown, anim_curves, display_layers, _ = _cleanliness_facts(cmds)
+    return _publish.ScenePrecheckFacts(
+        has_rig=scene_has_rig(),
+        namespaces=tuple(namespaces),
+        extra_root_nodes=_extra_root_nodes(cmds),
+        unknown_nodes=unknown,
+        anim_curves=anim_curves,
+        display_layers=display_layers,
+    )
+
+
+def precheck_scene() -> list:
+    """Run the Step-1 clean-room pre-check on the open scene. List of ``PreflightIssue``."""
+    return _publish.assemble_scene_precheck(gather_precheck_facts())
 
 
 # --------------------------------------------------------------------------- #

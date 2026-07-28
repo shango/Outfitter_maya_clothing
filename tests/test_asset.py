@@ -16,7 +16,7 @@ def test_from_spec_attr_names():
     assert meta is not None
     assert meta.asset_name == "trench_coat_A"
     assert meta.genhuman_compat == ("v03", "v04")
-    assert meta.supports("v04") and not meta.supports("v05")
+    assert meta.supports("genhuman", "v04") and not meta.supports("genhuman", "v05")
 
 
 def test_from_snake_case_names():
@@ -65,6 +65,17 @@ def test_bad_gender_rejected():
     assert any("unisex" in e for e in errors)
 
 
+def test_single_body_rig_publishes_gender_none():
+    # A registered rig may have one body and no variants at all; its assets say so
+    # explicitly rather than leaving gender blank (which reads as "forgot to set it").
+    meta, errors = AssetMetadata.from_mapping({
+        "assetName": "x", "assetType": "coat", "gender": "none",
+        "clothVersion": "1.0.0", "rigId": "acme_biped", "rigVersions": "v01",
+    })
+    assert errors == [] and meta is not None
+    assert meta.gender == "none"
+
+
 def test_gender_normalized_case_insensitive():
     meta, errors = AssetMetadata.from_mapping({
         "assetName": "x", "assetType": "coat", "gender": "Female",
@@ -110,3 +121,86 @@ def test_garbage_polycount_ignored_not_fatal():
     })
     assert errors == [] and meta is not None
     assert meta.tri_count is None and meta.vert_count is None
+
+
+# --- rig identity (rig-agnostic metadata) ------------------------------------
+def test_legacy_sidecar_with_no_rig_id_reads_as_genhuman():
+    """Back-compat contract: every asset published before the tool went rig-agnostic is,
+    by definition, a GenHuman asset. Its genHumanCompat list becomes rigVersions, so an
+    existing library keeps working with no file rewritten."""
+    meta, errors = AssetMetadata.from_mapping({
+        "assetName": "old_coat", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "genHumanCompat": "v03, v04",
+    })
+    assert errors == [] and meta is not None
+    assert meta.rig_id == "genhuman"
+    assert meta.rig_versions == ("v03", "v04")
+    assert meta.supports("genhuman", "v03")
+
+
+def test_explicit_rig_id_and_versions():
+    meta, errors = AssetMetadata.from_mapping({
+        "assetName": "acme_coat", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigId": "acme_biped", "rigVersions": "v01, v02",
+    })
+    assert errors == [] and meta is not None
+    assert meta.rig_id == "acme_biped"
+    assert meta.rig_versions == ("v01", "v02")
+
+
+def test_rig_versions_wins_over_legacy_genhuman_compat():
+    """A re-published GenHuman asset carries both keys; rigVersions is authoritative."""
+    meta, _ = AssetMetadata.from_mapping({
+        "assetName": "x", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigVersions": "v05", "genHumanCompat": "v03",
+    })
+    assert meta is not None and meta.rig_versions == ("v05",)
+
+
+def test_rig_versions_accepts_a_json_array():
+    meta, _ = AssetMetadata.from_mapping({
+        "assetName": "x", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigId": "acme_biped", "rigVersions": ["v01", "v02"],
+    })
+    assert meta is not None and meta.rig_versions == ("v01", "v02")
+
+
+def test_missing_version_list_is_still_an_error():
+    meta, errors = AssetMetadata.from_mapping({
+        "assetName": "x", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigId": "acme_biped",
+    })
+    assert meta is None
+    assert any("rigVersions" in e for e in errors)
+
+
+def test_supports_gates_on_the_rig_not_only_the_version():
+    """The failure this prevents: two rigs that happen to share a version string. A
+    GenHuman v01 garment must never read as compatible with Acme v01 - different
+    skeleton, so the cloth_ joints would not match anything."""
+    meta, _ = AssetMetadata.from_mapping({
+        "assetName": "x", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigId": "genhuman", "rigVersions": "v01",
+    })
+    assert meta is not None
+    assert meta.supports("genhuman", "v01")
+    assert not meta.supports("acme_biped", "v01")
+
+
+def test_supports_with_no_version_checks_the_rig_alone():
+    meta, _ = AssetMetadata.from_mapping({
+        "assetName": "x", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigId": "acme_biped", "rigVersions": "v01",
+    })
+    assert meta is not None
+    assert meta.supports("acme_biped")
+    assert not meta.supports("genhuman")
+
+
+def test_genhuman_compat_alias_still_reads():
+    """window.py and older callers read .genhuman_compat; it aliases rig_versions."""
+    meta, _ = AssetMetadata.from_mapping({
+        "assetName": "x", "assetType": "coat", "gender": "male",
+        "clothVersion": "1.0.0", "rigId": "acme_biped", "rigVersions": "v01",
+    })
+    assert meta is not None and meta.genhuman_compat == meta.rig_versions

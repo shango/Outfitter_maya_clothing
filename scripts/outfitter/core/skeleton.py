@@ -1,23 +1,20 @@
-"""Canonical GenHuman ``cloth_*`` skeleton - pure loader + model.
+"""A rig's ``cloth_*`` export skeleton - pure model + (de)serialization.
 
-There is exactly one GenHuman rig, therefore exactly one ``cloth_*`` export skeleton.
-Rather than make every rigger import the rig and duplicate / rename / prune it by hand,
-that skeleton is persisted once - ``data/cloth_skeleton.json``, extracted from the
-verified ``assets/trench_coat_A`` asset (body-derived export joints only; garment helper
-joints like ``cloth_coatTail_*`` excluded) - and rebuilt in-scene with one button by
-:mod:`core.maya_skeleton`. This module loads and validates that data with no Maya; the
-Maya boundary only replays it.
+Each registered rig has exactly one ``cloth_*`` export skeleton: the body joints a
+garment may bind to, captured once from that rig and replayed in-scene with one button
+by :mod:`core.maya_skeleton`. Rather than make every rigger import the rig and duplicate
+/ rename / prune it by hand, the skeleton is persisted inside the rig's profile (see
+:mod:`core.rigs`, which owns all profile file I/O). This module is the data model and
+the structural validator - no Maya, no filesystem.
 
-The joints carry their orientation in ``rotate`` (the rig has no ``jointOrient``); the
-``Rig_GRP`` frame carries the ``-90 X`` so the joints stand upright on the body and
-attach can reproduce the body pose from LOCAL transforms alone.
+The joints carry their orientation in ``rotate`` (GenHuman has no ``jointOrient``); the
+``Rig_GRP`` frame carries the export group's own rotation (``-90 X`` on GenHuman) so the
+joints stand upright on the body and attach can reproduce the body pose from LOCAL
+transforms alone.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from functools import lru_cache
-from pathlib import Path
 
 from .. import config
 
@@ -53,21 +50,20 @@ class SkeletonSpec:
         return tuple(j.name for j in self.joints)
 
 
-def skeleton_file() -> Path:
-    """Path to the persisted skeleton data (ships inside the package)."""
-    return config.package_dir() / "data" / "cloth_skeleton.json"
-
-
 def _v3(val, default: _Vec3) -> _Vec3:
     if not val:
         return default
     return (float(val[0]), float(val[1]), float(val[2]))
 
 
-@lru_cache(maxsize=1)
-def load_cloth_skeleton() -> SkeletonSpec:
-    """Load + cache the canonical skeleton from :func:`skeleton_file`."""
-    data = json.loads(skeleton_file().read_text())
+def from_json_dict(data: dict) -> SkeletonSpec:
+    """Build a :class:`SkeletonSpec` from the on-disk JSON shape (inverse of
+    :func:`to_json_dict`).
+
+    Tolerant of omitted defaults: a joint at the origin may leave out ``t``/``r``/``jo``,
+    an unscaled one may leave out ``s``. The rig-profile loader in :mod:`core.rigs` calls
+    this; nothing here touches the filesystem.
+    """
     joints = tuple(
         JointSpec(
             name=j["name"],
@@ -90,19 +86,12 @@ def load_cloth_skeleton() -> SkeletonSpec:
     )
 
 
-_REGEN_COMMENT = (
-    "Canonical GenHuman cloth_* skeleton. Regenerated from the rig in-scene via the "
-    "Publish tab ('Regenerate skeleton data'); see core.maya_skeleton. Body-derived "
-    "export joints, each at its captured LOCAL transform; rebuilt by "
-    "core.maya_skeleton.build_cloth_skeleton. Prefer regenerating over hand-editing."
-)
-
-
 def to_json_dict(spec: SkeletonSpec) -> dict:
-    """Serialize a :class:`SkeletonSpec` to the on-disk JSON shape (inverse of load).
+    """Serialize a :class:`SkeletonSpec` to the on-disk JSON shape (inverse of
+    :func:`from_json_dict`).
 
     Every joint carries its full transform explicitly (no zero-omission) so a captured
-    skeleton round-trips deterministically through :func:`load_cloth_skeleton`.
+    skeleton round-trips deterministically.
     """
     joints = [
         {
@@ -119,7 +108,6 @@ def to_json_dict(spec: SkeletonSpec) -> dict:
         for j in spec.joints
     ]
     return {
-        "_comment": _REGEN_COMMENT,
         "root_group": spec.root_group,
         "root_group_rotate": list(spec.root_group_rotate),
         "root_joint": spec.root_joint,

@@ -1,6 +1,6 @@
 """Genie export-readiness audit (FR-7 / M4).
 
-Attach binds a garment to the GenHuman rig through ``connectAttr`` only: it
+Attach binds a garment to the body rig through ``connectAttr`` only: it
 creates no DG nodes and never makes a rig attribute a *destination*. That is what
 keeps a dressed scene exportable to Genie (.ma / USD / FBX / Alembic) with the
 required node names preserved and the dependency graph lightweight.
@@ -66,7 +66,12 @@ def audit_export_readiness(
     required_nodes: tuple[str, ...] = config.GENIE_REQUIRED_NODES,
     export_group: str = config.EXPORT_SKELETON_GROUP,
 ) -> ExportAudit:
-    """Verify a dressed scene is still safe to export to Genie."""
+    """Verify a dressed scene is still safe to export to Genie.
+
+    ``export_group`` is the dressed rig's export-skeleton group: pass
+    ``profile.export_group`` for the rig actually in the scene. The default is the seed
+    GenHuman name, which is only right for a scene dressed with that rig.
+    """
     report = ValidationReport()
 
     # 1) required Genie node names preserved
@@ -91,7 +96,7 @@ def audit_export_readiness(
         report.error("export_skeleton_missing",
                      f"no joints resolve under export group '{export_group}'",
                      node=export_group,
-                     fix="verify EXPORT_SKELETON_GROUP path")
+                     fix="verify the rig's export-skeleton group path")
 
     # 3) + 4) connection invariants per instance
     namespaces = set(registry.namespaces())

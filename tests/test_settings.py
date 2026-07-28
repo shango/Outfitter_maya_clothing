@@ -123,3 +123,64 @@ def test_path_file_env_override(tmp_path, monkeypatch):
     st.set_local(tmp_path / "work", None)
     assert pf.exists()
     assert st.effective_library_roots() == [tmp_path / "work"]
+
+
+# --- remembered rig -----------------------------------------------------------
+def test_rig_round_trips(tmp_path):
+    pf = tmp_path / "path.txt"
+    st.set_rig("acme_biped", pf)
+    assert st.read_locations(pf).rig == "acme_biped"
+    assert st.active_rig_id(pf) == "acme_biped"
+
+
+def test_active_rig_defaults_to_genhuman_when_never_chosen(tmp_path):
+    """An existing install has no rig line; it must keep behaving as a GenHuman install."""
+    pf = tmp_path / "path.txt"
+    st.write_locations(tmp_path / "work", None, pf)
+    assert st.read_locations(pf).rig is None
+    assert st.active_rig_id(pf) == "genhuman"
+
+
+def test_active_rig_defaults_when_there_is_no_file_at_all(tmp_path):
+    assert st.active_rig_id(tmp_path / "nope.txt") == "genhuman"
+
+
+def test_setting_folders_preserves_the_chosen_rig(tmp_path):
+    """The Setup tab writes folders and the Publish tab writes the rig into the same
+    file - neither may silently drop the other's setting."""
+    pf = tmp_path / "path.txt"
+    st.set_rig("acme_biped", pf)
+    st.set_local(tmp_path / "work", pf)
+    st.set_remote(tmp_path / "server", pf)
+
+    loc = st.read_locations(pf)
+    assert loc.rig == "acme_biped"
+    assert loc.local == tmp_path / "work"
+    assert loc.remote == tmp_path / "server"
+
+
+def test_setting_the_rig_preserves_the_folders(tmp_path):
+    pf = tmp_path / "path.txt"
+    st.write_locations(tmp_path / "work", tmp_path / "server", pf)
+    st.set_rig("acme_biped", pf)
+
+    loc = st.read_locations(pf)
+    assert loc.local == tmp_path / "work"
+    assert loc.remote == tmp_path / "server"
+    assert loc.rig == "acme_biped"
+
+
+def test_clearing_the_rig_falls_back_to_the_default(tmp_path):
+    pf = tmp_path / "path.txt"
+    st.set_rig("acme_biped", pf)
+    st.set_rig(None, pf)
+    assert st.read_locations(pf).rig is None
+    assert st.active_rig_id(pf) == "genhuman"
+
+
+def test_legacy_bare_line_file_still_parses_with_no_rig(tmp_path):
+    pf = tmp_path / "path.txt"
+    pf.write_text(f"{tmp_path / 'work'}\n")
+    loc = st.read_locations(pf)
+    assert loc.local == tmp_path / "work"
+    assert loc.rig is None

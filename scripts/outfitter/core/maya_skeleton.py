@@ -12,10 +12,11 @@ boundary.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .. import config
 from . import maya_publish
+from . import rigs as _rigs
 from . import skeleton as _skeleton
 from . import skin_sets as _skin_sets
 
@@ -101,21 +102,34 @@ def _short(path: str) -> str:
     return path.rsplit("|", 1)[-1].rsplit(":", 1)[-1]
 
 
-def _find_export_root(cmds) -> tuple[str, str]:
-    """``(root joint, export group)`` full DAG paths for the GenHuman rig in scene.
+def _active_export_group() -> str:
+    """The export-group name of the rig the user is working with.
 
-    Mirrors ``examples/build_example_asset._find_export_root``: locate
-    ``EXPORT_SKELETON_GROUP`` by short name across any namespace, preferring the rig in
-    the current selection's namespace. Raises clearly if the rig is absent.
+    Falls back to the built-in default only when nothing is registered at all, so a fresh
+    install with no profiles still finds a GenHuman rather than failing on a lookup.
     """
-    marker = config.EXPORT_SKELETON_GROUP
+    profile = _rigs.resolve_profile()
+    return profile.export_group if profile is not None else config.EXPORT_SKELETON_GROUP
+
+
+def _find_export_root(cmds, marker: str | None = None) -> tuple[str, str]:
+    """``(root joint, export group)`` full DAG paths for the rig in scene.
+
+    Mirrors ``examples/build_example_asset._find_export_root``: locate the export-skeleton
+    group by short name across any namespace, preferring the rig in the current selection's
+    namespace. ``marker`` is that group's short name; with none given it comes from the
+    active rig profile, so this resolves whichever rig the user is working with. Raises
+    clearly if the rig is absent.
+    """
+    if marker is None:
+        marker = _active_export_group()
     groups = [
         t for t in (cmds.ls(type="transform", long=True) or [])
         if _short(t) == marker
     ]
     if not groups:
         raise RuntimeError(
-            f"GenHuman rig not found (no '{marker}' in the scene). Import the rig "
+            f"Rig not found (no '{marker}' in the scene). Import the rig "
             "first (File > Import, 'use namespaces' ON), pose it, then regenerate.")
     grp = groups[0]
     sel = cmds.ls(selection=True, long=True) or []
@@ -133,18 +147,18 @@ def _find_export_root(cmds) -> tuple[str, str]:
     return roots[0], grp
 
 
-def capture_cloth_skeleton_from_rig(dest=None) -> SkeletonCaptureResult:
-    """Capture the rig's export skeleton into a fresh ``cloth_skeleton.json``.
+def capture_skeleton_spec(cmds, root_joint: str, export_grp: str) -> _skeleton.SkeletonSpec:
+    """Read a rig's export skeleton out of the scene as a persistable ``SkeletonSpec``.
 
-    Walks ``EXPORT_SKELETON_GROUP``'s joint tree, recording each joint's LOCAL transform
-    under a ``cloth_<body name>`` identity (the root's parent becomes ``Rig_GRP``, whose
-    frame is the export group's own rotation - so a later rebuild reproduces this pose).
-    Helper joints never exist on the rig, so they're naturally excluded. Overwrites the
-    shipped data by default; pass ``dest`` to write elsewhere. Requires the rig in scene.
+    Walks ``root_joint``'s tree recording each joint's LOCAL transform under a
+    ``cloth_<body name>`` identity; the root's parent becomes ``Rig_GRP``, carrying the
+    export group's own rotation, so a later rebuild reproduces this pose. Helper joints
+    never exist on the rig, so they are naturally excluded.
+
+    Shared by the two capture paths: registering a new rig (:mod:`core.maya_rigs`) and
+    re-capturing the skeleton of an already-registered one
+    (:func:`capture_cloth_skeleton_from_rig`).
     """
-    cmds = _cmds()
-    root_joint, export_grp = _find_export_root(cmds)
-
     joints: list[_skeleton.JointSpec] = []
 
     def _vec(path: str, attr: str, default):
@@ -173,16 +187,58 @@ def capture_cloth_skeleton_from_rig(dest=None) -> SkeletonCaptureResult:
 
     walk(root_joint, config.RIG_GROUP)
 
-    spec = _skeleton.SkeletonSpec(
+    return _skeleton.SkeletonSpec(
         root_group=config.RIG_GROUP,
         root_group_rotate=_vec(export_grp, "rotate", (-90.0, 0.0, 0.0)),
         root_joint=f"{config.CLOTH_PREFIX}{_short(root_joint)}",
         joints=tuple(joints),
     )
-    path = _skeleton.write_skeleton(spec, dest)
+
+
+def capture_cloth_skeleton_from_rig(dest=None) -> SkeletonCaptureResult:
+    """Re-capture the rig's export skeleton into its registered rig profile.
+
+    Walks ``EXPORT_SKELETON_GROUP``'s joint tree, recording each joint's LOCAL transform
+    under a ``cloth_<body name>`` identity (the root's parent becomes ``Rig_GRP``, whose
+    frame is the export group's own rotation - so a later rebuild reproduces this pose).
+    Helper joints never exist on the rig, so they're naturally excluded. Requires the rig
+    in scene.
+
+    This is the *maintenance* path - re-capturing the skeleton of an already-registered
+    rig (e.g. after a new rig build). Registering a brand-new rig goes through
+    :mod:`core.maya_rigs`, which captures a whole profile rather than just the skeleton.
+    ``dest`` overrides the directory the updated profile is written to.
+    """
+    cmds = _cmds()
+    profile = _rigs.resolve_profile()
+    if profile is None:
+        raise RuntimeError(
+            "No rig is registered, so there is no profile to update. Use 'Register rig' "
+            "on the Publish tab to register this rig first.")
+
+    root_joint, export_grp = _find_export_root(cmds, profile.export_group)
+    spec = capture_skeleton_spec(cmds, root_joint, export_grp)
+    updated = replace(profile, skeleton=spec)
+    path = _rigs.write_profile(
+        updated, dest if dest is not None else _profile_dest(profile))
     return SkeletonCaptureResult(
         dest=str(path), joint_count=len(joints),
         root_group_rotate=spec.root_group_rotate)
+
+
+def _profile_dest(profile: _rigs.RigProfile):
+    """Where to write an updated profile back to - beside where it was loaded from.
+
+    A profile synced into the local library is updated in place; the bundled one is
+    copied out into the local library's ``_rigs`` instead, so an installer upgrade (which
+    overwrites the package) can't silently discard a re-captured skeleton.
+    """
+    from . import settings as _settings
+
+    if profile.source is not None and profile.source.parent != _rigs.bundled_rigs_dir():
+        return profile.source.parent
+    roots = _settings.effective_library_roots()
+    return _rigs.library_rigs_dir(roots[0])
 
 
 def build_cloth_skeleton(spec: _skeleton.SkeletonSpec | None = None) -> SkeletonBuildResult:
@@ -194,7 +250,13 @@ def build_cloth_skeleton(spec: _skeleton.SkeletonSpec | None = None) -> Skeleton
     skeleton. Raises if the persisted data is structurally invalid.
     """
     cmds = _cmds()
-    spec = spec or _skeleton.load_cloth_skeleton()
+    if spec is None:
+        profile = _rigs.resolve_profile()
+        if profile is None:
+            raise RuntimeError(
+                "No rig is registered. Use 'Register rig' on the Publish tab to register "
+                "the rig you're authoring for, then build the cloth skeleton.")
+        spec = profile.skeleton
 
     errors = _skeleton.validate_skeleton(spec)
     if errors:
@@ -258,7 +320,7 @@ def scaffold_asset_groups(
 
     Run straight after the skeleton build (which already makes Rig_GRP) so a single click
     leaves the three-group asset skeleton the publish preflight requires. Mesh grouping is
-    skipped when a GenHuman rig is in the scene - its body mesh would be ambiguous - so then
+    skipped when a body rig is in the scene - its body mesh would be ambiguous - so then
     Mesh_GRP is left empty for the rigger to fill. Parenting preserves world position, so the
     garment stays at its authored height.
     """
@@ -422,7 +484,19 @@ def build_skin_set(asset_type: str) -> SkinSetResult:
         raise RuntimeError(
             "No cloth_* joints in the scene. Run 'Create cloth skeleton' first.")
 
-    plan = _skin_sets.plan_skin_set(asset_type, set(parents))
+    profile = _rigs.resolve_profile()
+    if profile is None:
+        raise RuntimeError(
+            "No rig is registered, so there is no skin-set recommendation to apply. "
+            "Use 'Register rig' on the Publish tab first.")
+    recommended = profile.skin_set(asset_type)
+    if not recommended:
+        raise RuntimeError(
+            f"The {profile.label} rig has no recommended skin joints for a "
+            f"{asset_type!r}. Add them to skinSets in {profile.source}, or select the "
+            "joints by hand and bind.")
+
+    plan = _skin_sets.plan_skin_set(asset_type, set(parents), recommended)
     if plan.is_empty:
         raise RuntimeError(
             f"None of the recommended skin joints for a {asset_type!r} are in this "

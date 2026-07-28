@@ -27,7 +27,7 @@ def test_destination_paths_layout(tmp_path):
 def test_spec_to_sidecar_keys():
     spec = P.PublishSpec(
         asset_name="coat_a", asset_type="coat", gender="male", cloth_version="1.0.0",
-        genhuman_compat=("v03", "v04"), author="me", description="a coat",
+        rig_versions=("v03", "v04"), author="me", description="a coat",
         rig_version="v03", created="2026-06-11", tri_count=1240, vert_count=820)
     data = spec.to_sidecar()
     assert data["assetName"] == "coat_a"
@@ -40,7 +40,7 @@ def test_spec_to_sidecar_keys():
 
 def test_sidecar_omits_unknown_polycount():
     spec = P.PublishSpec(asset_name="x", asset_type="hat", gender="female",
-                         cloth_version="1.0.0", genhuman_compat=("v03",))
+                         cloth_version="1.0.0", rig_versions=("v03",))
     data = spec.to_sidecar()
     assert "triCount" not in data and "vertCount" not in data
     assert data["created"]  # defaults to today when not supplied
@@ -49,7 +49,7 @@ def test_sidecar_omits_unknown_polycount():
 def test_spec_metadata_round_trip():
     spec = P.PublishSpec(
         asset_name="coat_a", asset_type="coat", gender="male", cloth_version="2.0.0",
-        genhuman_compat=("v03",), rig_version="v03", created="2026-06-11",
+        rig_versions=("v03",), rig_version="v03", created="2026-06-11",
         tri_count=999, vert_count=500, description="desc")
     meta, errors = spec.metadata()
     assert errors == [] and meta is not None
@@ -61,7 +61,7 @@ def test_spec_metadata_round_trip():
 def test_gender_survives_sidecar_round_trip():
     spec = P.PublishSpec(
         asset_name="coat_a", asset_type="coat", gender="female",
-        cloth_version="1.0.0", genhuman_compat=("v03",))
+        cloth_version="1.0.0", rig_versions=("v03",))
     assert spec.to_sidecar()["gender"] == "female"
     meta, errors = spec.metadata()
     assert errors == [] and meta is not None and meta.gender == "female"
@@ -69,7 +69,7 @@ def test_gender_survives_sidecar_round_trip():
 
 def test_spec_metadata_reports_bad_type():
     spec = P.PublishSpec(asset_name="x", asset_type="cape", gender="male",
-                         cloth_version="1.0.0", genhuman_compat=("v03",))
+                         cloth_version="1.0.0", rig_versions=("v03",))
     meta, errors = spec.metadata()
     assert meta is None and any("cape" in e for e in errors)
 
@@ -83,7 +83,7 @@ def test_write_sidecar_read_by_library(tmp_path):
         paths.ma, joints=["cloth_root", "cloth_spine_01"], asset_name="coat_a")
     spec = P.PublishSpec(
         asset_name="coat_a", asset_type="coat", gender="male", cloth_version="1.0.0",
-        genhuman_compat=("v03",), rig_version="v03", created="2026-06-11",
+        rig_versions=("v03",), rig_version="v03", created="2026-06-11",
         tri_count=1240, vert_count=820, description="published coat")
     P.write_sidecar(paths, spec)
 
@@ -155,7 +155,7 @@ def test_preflight_clean_scene_passes():
 def test_preflight_flags_rig_in_scene():
     issues = P.assemble_preflight(_clean_facts(has_rig=True))
     errs = _levels(issues, "error")
-    assert any("GenHuman rig" in i.message for i in errs)
+    assert any("rig is still in the scene" in i.message for i in errs)
     assert all(i.fix for i in errs)  # every error carries an actionable fix
     assert not _levels(issues, "ok")  # no OK when something blocks
 
@@ -205,7 +205,7 @@ def test_preflight_warns_when_test_body_still_connected():
     warn = next(i for i in issues if i.level == "warn" and "test body" in i.message)
     assert "2 cloth_* joint(s)" in warn.message
     assert "Disconnect test body" in warn.fix
-    assert not _levels(issues, "error")  # advisory — the rig error is the hard blocker
+    assert not _levels(issues, "error")  # advisory - the rig error is the hard blocker
 
 
 def test_preflight_test_body_warning_truncates_long_lists():
@@ -251,7 +251,101 @@ def test_preflight_cleanliness_sample_truncates_long_lists():
 
 
 def test_preflight_clean_scene_has_no_cleanliness_errors():
-    # all four cleanliness facts default to () — a clean scene must still pass.
+    # all four cleanliness facts default to () - a clean scene must still pass.
     issues = P.assemble_preflight(_clean_facts())
     assert not _levels(issues, "error")
     assert _levels(issues, "ok")
+
+
+# --- Step-1 clean-room pre-check (pure decision logic) -----------------------
+def test_precheck_clean_scene_passes():
+    # a scene holding only the garment geo (every leftover fact empty) is clean
+    issues = P.assemble_scene_precheck(P.ScenePrecheckFacts(has_rig=False))
+    assert not [i for i in issues if i.level != "ok"]
+    assert _levels(issues, "ok")
+
+
+def test_precheck_flags_rig_in_scene():
+    issues = P.assemble_scene_precheck(P.ScenePrecheckFacts(has_rig=True))
+    warn = next(i for i in _levels(issues, "warn") if "rig is still in the scene" in i.message)
+    assert warn.fix
+    assert not _levels(issues, "ok")  # no OK when something was found
+
+
+def test_precheck_flags_leftover_namespaces():
+    issues = P.assemble_scene_precheck(P.ScenePrecheckFacts(
+        has_rig=False, namespaces=("GenHuman_rig_v03", "GenHuman_rig_v03:body")))
+    warn = next(i for i in _levels(issues, "warn") if "namespace" in i.message.lower())
+    assert "GenHuman_rig_v03" in warn.message
+
+
+def test_precheck_flags_extra_root_nodes():
+    issues = P.assemble_scene_precheck(P.ScenePrecheckFacts(
+        has_rig=False, extra_root_nodes=("leftover_GRP", "stray_locator")))
+    warn = next(i for i in _levels(issues, "warn") if "besides the garment geo" in i.message)
+    assert "leftover_GRP" in warn.message and warn.fix
+
+
+def test_precheck_flags_import_artifacts():
+    # unknown nodes / anim curves / display layers are all rig-import leftovers
+    issues = P.assemble_scene_precheck(P.ScenePrecheckFacts(
+        has_rig=False, unknown_nodes=("lostPluginNode",),
+        anim_curves=("body_translateX",), display_layers=("rig_layer",)))
+    warns = _levels(issues, "warn")
+    assert any("Unknown" in i.message for i in warns)
+    assert any("Animation curve" in i.message for i in warns)
+    assert any("Display layer" in i.message for i in warns)
+    assert not _levels(issues, "ok")
+
+
+def test_precheck_sample_truncates_long_lists():
+    issues = P.assemble_scene_precheck(P.ScenePrecheckFacts(
+        has_rig=False, extra_root_nodes=tuple(f"node_{i:02d}" for i in range(10))))
+    msg = next(i.message for i in issues if "besides the garment geo" in i.message)
+    assert "+4 more" in msg
+
+
+# --- rig identity in the published sidecar ------------------------------------
+def test_sidecar_carries_rig_id_and_versions():
+    spec = P.PublishSpec(
+        asset_name="acme_coat", asset_type="coat", gender="male",
+        cloth_version="1.0.0", rig_id="acme_biped", rig_versions=("v01", "v02"))
+    data = spec.to_sidecar()
+    assert data["rigId"] == "acme_biped"
+    assert data["rigVersions"] == "v01, v02"
+
+
+def test_genhuman_sidecar_keeps_the_legacy_alias():
+    """Costs one line and keeps a freshly published GenHuman asset readable by an
+    Outfitter install that has not been upgraded yet."""
+    spec = P.PublishSpec(
+        asset_name="coat", asset_type="coat", gender="male",
+        cloth_version="1.0.0", rig_id="genhuman", rig_versions=("v03",))
+    assert spec.to_sidecar()["genHumanCompat"] == "v03"
+
+
+def test_non_genhuman_sidecar_omits_the_legacy_alias():
+    """Writing genHumanCompat for an Acme asset would be actively misleading."""
+    spec = P.PublishSpec(
+        asset_name="acme_coat", asset_type="coat", gender="male",
+        cloth_version="1.0.0", rig_id="acme_biped", rig_versions=("v01",))
+    assert "genHumanCompat" not in spec.to_sidecar()
+
+
+def test_published_sidecar_round_trips_rig_identity():
+    spec = P.PublishSpec(
+        asset_name="acme_coat", asset_type="coat", gender="female",
+        cloth_version="1.0.0", rig_id="acme_biped", rig_versions=("v01",))
+    meta, errors = spec.metadata()
+    assert errors == [] and meta is not None
+    assert meta.rig_id == "acme_biped"
+    assert meta.supports("acme_biped", "v01")
+    assert not meta.supports("genhuman", "v01")
+
+
+def test_publish_defaults_to_genhuman_for_an_unspecified_rig():
+    spec = P.PublishSpec(
+        asset_name="coat", asset_type="coat", gender="male",
+        cloth_version="1.0.0", rig_versions=("v03",))
+    assert spec.rig_id == "genhuman"
+    assert spec.to_sidecar()["rigId"] == "genhuman"

@@ -1,7 +1,7 @@
 """In-scene skinning test - plan the body→``cloth_*`` connections (pure, headless).
 
 Before publishing, the rigger needs to confirm the garment deforms correctly. They
-already fit it on the GenHuman body that is *still in the authoring scene*, so the
+already fit it on the rig body that is *still in the authoring scene*, so the
 test is simply: drive the ``cloth_*`` skeleton from that body, pose it, watch the
 mesh follow - then disconnect so the joints go static and publish-safe again.
 
@@ -15,23 +15,28 @@ live-Maya half (:mod:`core.maya_testfit`) gathers the facts and applies the plan
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from .. import config
 
+if TYPE_CHECKING:  # import for typing only - core.rigs is data, not a runtime dependency
+    from .rigs import Variants
 
-def body_morph_value(gender: str) -> float:
-    """The ``GH_Body_morph`` value that puts the GenHuman body into ``gender`` (M14).
 
-    The tool ships one rig and flips this switch (female = base, male = full morph), so
-    the loaded test body matches the garment variant being authored. Raises ``ValueError``
-    on an unknown gender so the caller surfaces it rather than silently loading the base.
+def body_morph_value(gender: str, variants: "Variants") -> float:
+    """The morph value that puts a rig's body into ``gender`` (M14).
+
+    A rig that offers several bodies declares how to switch between them in its profile
+    (:class:`core.rigs.Variants`); GenHuman flips one attribute, ``GH_Body_morph``
+    (female = base, male = full morph). Raises ``ValueError`` for a variant the rig does
+    not offer, so the caller surfaces it rather than silently loading the wrong body.
     """
-    key = gender.strip().lower()
-    try:
-        return config.GENDER_BODY_MORPH[key]
-    except KeyError:
-        valid = ", ".join(config.GENDER_BODY_MORPH)
-        raise ValueError(f"unknown gender '{gender}' - expected one of: {valid}") from None
+    value = variants.value_for(gender)
+    if value is None:
+        offered = ", ".join(variants.names) or "none - this rig has a single body"
+        raise ValueError(
+            f"this rig has no body variant '{gender}' - it offers: {offered}")
+    return value
 
 
 @dataclass(frozen=True)

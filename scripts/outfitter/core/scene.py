@@ -57,22 +57,27 @@ class SceneGateway(Protocol):
         ...
 
     # --- rig identification ---------------------------------------------------
-    def genhuman_version(self) -> str | None:
-        """Detected GenHuman rig version string, or ``None`` if undetectable."""
+    def rig_version(self, markers: tuple[str, ...]) -> str | None:
+        """Detected version string of the rig in the scene, or ``None`` if undetectable.
+
+        ``markers`` are the node names that identify the rig, from its profile
+        (:attr:`core.rigs.RigProfile.markers`) - so this works for any registered rig,
+        not just GenHuman.
+        """
         ...
 
     def selected_nodes(self) -> list[str]:
         """Currently selected scene nodes (full DAG paths), or empty."""
         ...
 
-    def resolve_export_group(self, selected_node: str) -> str | None:
+    def resolve_export_group(self, selected_node: str, export_group: str) -> str | None:
         """Resolve the export-skeleton group of the rig that ``selected_node`` belongs to.
 
-        Multi-rig disambiguation (PRD §4): a scene may hold several GenHuman rigs,
-        each imported under its own namespace. Given *any* node of a rig (the top
-        group, the godnode, a joint - whatever the user selected), return the full
-        DAG path of that rig's ``EXPORT_SKELETON_GROUP``, so attach binds to the
-        intended rig. Returns ``None`` if no such group is found in the node's
+        Multi-rig disambiguation (PRD §4): a scene may hold several rigs, each imported
+        under its own namespace. Given *any* node of a rig (the top group, the godnode, a
+        joint - whatever the user selected), return the full DAG path of that rig's
+        ``export_group`` (the short name from the chosen rig's profile), so attach binds
+        to the intended rig. Returns ``None`` if no such group is found in the node's
         namespace (caller falls back to a root-level rig / surfaces an error).
         """
         ...
@@ -156,18 +161,22 @@ class MayaScene:
         # delete the namespace AND its content (the imported asset nodes)
         self._cmds.namespace(removeNamespace=namespace, deleteNamespaceContent=True)
 
-    def genhuman_version(self) -> str | None:
+    def rig_version(self, markers: tuple[str, ...]) -> str | None:
         # PRD §9 open task: version-id method undefined. Best-effort: look for a
-        # 'genHumanVersion' string attr on any rig marker node. Returns None when
-        # not found so callers degrade to a warning rather than hard-failing.
-        from .. import config
-
-        for marker in config.RIG_MARKERS:
-            if self._cmds.objExists(marker) and self._cmds.attributeQuery(
-                "genHumanVersion", node=marker, exists=True
-            ):
-                val = self._cmds.getAttr(f"{marker}.genHumanVersion")
-                return str(val) if val else None
+        # version string attr on any of the rig's marker nodes. Returns None when not
+        # found so callers degrade to a warning rather than hard-failing.
+        #
+        # Two attribute names are accepted: 'rigVersion' (what a rig registered with this
+        # tool should carry) and 'genHumanVersion' (what GenHuman rigs in the wild already
+        # carry). Namespaced rigs are matched too, so an imported rig is still identified.
+        for marker in markers:
+            for node in ([marker] if self._cmds.objExists(marker) else
+                         (self._cmds.ls(f"*:{marker}") or [])):
+                for attr in ("rigVersion", "genHumanVersion"):
+                    if self._cmds.attributeQuery(attr, node=node, exists=True):
+                        val = self._cmds.getAttr(f"{node}.{attr}")
+                        if val:
+                            return str(val)
         return None
 
     def selected_nodes(self) -> list[str]:
@@ -179,10 +188,8 @@ class MayaScene:
     def set_world_matrix(self, node: str, matrix: list[float]) -> None:
         self._cmds.xform(node, worldSpace=True, matrix=list(matrix))
 
-    def resolve_export_group(self, selected_node: str) -> str | None:
-        from .. import config
-
-        marker = config.EXPORT_SKELETON_GROUP
+    def resolve_export_group(self, selected_node: str, export_group: str) -> str | None:
+        marker = export_group
         short = selected_node.rsplit("|", 1)[-1]
         if ":" in short:
             # Search the rig's top namespace, recursing into nested namespaces

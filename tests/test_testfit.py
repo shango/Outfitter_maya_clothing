@@ -7,7 +7,10 @@ joints with no body match are left unconnected; locked / already-driven plugs ar
 """
 import _bootstrap  # noqa: F401
 
+import pytest
+
 from outfitter import config
+from outfitter.core import rigs
 from outfitter.core import testfit as T
 
 
@@ -91,25 +94,33 @@ def test_non_cloth_nodes_are_ignored():
 
 
 # --- gendered test body (M14) -----------------------------------------------
+# The switch is per-rig now: the value comes from the rig's profile, not from a constant.
+GENHUMAN = rigs.load_profile("genhuman", roots=[]).variants
+
+
 def test_body_morph_value_per_gender():
-    # The tool ships ONE rig and flips GH_Body_morph: female = base (0), male = full morph (1).
-    assert T.body_morph_value("male") == config.GENDER_BODY_MORPH["male"]
-    assert T.body_morph_value("female") == config.GENDER_BODY_MORPH["female"]
-    assert T.body_morph_value("male") != T.body_morph_value("female")
+    # GenHuman flips one attr: female = base (0), male = full morph (1).
+    assert T.body_morph_value("male", GENHUMAN) == 1.0
+    assert T.body_morph_value("female", GENHUMAN) == 0.0
 
 
 def test_body_morph_value_case_insensitive():
-    assert T.body_morph_value("Female") == T.body_morph_value("female")
+    assert T.body_morph_value("Female", GENHUMAN) == T.body_morph_value("female", GENHUMAN)
 
 
-def test_body_morph_value_rejects_unknown_gender():
-    import pytest
+def test_body_morph_value_rejects_a_variant_the_rig_does_not_offer():
+    with pytest.raises(ValueError, match="unisex"):
+        T.body_morph_value("unisex", GENHUMAN)
 
-    with pytest.raises(ValueError):
-        T.body_morph_value("unisex")
+
+def test_body_morph_value_rejects_any_gender_on_a_single_body_rig():
+    # A rig with one body has no switch to flip; asking for a gender is a caller bug, and
+    # silently returning 0.0 would load the wrong body without saying so.
+    with pytest.raises(ValueError, match="single body"):
+        T.body_morph_value("male", rigs.Variants())
 
 
 def test_every_gender_has_a_morph_value():
     for g in config.GENDERS:
-        # each declared gender must map to a concrete switch value
-        assert isinstance(T.body_morph_value(g), float)
+        # each declared gender must map to a concrete switch value on a gendered rig
+        assert isinstance(T.body_morph_value(g, GENHUMAN), float)

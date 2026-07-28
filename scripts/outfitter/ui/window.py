@@ -2,8 +2,9 @@
 
 The window scans the configured library roots and shows a filterable thumbnail
 grid with a read-only detail panel (M1), plus an action bar that drives the real
-``AttachEngine`` to attach the selected asset onto the GenHuman rig and detach a
-live instance (M2).
+``AttachEngine`` to attach the selected asset onto the selected rig and detach a
+live instance (M2). Clothing is filtered to the rig being dressed - a garment is
+skinned to one rig's skeleton, so the others can't be attached here.
 
 Runs both inside Maya 2026 (parented to the main window, dockable-ready) and
 standalone for dev preview (``python -m`` with PySide6 only - no Maya needed).
@@ -20,11 +21,13 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from .. import __version__, config
 from ..core import library
+from ..core import rigs as _rigs
 from ..core import settings as _settings
 from ..core import sync as _sync
 from ..core.asset import ClothingAsset
 from . import style
 from .publish_panel import PublishPanel
+from .rig_bar import RigSelector
 from .turntable import TurntableView
 
 WINDOW_OBJECT_NAME = "outfitterBrowser"
@@ -170,12 +173,25 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         outer = QtWidgets.QVBoxLayout(central)
         outer.setContentsMargins(8, 8, 8, 8)
 
+        # rig bar: which rig is being dressed - it filters everything below it
+        self._rig = RigSelector()
+        self._rig.rigChanged.connect(self._on_rig_changed)
+        self._other_rigs = QtWidgets.QCheckBox("Show other rigs")
+        self._other_rigs.setToolTip(
+            "Clothing is skinned to one rig's skeleton, so an asset built for another rig "
+            "can't be attached to this one. Tick to see them anyway (greyed out) - e.g. to "
+            "pick one to retarget.")
+        self._other_rigs.toggled.connect(self._apply_filter)
+        rig_row = QtWidgets.QHBoxLayout()
+        rig_row.addWidget(self._rig, 1)
+        rig_row.addWidget(self._other_rigs, 0)
+        outer.addLayout(rig_row)
+
         # top bar: gender filter + type filter + search + refresh
         top = QtWidgets.QHBoxLayout()
         self._gender_combo = QtWidgets.QComboBox()
-        self._gender_combo.addItem(_ALL_GENDERS)
-        self._gender_combo.addItems(list(config.GENDERS))
         self._gender_combo.currentIndexChanged.connect(self._apply_filter)
+        self._reload_gender_filter()
         self._type_combo = QtWidgets.QComboBox()
         self._type_combo.addItem(_ALL_TYPES)
         self._type_combo.addItems(list(config.ASSET_TYPES))
@@ -273,6 +289,17 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._sync_progress.hide()  # shown only while a sync runs
         v.addWidget(self._sync_progress)
 
+        # One-off migration, parked below the folders because most libraries never need it.
+        stamp_row = QtWidgets.QHBoxLayout()
+        self._stamp_btn = QtWidgets.QPushButton("Stamp rig metadata…")
+        self._stamp_btn.setToolTip(
+            "Write the rig identity into assets published before the tool supported "
+            "multiple rigs. They already read as GenHuman; this records it explicitly.")
+        self._stamp_btn.clicked.connect(self._stamp_rig_metadata)
+        stamp_row.addWidget(self._stamp_btn)
+        stamp_row.addStretch(1)
+        v.addLayout(stamp_row)
+
         v.addStretch(1)
         note = QtWidgets.QLabel(
             "Sync copies new and changed assets from the remote into the local "
@@ -285,6 +312,56 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
         self._reload_setup_fields()
         return w
+
+    def _stamp_rig_metadata(self) -> None:
+        """Write the implied rig identity into old assets' sidecars (one-off migration).
+
+        Nothing depends on this - an asset with no ``rigId`` already reads as GenHuman.
+        It matters once a second rig shares the library: two rigs can use the same version
+        string, and then an assumption is not good enough.
+        """
+        from ..core import migrate
+
+        if self._scan is None:
+            self.refresh()
+        sidecars = [a.sidecar for a in self._scan.assets if a.sidecar is not None]
+        if not sidecars:
+            QtWidgets.QMessageBox.information(
+                self, WINDOW_TITLE,
+                "No sidecar files found in the library, so there is nothing to stamp.")
+            return
+
+        rig_id = self._rig.rig_id() or _rigs.DEFAULT_RIG_ID
+        plan = migrate.plan_stamp(sidecars, rig_id)
+        if plan.is_empty:
+            QtWidgets.QMessageBox.information(self, "Stamp rig metadata", plan.summary())
+            return
+
+        names = "\n  ".join(c.asset_name for c in plan.candidates[:15])
+        if len(plan.candidates) > 15:
+            names += f"\n  …and {len(plan.candidates) - 15} more"
+        ok = QtWidgets.QMessageBox.question(
+            self, "Stamp rig metadata",
+            plan.summary()
+            + f"\n\nThese assets will be recorded as built for '{rig_id}':\n  {names}\n\n"
+              "Their .json sidecars are rewritten in place (the .ma files aren't "
+              "touched). Assets that already name a rig are left alone.\n\nContinue?")
+        if ok != QtWidgets.QMessageBox.Yes:
+            return
+
+        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        try:
+            result = migrate.apply_stamp(plan)
+        finally:
+            QtWidgets.QApplication.restoreOverrideCursor()
+
+        detail = result.summary()
+        if result.warnings:
+            detail += "\n\n" + "\n".join(f"• {w}" for w in result.warnings)
+        if result.failed:
+            detail += "\n\nFailed:\n" + "\n".join(f"• {f}" for f in result.failed)
+        QtWidgets.QMessageBox.information(self, "Stamp rig metadata", detail)
+        self.refresh()
 
     def _make_folder_row(self, on_browse) -> tuple[QtWidgets.QLabel, QtWidgets.QWidget]:
         row = QtWidgets.QWidget()
@@ -443,6 +520,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         form.setVerticalSpacing(6)
         self._d_gender = self._value_label()
         self._d_version = self._value_label()
+        self._d_rig = self._value_label()
         self._d_compat = self._value_label()
         self._d_polys = self._value_label()
         self._d_created = self._value_label()
@@ -452,7 +530,8 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         for caption, widget in (
             ("Gender", self._d_gender),
             ("Version", self._d_version),
-            ("GenHuman compat", self._d_compat),
+            ("Rig", self._d_rig),
+            ("Rig versions", self._d_compat),
             ("Polycount", self._d_polys),
             ("Created", self._d_created),
             ("Rig version", self._d_rigver),
@@ -529,7 +608,28 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
             self.refresh()
 
     def refresh(self) -> None:
+        # A sync brings in rig profiles as well as assets, so the rig list is rebuilt
+        # here too - a rig someone else registered shows up on the next Refresh.
+        self._rig.reload()
+        self._reload_gender_filter()
         self._scan = library.scan_library(self._effective_roots())
+        self._apply_filter()
+
+    def _reload_gender_filter(self) -> None:
+        """Offer exactly the body variants the selected rig has (plus 'all')."""
+        profile = self._rig.profile()
+        variants = profile.variants.names if profile is not None else config.GENDERS
+        current = self._gender_combo.currentText()
+        self._gender_combo.blockSignals(True)
+        self._gender_combo.clear()
+        self._gender_combo.addItem(_ALL_GENDERS)
+        self._gender_combo.addItems(list(variants))
+        index = self._gender_combo.findText(current)
+        self._gender_combo.setCurrentIndex(max(index, 0))
+        self._gender_combo.blockSignals(False)
+
+    def _on_rig_changed(self, _rig_id: str) -> None:
+        self._reload_gender_filter()
         self._apply_filter()
 
     def _apply_filter(self) -> None:
@@ -538,18 +638,28 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         wanted_type = self._type_combo.currentText()
         wanted_gender = self._gender_combo.currentText()
         query = self._search.text().strip().lower()
+        rig_id = self._rig.rig_id()
+        show_others = self._other_rigs.isChecked()
 
         self._grid.blockSignals(True)
         self._grid.clear()
         shown = 0
+        hidden_other_rig = 0
         for asset in self._scan.assets:
+            # Rig first: a garment built for another rig can't attach here at all, so it
+            # is hidden by default rather than offered and then rejected.
+            fits = not rig_id or asset.fits_rig(rig_id)
+            if not fits:
+                hidden_other_rig += 1
+                if not show_others:
+                    continue
             if wanted_gender != _ALL_GENDERS and asset.gender != wanted_gender:
                 continue
             if wanted_type != _ALL_TYPES and asset.asset_type != wanted_type:
                 continue
             if query and query not in asset.display_name.lower():
                 continue
-            self._grid.addItem(self._make_item(asset))
+            self._grid.addItem(self._make_item(asset, fits_rig=fits))
             shown += 1
         self._grid.blockSignals(False)
 
@@ -562,17 +672,28 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         invalid = len(self._scan.invalid)
         roots = ", ".join(str(r) for r in self._scan.scanned_roots) or "(no readable roots)"
         suffix = f" · {invalid} invalid" if invalid else ""
+        if hidden_other_rig and not show_others:
+            # Say so explicitly: "my asset vanished" is otherwise a mystery.
+            suffix += f" · {hidden_other_rig} for other rigs (hidden)"
         self._status.setText(f"Showing {shown}/{total} assets{suffix}  -  roots: {roots}")
 
-    def _make_item(self, asset: ClothingAsset) -> QtWidgets.QListWidgetItem:
+    def _make_item(self, asset: ClothingAsset,
+                   fits_rig: bool = True) -> QtWidgets.QListWidgetItem:
         label = asset.display_name if asset.is_valid else f"⚠ {asset.display_name}"
+        if not fits_rig:
+            label = f"{label}  [{asset.rig_id}]"
         item = QtWidgets.QListWidgetItem(self._icon_for(asset), label)
         item.setData(QtCore.Qt.UserRole, asset)
         item.setSizeHint(QtCore.QSize(_THUMB_SIZE + 28, _THUMB_SIZE + 36))
         tip = asset.asset_type if asset.is_valid else "; ".join(asset.errors)
+        if not fits_rig:
+            tip += (f"\nBuilt for rig '{asset.rig_id}' - can't be attached to the "
+                    "selected rig.")
         item.setToolTip(f"{asset.ma_path}\n{tip}")
         if not asset.is_valid:
             item.setForeground(QtGui.QColor("#c0392b"))
+        elif not fits_rig:
+            item.setForeground(QtGui.QColor("#6f7378"))  # greyed: visible, not usable here
         return item
 
     def _icon_for(self, asset: ClothingAsset) -> QtGui.QIcon:
@@ -608,7 +729,8 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
         self._d_gender.setText((meta.gender or "-") if meta else "-")
         self._d_version.setText(meta.cloth_version if meta else "-")
-        self._d_compat.setText(", ".join(meta.genhuman_compat) if meta and meta.genhuman_compat else "-")
+        self._set_rig_field(asset)
+        self._d_compat.setText(", ".join(meta.rig_versions) if meta and meta.rig_versions else "-")
         self._d_polys.setText(self._poly_text(meta))
         self._d_created.setText((meta.created or "-") if meta else "-")
         self._d_rigver.setText((meta.rig_version or "-") if meta else "-")
@@ -618,6 +740,18 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._set_path(asset.ma_path)
         self._d_errors.setText("; ".join(asset.errors))
         self._d_errors.setVisible(bool(asset.errors))
+
+    def _set_rig_field(self, asset: ClothingAsset) -> None:
+        """Name the rig this garment was built for, flagged when it isn't the chosen one."""
+        if asset.metadata is None:
+            self._d_rig.setText("-")
+            self._d_rig.setStyleSheet("")
+            return
+        rig_id = asset.rig_id
+        selected = self._rig.rig_id()
+        mismatch = bool(selected) and rig_id != selected
+        self._d_rig.setText(f"{rig_id}  -  not the selected rig" if mismatch else rig_id)
+        self._d_rig.setStyleSheet("color: #e0b057;" if mismatch else "")
 
     @staticmethod
     def _poly_text(meta) -> str:
@@ -683,7 +817,123 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         menu.addAction("Copy path", self._copy_path)
         menu.addSeparator()
         menu.addAction("↻ Refresh thumbnails", self._refresh_thumbnails)
+        profile = self._rig.profile()
+        if profile is not None:
+            menu.addAction(f"Retarget to {profile.label}…", self._retarget_selected)
         menu.exec(self._grid.viewport().mapToGlobal(pos))
+
+    def _retarget_selected(self) -> None:
+        """Convert the selected asset to the rig currently chosen in the selector.
+
+        Opens the asset itself (this replaces the scene), remaps its joints onto the new
+        rig's rest skeleton with the skin weights preserved, and stamps the new rig
+        identity - then hands over to the user, because the part a tool cannot do is
+        refit the mesh.
+        """
+        asset = self._selected_asset()
+        target = self._rig.profile()
+        if asset is None or target is None:
+            return
+        if not _maya_available():
+            QtWidgets.QMessageBox.warning(
+                self, WINDOW_TITLE,
+                "Retargeting must run inside Maya 2026 - it moves the garment's joints "
+                "in a live scene.")
+            return
+        if asset.metadata is None:
+            QtWidgets.QMessageBox.warning(
+                self, WINDOW_TITLE,
+                "This asset has no readable metadata, so there is no telling which rig it "
+                "was built for. Fix its metadata before retargeting it.")
+            return
+        if asset.rig_id == target.rig_id:
+            QtWidgets.QMessageBox.information(
+                self, WINDOW_TITLE,
+                f"'{asset.display_name}' is already built for {target.label}.")
+            return
+
+        ok = QtWidgets.QMessageBox.question(
+            self, "Retarget to another rig?",
+            f"Convert '{asset.display_name}' from the '{asset.rig_id}' rig to "
+            f"{target.label}?\n\n"
+            "This opens the asset (replacing the current scene), renames its joints to "
+            "the new rig's, and moves them onto the new rest pose without disturbing the "
+            "skin weights.\n\n"
+            "It does NOT reshape the garment. If the two rigs differ in proportion the "
+            "mesh will need a manual refit and probably a weight touch-up, so check the "
+            "fit on the new body and publish it under a new asset name.")
+        if ok != QtWidgets.QMessageBox.Yes:
+            return
+
+        from ..core import maya_retarget
+        from ..core import rigs as _rigs
+
+        try:
+            if not self._open_asset_scene(asset):
+                return
+            source = _rigs.find_profile(asset.rig_id)
+            plan = maya_retarget.plan_for_scene(target, source)
+        except Exception as exc:  # noqa: BLE001 - surface the Maya/plan error
+            QtWidgets.QMessageBox.critical(self, "Retarget failed", str(exc))
+            return
+
+        if not plan.ok:
+            QtWidgets.QMessageBox.warning(
+                self, "Nothing to retarget",
+                f"None of this garment's joints map onto {target.label}, so there is "
+                "nothing a retarget could do.\n\nThe two skeletons may be unrelated, or "
+                f"{target.label}'s profile may need jointAliases for this rig's joint "
+                "names.")
+            return
+        if not self._confirm_plan(plan):
+            return
+
+        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        try:
+            result = maya_retarget.apply_retarget(plan, target)
+        except Exception as exc:  # noqa: BLE001
+            QtWidgets.QMessageBox.critical(self, "Retarget failed", str(exc))
+            return
+        finally:
+            QtWidgets.QApplication.restoreOverrideCursor()
+
+        self._status.setText(result.summary())
+        detail = result.summary()
+        if result.warnings:
+            detail += "\n\n" + "\n".join(f"• {w}" for w in result.warnings)
+        if result.unmatched:
+            detail += "\n\nNot mapped: " + ", ".join(result.unmatched[:12])
+            if len(result.unmatched) > 12:
+                detail += f" (+{len(result.unmatched) - 12} more)"
+        detail += ("\n\nNext: check the fit on the new body, then publish it from the "
+                   "Publish tab under a NEW asset name - the original is untouched.")
+        QtWidgets.QMessageBox.information(self, "Retargeted", detail)
+
+    def _open_asset_scene(self, asset: ClothingAsset) -> bool:
+        """Open the asset's own ``.ma``, asking first if the current scene is unsaved."""
+        import maya.cmds as cmds  # type: ignore
+
+        if cmds.file(query=True, modified=True):
+            answer = QtWidgets.QMessageBox.question(
+                self, "Discard unsaved changes?",
+                "The current scene has unsaved changes. Retargeting opens the asset "
+                "instead.\n\nDiscard them and continue?")
+            if answer != QtWidgets.QMessageBox.Yes:
+                return False
+        cmds.file(str(asset.ma_path), open=True, force=True)
+        return True
+
+    def _confirm_plan(self, plan) -> bool:
+        body = plan.summary()
+        if plan.unmatched:
+            body += ("\n\nThese joints have no counterpart on the new rig and will be "
+                     "left as they are - anything weighted to them will not follow the "
+                     "body:\n  " + "\n  ".join(plan.unmatched[:12]))
+            if len(plan.unmatched) > 12:
+                body += f"\n  …and {len(plan.unmatched) - 12} more"
+        body += "\n\nApply this retarget?"
+        return QtWidgets.QMessageBox.question(
+            self, "Retarget plan", body) == QtWidgets.QMessageBox.Yes
 
     def _refresh_thumbnails(self) -> None:
         """Recapture the selected asset's still + turntable in place (images only).
@@ -784,9 +1034,11 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         self._d_badge.setStyleSheet("")
         self._d_desc.setText("")
         self._d_desc.setVisible(False)
-        for lbl in (self._d_gender, self._d_version, self._d_compat, self._d_polys,
-                    self._d_created, self._d_rigver, self._d_author, self._d_source):
+        for lbl in (self._d_gender, self._d_version, self._d_rig, self._d_compat,
+                    self._d_polys, self._d_created, self._d_rigver, self._d_author,
+                    self._d_source):
             lbl.setText("-")
+        self._d_rig.setStyleSheet("")
         self._d_path.setText("-")
         self._d_path.setToolTip("")
         self._d_errors.setText("")
@@ -812,17 +1064,37 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         if engine is None:
             return
 
+        # Which registered rig are we dressing? The selector's choice drives the
+        # export-group name we look for, so the tool finds the right rig in the scene.
+        profile = self._rig.profile()
+        if profile is None:
+            QtWidgets.QMessageBox.warning(
+                self, WINDOW_TITLE,
+                "No rig is registered, so there's nothing to attach to.\n\n"
+                "Register the rig you're working with on the Publish tab first.")
+            return
+        if not asset.fits_rig(profile.rig_id):
+            QtWidgets.QMessageBox.warning(
+                self, WINDOW_TITLE,
+                f"'{asset.display_name}' is built for the '{asset.rig_id}' rig, but you "
+                f"have {profile.label} selected.\n\n"
+                "A garment is skinned to one rig's skeleton, so it can't be attached to a "
+                "different one. Select the rig it was built for, or convert it with "
+                "'Retarget to rig…' on the right-click menu.")
+            return
+
         # Multi-rig: the user selects any node of the target rig; we resolve that
         # rig's export-skeleton group from the selection's namespace. With nothing
         # selected we fall back to a root-level rig (single-rig / no-namespace case).
-        export_group = config.EXPORT_SKELETON_GROUP
-        rig_label = "root-level rig"
+        export_group = profile.export_group
+        rig_label = f"{profile.label} (root-level)"
         selection = engine.scene.selected_nodes()
         if selection:
-            resolved = engine.scene.resolve_export_group(selection[0])
+            resolved = engine.scene.resolve_export_group(
+                selection[0], profile.export_group)
             if resolved is not None:
                 export_group = resolved
-                rig_label = _rig_label(resolved)
+                rig_label = f"{profile.label} - {_rig_label(resolved)}"
 
         from ..core.attach import sanitize_namespace
         suggested = sanitize_namespace(asset.asset_type or asset.display_name)
@@ -836,7 +1108,8 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
 
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         try:
-            result = engine.attach(asset, namespace, export_group=export_group)
+            result = engine.attach(asset, namespace, profile=profile,
+                                   export_group=export_group)
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
 
@@ -917,7 +1190,7 @@ def _ensure_engine(parent: QtWidgets.QWidget):
             QtWidgets.QMessageBox.warning(
                 parent, WINDOW_TITLE,
                 "Attach and Detach must run inside Maya 2026 (they need a live "
-                "scene and the GenHuman rig).\n\nDetails: " + str(exc))
+                "scene and the rig in it).\n\nDetails: " + str(exc))
             return None
     return _engine_singleton
 

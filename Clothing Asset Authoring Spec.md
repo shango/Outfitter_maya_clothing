@@ -1,6 +1,8 @@
 # Clothing Asset Authoring Specification
 
-**For:** Clothing artist / rigger building snap-on assets for the GenHuman rig
+**For:** Clothing artist / rigger building snap-on assets for a registered body rig
+(GenHuman is the reference rig used throughout; any rig registered with the tool works the
+same way — see *Registering a rig* in the user guide)
 **Host:** Maya 2026 · deliver Maya ASCII (`.ma`) only
 **Status:** v1 · 2026-06-04
 **Authority:** This document is the build contract. It consolidates the *Addendum — Snap-On
@@ -232,15 +234,28 @@ Each asset must contain a metadata node so the browser and validator can identif
 |---|---|---|
 | `assetName` | `"trench_coat_A"` | unique asset name |
 | `assetType` | `"coat"` | one of: `shoes` `pants` `shirt` `dress` `coat` `hat` |
-| `gender` | `"male"` | **required** — body variant the garment is pre-fit to: `male` or `female` (§8) |
+| `gender` | `"male"` | **required** - body variant the garment is pre-fit to (§8). One of the variants the rig offers; `none` for a rig with a single body |
 | `clothVersion` | `"1.0.0"` | this asset's own version |
-| `genHumanCompat` | `"v03"` | supported GenHuman rig version(s); comma-separated if multiple |
+| `rigId` | `"genhuman"` | **which registered rig this garment is built for** |
+| `rigVersions` | `"v03"` | builds of that rig it fits; comma-separated if multiple |
 | `author` | `"Jane R."` | optional |
 | `notes` | `""` | optional |
 
-> The exact GenHuman version string and any **Genie-required node names** are still being finalized by
-> the pipeline team (see §15). For now set `genHumanCompat` to the rig version you authored against
-> (`v03`) — we'll confirm the canonical value before you ship final assets.
+**Rig identity.** A garment is skinned to one rig's skeleton, so it declares exactly one `rigId` and
+the versions of *that* rig it works with. The pair is what the tool checks before attaching: a
+mismatched `rigId` is refused outright, because two rigs can share joint names and the garment would
+attach and then deform into nonsense. Reusing a garment on a different rig is a **retarget**
+(Library tab ▸ right-click ▸ *Retarget to…*), which produces a second asset - never a second `rigId`
+on the same one.
+
+> **Older assets.** Assets published before the tool supported multiple rigs carry `genHumanCompat`
+> instead of `rigId`/`rigVersions`. They are still read correctly - no `rigId` means `genhuman`, with
+> `genHumanCompat` as the version list - so an existing library keeps working untouched. Setup ▸
+> *Stamp rig metadata* writes the identity down explicitly, which matters once a second rig shares the
+> library. The Publish tab keeps writing `genHumanCompat` alongside the new fields for GenHuman assets,
+> so a freshly published asset still opens in an install that hasn't been upgraded.
+
+> Any **Genie-required node names** are still being finalized by the pipeline team (see §15).
 
 ---
 
@@ -305,7 +320,8 @@ Before exporting, confirm:
 
 **Variants & controls**
 - [ ] Delivered as a **male** variant and a **female** variant, each pre-fit to that body (§8).
-- [ ] `gender` set (`male` / `female`) in `cloth_info` / sidecar.
+- [ ] `gender` set in `cloth_info` / sidecar (one of the rig's body variants, or `none`).
+- [ ] `rigId` + `rigVersions` set - which rig this garment is for, and which builds of it.
 - [ ] Secondary controls named `cloth_<name>_ctrl`, under `Ctrl_GRP`.
 
 **Geometry & materials**

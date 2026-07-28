@@ -22,6 +22,7 @@ from pathlib import Path
 
 from .. import config
 from . import ma_parse
+from . import rigs
 from .asset import AssetMetadata
 from .validate import ValidationReport, validate_asset_summary
 
@@ -73,7 +74,9 @@ class PublishSpec:
     asset_type: str
     gender: str
     cloth_version: str
-    genhuman_compat: tuple[str, ...] = ()
+    # The rig this garment was authored against, and the versions of it that fit.
+    rig_id: str = rigs.DEFAULT_RIG_ID
+    rig_versions: tuple[str, ...] = ()
     author: str = ""
     description: str = ""
     rig_version: str = ""
@@ -87,18 +90,26 @@ class PublishSpec:
         Mirrors the keys :meth:`AssetMetadata.from_mapping` reads, so a published
         sidecar round-trips back into the same metadata the browser shows. Optional
         numeric fields are omitted when unknown rather than written as null.
+
+        ``genHumanCompat`` is still written alongside ``rigVersions`` - it costs one line
+        and keeps a freshly published GenHuman asset readable by an Outfitter install that
+        hasn't been upgraded yet. It is only meaningful for GenHuman assets, so it is
+        omitted for every other rig rather than written misleadingly.
         """
         data: dict[str, object] = {
             "assetName": self.asset_name,
             "assetType": self.asset_type,
             "gender": self.gender,
             "clothVersion": self.cloth_version,
-            "genHumanCompat": ", ".join(self.genhuman_compat),
+            "rigId": self.rig_id,
+            "rigVersions": ", ".join(self.rig_versions),
             "author": self.author,
             "notes": self.description,
             "created": self.created or today_iso(),
             "rigVersion": self.rig_version,
         }
+        if self.rig_id == rigs.DEFAULT_RIG_ID:
+            data["genHumanCompat"] = ", ".join(self.rig_versions)
         if self.tri_count is not None:
             data["triCount"] = self.tri_count
         if self.vert_count is not None:
@@ -205,7 +216,7 @@ def assemble_preflight(
 
     if facts.has_rig:
         issues.append(PreflightIssue(
-            "error", "A GenHuman rig is still in the scene.",
+            "error", "A rig is still in the scene.",
             "Delete the rig and remove its namespace so the asset contains only the "
             "garment (no rig, namespaces, or references)."))
 
@@ -286,6 +297,80 @@ def assemble_preflight(
 
     if not any(i.is_error for i in issues):
         issues.append(PreflightIssue("ok", "Scene looks publish-ready.", ""))
+
+    return issues
+
+
+# --------------------------------------------------------------------------- #
+# Step-1 "clean room" pre-check (pure decision logic)
+# --------------------------------------------------------------------------- #
+# Before the cloth rig is built, the scene should hold only the garment geo. Riggers
+# commonly *import* the body rig to fit the garment to height, then delete it -
+# which leaves namespaces, unknown nodes, empty groups and orphaned joints behind, and
+# building the rig on top of that junk bakes it into the asset. This scans first and
+# reports anything that isn't the garment, so it's cleaned before Step 1 proceeds.
+
+@dataclass(frozen=True)
+class ScenePrecheckFacts:
+    """What the Step-1 clean-room pre-check needs from the open scene (gathered in Maya).
+
+    Every field but ``has_rig`` lists short names of nodes that shouldn't be there before
+    the cloth rig is built (empty = clean).
+    """
+
+    has_rig: bool
+    namespaces: tuple[str, ...] = ()
+    extra_root_nodes: tuple[str, ...] = ()
+    unknown_nodes: tuple[str, ...] = ()
+    anim_curves: tuple[str, ...] = ()
+    display_layers: tuple[str, ...] = ()
+
+
+def assemble_scene_precheck(facts: ScenePrecheckFacts) -> list[PreflightIssue]:
+    """Turn Step-1 scene facts into cleanup findings (pure, fully unit-testable).
+
+    Findings are advisory (``warn``): the pre-check guides the rigger to a clean scene, it
+    doesn't hard-block. A trailing ``ok`` is appended when nothing was found.
+    """
+    issues: list[PreflightIssue] = []
+
+    if facts.has_rig:
+        issues.append(PreflightIssue(
+            "warn", "A rig is still in the scene.",
+            "Remove the rig and its namespace - build the cloth skeleton against the bare "
+            "garment, then load the test body afterwards."))
+
+    roots = root_namespaces(facts.namespaces)
+    if roots:
+        issues.append(PreflightIssue(
+            "warn", f"Leftover namespace(s): {', '.join(roots)}.",
+            "Remove them (Window > Namespace Editor) - a namespace usually means an "
+            "imported/referenced rig wasn't fully cleaned up."))
+
+    if facts.extra_root_nodes:
+        issues.append(PreflightIssue(
+            "warn", f"Node(s) besides the garment geo: {_sample(facts.extra_root_nodes)}.",
+            "Delete everything except the garment mesh - loose groups, orphaned joints, "
+            "locators and constraints left behind by a deleted rig import."))
+
+    if facts.unknown_nodes:
+        issues.append(PreflightIssue(
+            "warn", f"Unknown (lost-plugin) node(s): {_sample(facts.unknown_nodes)}.",
+            "Delete them - Edit > Delete All by Type > Unknown Nodes."))
+
+    if facts.anim_curves:
+        issues.append(PreflightIssue(
+            "warn", f"Animation curve(s): {_sample(facts.anim_curves)}.",
+            "Delete all keys - a rig import often drags posed animation in with it."))
+
+    if facts.display_layers:
+        issues.append(PreflightIssue(
+            "warn", f"Display layer(s): {_sample(facts.display_layers)}.",
+            "Remove them - they don't belong in a delivered asset."))
+
+    if not issues:
+        issues.append(PreflightIssue(
+            "ok", "Scene is clean - only the garment geo is present.", ""))
 
     return issues
 

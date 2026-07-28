@@ -16,6 +16,12 @@ Semantics (locked with the user, 2026-06-09):
   remote copy is a different size or is *newer* (beyond a small filesystem
   tolerance), so a file the artist just edited locally is not clobbered by an
   older remote copy of the same size.
+* **Rig bodies are not pulled.** The ``_rigs`` folder holds registered rig profiles
+  (small ``.json``) *and* the rig ``.ma`` files themselves, which run 25-30 MB each.
+  Sync carries the profiles - so every artist sees every registered rig - but skips
+  the rig bodies, which are fetched individually the first time one is actually
+  needed (:func:`core.rigs.ensure_rig_file`). Otherwise adding a rig would push tens
+  of megabytes at every artist on their next sync, for a rig most of them never open.
 
 ``shutil.copy2`` preserves the source modified-time, so a file copied in one sync
 compares equal on the next and is skipped - repeated syncs only move real changes.
@@ -30,10 +36,28 @@ from pathlib import Path
 from typing import Callable
 
 from .. import config
+from . import rigs
 
 # Filesystem mtime resolution varies (FAT rounds to 2s); treat times within this
 # many seconds as equal so we don't re-copy unchanged files forever.
 _MTIME_TOLERANCE_S = 2.0
+
+
+def _is_rigs_path(rel: Path) -> bool:
+    """True if a library-relative path lives under the ``_rigs`` folder."""
+    return rigs.RIGS_DIRNAME in rel.parts
+
+
+def is_syncable(rel: Path) -> bool:
+    """True if a library-relative remote file should be pulled by a sync.
+
+    Everything outside ``_rigs`` is an asset file and syncs. Inside ``_rigs`` only the
+    rig *profiles* sync; the rig bodies they point at are fetched on demand instead (see
+    the module docstring).
+    """
+    if not _is_rigs_path(rel):
+        return True
+    return rel.suffix.lower() == rigs.PROFILE_EXT
 
 
 @dataclass(frozen=True)
@@ -137,13 +161,17 @@ def sync_remote_to_local(remote: Path | str, local: Path | str,
     # Walk the remote tree first (the slow network step) so we know the total
     # up front and the UI can show a determinate bar during the copy.
     _emit("scanning")
-    files = [src for src in sorted(remote.rglob("*")) if src.is_file()]
+    files = [
+        src for src in sorted(remote.rglob("*"))
+        if src.is_file() and is_syncable(src.relative_to(remote))
+    ]
     total = len(files)
 
     # Asset packages = folders containing a .ma (published layout: one folder per asset).
     # Record which already exist locally *before* copying anything, so a folder we create
     # mid-sync isn't mistaken for pre-existing - that's what separates "added" from
-    # "updated" at the asset level.
+    # "updated" at the asset level. Rig files are excluded above, so a registered rig can
+    # never be counted (or reported to the user) as a clothing asset.
     asset_folders = {
         src.relative_to(remote).parent for src in files
         if src.suffix == config.ASSET_EXT}
