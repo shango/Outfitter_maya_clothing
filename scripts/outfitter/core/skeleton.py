@@ -115,20 +115,13 @@ def to_json_dict(spec: SkeletonSpec) -> dict:
     }
 
 
-def write_skeleton(spec: SkeletonSpec, dest: Path | None = None) -> Path:
-    """Write ``spec`` to ``dest`` (defaults to the shipped :func:`skeleton_file`) as JSON.
-
-    Clears the :func:`load_cloth_skeleton` cache so the next load reflects the new data.
-    The spec is validated first; an invalid skeleton is never written.
-    """
-    errors = validate_skeleton(spec)
-    if errors:
-        raise ValueError("refusing to write invalid skeleton:\n  " + "\n  ".join(errors))
-    path = Path(dest) if dest is not None else skeleton_file()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(to_json_dict(spec), indent=1))
-    load_cloth_skeleton.cache_clear()
-    return path
+# NOTE: a ``write_skeleton`` used to live here, from when the skeleton was a standalone
+# ``data/cloth_skeleton.json``. Rig-agnosticism moved skeleton persistence inside the rig
+# profile, so the writer is now ``core.rigs.write_profile`` and this one was left behind
+# referencing four names (``Path``, ``json``, ``skeleton_file``, ``load_cloth_skeleton``)
+# that no longer exist in this module - it raised NameError on the first line it ran.
+# Removed rather than repaired: it had no callers, and a second skeleton writer that
+# bypasses profile validation is exactly what the rig-agnostic design took away.
 
 
 @dataclass(frozen=True)

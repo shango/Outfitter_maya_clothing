@@ -222,7 +222,7 @@ def capture_cloth_skeleton_from_rig(dest=None) -> SkeletonCaptureResult:
     path = _rigs.write_profile(
         updated, dest if dest is not None else _profile_dest(profile))
     return SkeletonCaptureResult(
-        dest=str(path), joint_count=len(joints),
+        dest=str(path), joint_count=len(spec.joints),
         root_group_rotate=spec.root_group_rotate)
 
 
