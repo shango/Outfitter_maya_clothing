@@ -10,9 +10,14 @@ All *structural* Outfitter-readiness work is done. It has **not been opened in M
 that is the one outstanding verification. `01.5` is kept as the pre-surgery source, and
 `01.3` / `01.4` are the two earlier (unskinned) drops.
 
-**Outfitter code: v1.2.1**, commit `84e9b1f` on branch `fix/maya-boundary-nameerrors`.
-Not merged. `git checkout master && git merge --ff-only fix/maya-boundary-nameerrors`
-when ready. 354 tests passing.
+**Outfitter code: v1.2.1**, branch `fix/maya-boundary-nameerrors`, pushed to origin.
+Not merged into master. `git checkout master && git merge --ff-only
+fix/maya-boundary-nameerrors && git push` when ready - master is a strict ancestor, so it
+is a clean fast-forward. 354 tests passing.
+
+**Decided 2026-09-02: Daniel will NOT be registered into Outfitter. MichaelC will.**
+So the registered rig set becomes GenHuman (bundled) + MichaelC. Nothing about Daniel needs
+fixing - see "Daniel comparison" below for what was found and is deliberately being left.
 
 **Work order for the two artists** (rigging lane + skin-weights lane):
 https://claude.ai/code/artifact/0851a776-5c1e-48f7-9f9a-c75d460fe43d
@@ -149,11 +154,58 @@ at bind/rest when Register rig runs.
   `load_cloth_skeleton`, none of which exist there. Dead since rig-agnosticism moved skeleton
   persistence into `rigs.write_profile`; removed rather than repaired.
 
+## Daniel comparison (for context; no action)
+
+Measured against `Daniel_rig_v03-RENAMED.ma`, since both derive from the same export
+contract:
+
+* **Export skeletons are identical** across Daniel, MichaelC and GenHuman - same 89 joints,
+  same names, same parent-child hierarchy. Only difference is each root's parent (its own
+  export group). Child creation order differs (Daniel emits `clavicle_l` first, MichaelC
+  `clavicle_r`), which Outfitter does not care about.
+* **Proportions differ**, from the `.bps` bind matrices:
+
+  | Pair | Median | Max |
+  |---|---|---|
+  | Daniel ↔ GenHuman | 2.48 cm | 3.58 cm |
+  | MichaelC ↔ Daniel | 6.82 cm | 10.62 cm |
+  | MichaelC ↔ GenHuman | 8.71 cm | 11.21 cm |
+
+  Daniel is GenHuman-sized; MichaelC is a distinctly bigger character. **Consequence for the
+  library:** existing GenHuman garments retarget onto MichaelC by *exact name* (no
+  `jointAliases`, no role heuristic) and `moveJointsMode` preserves the weights - but every
+  one needs a real refit afterwards. Retarget converts the binding, never the shape.
+* Daniel also differs structurally: mesh group named `Mesh_GRP`, `Daniel_Body_morph`
+  (gendered, so its garments carry male/female where MichaelC's carry `gender: none`), a
+  230-joint deform layer including a `mouth_M` face rig, and 14 skinClusters. It is *not* a
+  pure rename of GenHuman whatever `genhuman_to_daniel_rename.json` implies.
+* **Known and deliberately unfixed:** Daniel's mesh group is literally `Mesh_GRP`, which is
+  `config.MESH_GROUP` - the name a *garment* must use. With Daniel in a scene,
+  `scaffold_asset_groups` sees it already exists, skips creating the garment's own, and
+  reports "already in place"; a garment mesh parented under it would be deleted along with
+  the rig. Moot while Daniel stays unregistered. If that ever changes, the fix is the same
+  one-line rename applied to MichaelC, using `tools/michaelc/make_016.py` as the template.
+
+## Blocking on the Setup tab, before registering
+
+`scripts/path.txt` currently reads:
+
+```
+local = \\wsl.localhost\Ubuntu-24.04\home\sgold\dev\repos\maya_clothing_rig\assets
+```
+
+Two problems: that path uses the repo's **old** name (this repo is
+`Outfitter_maya_clothing`), and **no remote is configured**. Registration writes the profile
+to the remote first - that is the copy other artists fetch - so with no remote set, MichaelC
+registers on this machine only and reaches nobody. Fix both on the Setup tab first.
+
 ## Next steps
 
 1. Open `MichaelC_rig_01.6.ma` in Maya, confirm it loads with no script-editor errors.
-2. Hand the artifact to the two artists; R2/R3 decisions first.
-3. On completion: save as `MichaelC_rig_01.7.ma`, run `p.prep()` for a clean audit, then
+   (Never yet verified in Maya - the only outstanding check on the file itself.)
+2. Fix the local path and set a remote on the Setup tab (see above).
+3. Hand the artifact to the two artists; R2/R3 decisions first.
+4. On completion: save as `MichaelC_rig_01.7.ma`, run `p.prep()` for a clean audit, then
    Publish tab > **Register rig...** with export group `MichaelC_Joint_GRP` and the
    body-variant switch left empty.
-4. Merge `fix/maya-boundary-nameerrors` into master.
+5. Merge `fix/maya-boundary-nameerrors` into master.
