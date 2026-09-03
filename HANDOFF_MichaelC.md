@@ -89,13 +89,23 @@ Full detail, with vertex IDs and weight figures, is in the artifact linked above
 | | Item | Kind |
 |---|---|---|
 | R1 | Rig at bind pose; confirm `leg_[lr]_primaryLegIkDistanceEnd_anim` are by-design measure locators (only 2 controls off default) | Blocking |
-| R2 | Decide dual quaternion vs classic linear (`skinningMethod` is 2) | Decision |
+| R2 | Pick one skinning method. `skinningMethod` is 2 (*weighted blend*) with no `blendWeights` authored, so it runs as classic linear | Decision |
 | R3 | Set the real influence budget (`maxInfluences` says 3, peak is 8, 824 verts over 4) | Decision |
 | R4 | Five duplicate `spine_m_01..05_anim_spaceorientSpace` node names | Nuisance |
 | R5 | Known and deliberately left: empty `MichaelC_geo_hrc` / `MichaelC_Anatomical_Bone_Contour_GRP`, locked `UsdDefaultRenderSettings`, Hive body-guide viz | No action |
 
-R2 has a knock-on outside this rig: if DQ stays, it must go into
-`Clothing Asset Authoring Spec.md`, or garments bind classic linear by default and deform
+R2 needs restating, because `skinningMethod` 2 is not dual quaternion. It is Maya's
+*weighted blend* mode, in which a per-vertex `blendWeights` array (0 = linear, 1 = DQ) mixes the
+two. **That array was never authored - it is absent from the .ma entirely** - so every vertex sits
+at the default and the mesh deforms as classic linear inside a mode that claims to blend.
+
+Weighted blend is the wrong answer for this pipeline regardless of taste: a garment author can
+match a single setting, but not a per-vertex blend map that would have to be transferred onto every
+garment, and FBX to UE5 does not carry the map. So set `skinningMethod` explicitly to 0 or 1.
+Choosing 0 matches how the mesh already behaves and changes nothing visually. Choosing 1 is a real
+quality gain at twists, but note the rig already has twist joints for exactly that problem - once
+W3/W4 weight them, classic linear is adequate and is the engine-friendly pick. Whichever is chosen
+goes into `Clothing Asset Authoring Spec.md`, or garments bind classic linear by default and deform
 differently against the body at the same joints.
 
 ### Lane W - skin weights (6 items)
