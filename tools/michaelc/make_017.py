@@ -6,6 +6,7 @@ them. Every byte outside the four edited regions is carried over untouched.
 
   R3  maxInfluences 3 -> 4, maintainMaxInfluences on
   R4  rename the input-layer half of the five duplicated spine space-switch nodes
+      the in-scene version stamp, MichaelC_rig_v01_6 -> _v01_7
   W2/W3/W4/W6  replace the .wl weight block with the one Maya computed in mc_apply.py
 """
 import sys
@@ -54,6 +55,11 @@ for i, l in enumerate(out):
 assert renamed == 5, renamed
 assert refs == 15, refs
 print("R4: renamed %d nodes, rewrote %d path references" % (renamed, refs))
+
+# version stamp - an info-node marker under MichaelC_info_GRP, no connections
+stamp = only(out, 'createNode transform -n "MichaelC_rig_v01_6" -p "MichaelC_info_GRP";\n')
+out[stamp] = 'createNode transform -n "MichaelC_rig_v01_7" -p "MichaelC_info_GRP";\n'
+print("stamp: MichaelC_rig_v01_6 -> _v01_7 at line %d" % (stamp + 1))
 
 open(DST, "w").writelines(out)
 print("wrote %s (%d lines)" % (DST, len(out)))
