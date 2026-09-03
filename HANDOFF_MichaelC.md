@@ -1,14 +1,16 @@
 # MichaelC rig - Outfitter onboarding handoff
 
 Working record for bringing the MichaelC rig into the Outfitter rig repo.
-Session date: 2026-09-02. Sibling to `HANDOFF.md` (the rig-agnostic tool work).
+Sessions: 2026-09-02 (onboarding) and 2026-09-03 (verification against a real Maya).
+Sibling to `HANDOFF.md` (the rig-agnostic tool work).
 
 ## Where things stand
 
-**Rig file: `MichaelC_rig_01.6.ma`** - written this session by text surgery on 01.5.
-All *structural* Outfitter-readiness work is done. It has **not been opened in Maya**;
-that is the one outstanding verification. `01.5` is kept as the pre-surgery source, and
-`01.3` / `01.4` are the two earlier (unskinned) drops.
+**Rig file: `MichaelC_rig_01.6.ma`** - written by text surgery on 01.5. All *structural*
+Outfitter-readiness work is done, and on 2026-09-03 it was **confirmed to open in Maya 2026**:
+3,526 nodes, no errors, `skinningMethod` reads back 0, mesh at bind pose. Nothing about the
+file itself is outstanding. `01.5` is kept as the pre-surgery source, `01.3` / `01.4` are the
+two earlier (unskinned) drops.
 
 **Outfitter code: v1.2.1**, branch `fix/maya-boundary-nameerrors`, pushed to origin.
 Not merged into master. `git checkout master && git merge --ff-only
@@ -303,11 +305,30 @@ registers on this machine only and reaches nobody. Fix both on the Setup tab fir
 
 ## Next steps
 
-1. Open `MichaelC_rig_01.6.ma` in Maya, confirm it loads with no script-editor errors.
-   (Never yet verified in Maya - the only outstanding check on the file itself.)
-2. Fix the local path and set a remote on the Setup tab (see above).
-3. Hand the artifact to the two artists; R2/R3 decisions first.
+1. Fix the local path and set a remote on the Setup tab (see above). **This is the real
+   blocker** - without a remote, registering MichaelC reaches nobody.
+2. Hand the artifact to the two artists. **R3 is the only decision** and it only gates W6;
+   W2, W3 and W4 can start immediately, in any order.
+3. Add the skinning method to `Clothing Asset Authoring Spec.md`: garments must bind
+   **classic linear** to match the body. Nobody owns this yet and it is not an artist task.
 4. On completion: save as `MichaelC_rig_01.7.ma`, run `p.prep()` for a clean audit, then
    Publish tab > **Register rig...** with export group `MichaelC_Joint_GRP` and the
    body-variant switch left empty.
-5. Merge `fix/maya-boundary-nameerrors` into master.
+5. Merge `fix/maya-boundary-nameerrors` into master (clean fast-forward).
+
+## Maya is reachable from this shell - use it
+
+Two work-order items (W1, W5) were fiction produced by reasoning from the `.ma` text. Both
+died the moment a real Maya was asked. Do not infer Maya behaviour; test it:
+
+```bash
+"/mnt/c/Program Files/Autodesk/Maya2026/bin/mayapy.exe" script.py
+```
+
+Keep the script under `/mnt/c/Windows/Temp/...` (cmd.exe refuses a UNC working directory) and
+reach repo files by UNC:
+`\\wsl.localhost\Ubuntu-24.04\home\sgold\dev\repos\Outfitter_maya_clothing`.
+`maya.standalone.initialize()` costs ~35s, loading the rig ~4s. Load `mayaUsdPlugin` first or
+`UsdDefaultRenderSettings` arrives as an unknown node - and **never save the scene from a
+session where anything is unknown**. Baseline unfamiliar behaviour in an empty scene first;
+that is what exposed W1.
