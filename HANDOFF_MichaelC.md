@@ -6,10 +6,12 @@ Sibling to `HANDOFF.md` (the rig-agnostic tool work).
 
 ## Where things stand
 
-**Rig file: `MichaelC_rig_01.7.ma`** - written by text surgery on 01.6, which was itself
-text surgery on 01.5. **Every item in the work order has now been applied and verified in
-Maya**: the structural work in 01.6, and R3/R4/W2/W3/W4/W6 in 01.7. See "01.7: the whole work
-order, applied" below. `01.6` is kept as the pre-weights source, `01.5` as the pre-surgery
+**Rig file: `MichaelC_rig_01.8.ma`** - written by text surgery on 01.7, which was itself
+text surgery on 01.6, itself text surgery on 01.5. **Every item in the work order has now
+been applied and verified in Maya**: the structural work in 01.6, and R3/R4/W2/W3/W4/W6 in
+01.7. See "01.7: the whole work order, applied" below. 01.8 changes exactly two lines - it
+hides the body-guide layer (see "01.8: the guide layer off the controls"). `01.7` is kept as
+the last guide-visible build, `01.6` as the pre-weights source, `01.5` as the pre-surgery
 source, `01.3` / `01.4` are the two earlier (unskinned) drops.
 
 **Outfitter code: v1.2.1**, branch `fix/maya-boundary-nameerrors`, pushed to origin.
@@ -82,6 +84,52 @@ display-layer connection accounting exact (3 -> 2, the dropped one being the del
 
 **Since confirmed in Maya**: 01.6 opens with 3,526 nodes and no errors, and 01.7 (below)
 opens with the same count.
+
+## 01.8: the guide layer off the controls
+
+Reported from the viewport as "an extra clavicle control". There is no extra control. The
+clavicle component has exactly one control per side in every drop, and no node named
+`MichaelC_clavicle_l_00_anim1` has ever existed in 01.3 through 01.7 - Maya generates that
+`1` suffix on a `Ctrl+D` duplicate, so a node by that literal name lives in someone's working
+scene, not in a delivered file.
+
+What is real, and what a click at the clavicle actually finds:
+
+```
+MichaelC_BODY_clavicle_l_JOINT_MARKER_CRV   dist 0.000 from MichaelC_clavicle_l_00_anim
+```
+
+Distance zero, visible, `displayType 0` (normal, not reference), so it is selectable and it
+draws on top of the control. It is not one stray curve either - **all 31** joint markers on
+`MichaelC_BODY_GUIDE_LYR` sit exactly on an animation control:
+
+| marker | control it covers |
+|---|---|
+| `clavicle_l` / `clavicle_r` | `MichaelC_clavicle_*_00_anim` |
+| `shoulder_l` / `shoulder_r` | `MichaelC_arm_*_shldr_ik_anim` |
+| `elbow_*`, `knee_*` | the `bendy01_bendy_anim` controls |
+| `wrist_*`, `forearm_end_*` | `MichaelC_arm_*_hand_fk_anim` |
+| `ankle_*`, `ball_*` | `MichaelC_leg_*_foot_fk_anim`, `*_ball_fk_anim` |
+| `hip_l` / `hip_r` | `MichaelC_leg_*_hip_ik_anim` |
+| `spine_01`..`spine_05`, `pelvis_center` | the spine controls and `spine_m_gimbal_anim` |
+| `neck_base`, `neck_top`, `head` | the neck and head controls |
+| `palm_*`, `middle_finger_tip_*` | `MichaelC_middle_*_metacarpal_anim`, `*_03_anim` |
+
+**Fix applied in 01.8:** `setAttr "MichaelC_BODY_GUIDE_LYR.v" no;`, written the same way
+`MichaelC_JNT_LAYER` is already written. Nothing is deleted - the guide comes back by turning
+the layer on in the Display Layer editor. This is item 4 of the animation next steps, now
+closed for the markers.
+
+Still on: `MichaelC_god_m_godnode_anim.bodyJointLineVis` and `.toggleHeadWire`. Those are
+animator-facing toggles on the god node rather than layer state, so they were left for whoever
+sets the delivery default. There is no equivalent toggle for the markers, which is why the
+layer was the only lever.
+
+`verify_016.py MichaelC_rig_01.7.ma MichaelC_rig_01.8.ma`: 3,404 nodes and 18,107 connections
+unchanged, the only node delta the version stamp. Reloaded in Maya: 3,526 nodes, both unknown
+nodes present and not duplicated, `skm=0 mi=4 mmi=True`, 89 influences, guide layer `vis=False`
+with its 172 members intact, every control still visible and selectable. `diff` between the two
+files is two lines.
 
 ## 01.7: the whole work order, applied
 
@@ -349,10 +397,11 @@ use, and the only script nodes are Maya's own `sceneConfigurationScriptNode` /
    nothing was built. The spine, clavicles and every finger have spaces. Head-follows-world is
    the most used space switch there is, so this will be the first thing an animator asks for.
 3. **Decide the arm twists** (see "Not done" above).
-4. **Turn the body-guide viz off for delivery.** `MichaelC_BODY_GUIDE_LYR` is visible with 172
-   members, and `MichaelC_god_m_godnode_anim.bodyJointLineVis` and `.toggleHeadWire` are both
-   on. That is 34 anatomy curves and 31 joint markers drawn over the character. Flip them and
-   re-save.
+4. **Body-guide viz: markers done, toggles left.** `MichaelC_BODY_GUIDE_LYR` is hidden in
+   01.8, which takes all 31 joint markers off the controls they were sitting on. Still on:
+   `MichaelC_god_m_godnode_anim.bodyJointLineVis` and `.toggleHeadWire`, which draw 34 anatomy
+   curves over the character. They are god-node attributes rather than layer state, so decide
+   the delivery default and flip them.
 5. **IK/FK matching is not in the file.** The rig blends fine on the `ikfk` attribute, but
    snapping a pose across the switch is a Zoo Tools command. Either the animators install Zoo,
    or someone writes a small match script. A decision, not a defect.
