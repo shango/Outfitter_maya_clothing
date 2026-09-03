@@ -89,7 +89,7 @@ Full detail, with vertex IDs and weight figures, is in the artifact linked above
 | | Item | Kind |
 |---|---|---|
 | R1 | Rig at bind pose; confirm `leg_[lr]_primaryLegIkDistanceEnd_anim` are by-design measure locators (only 2 controls off default) | Blocking |
-| R2 | Pick one skinning method. `skinningMethod` is 2 (*weighted blend*) with no `blendWeights` authored, so it runs as classic linear | Decision |
+| R2 | ~~Pick one skinning method~~ **DONE 2026-09-03**: `skinningMethod` set 2 -> 0 in 01.6. Rigger only needs to keep it at 0 when rebinding | Done |
 | R3 | Set the real influence budget (`maxInfluences` says 3, peak is 8, 824 verts over 4) | Decision |
 | R4 | Five duplicate `spine_m_01..05_anim_spaceorientSpace` node names | Nuisance |
 | R5 | Known and deliberately left: empty `MichaelC_geo_hrc` / `MichaelC_Anatomical_Bone_Contour_GRP`, locked `UsdDefaultRenderSettings`, Hive body-guide viz | No action |
@@ -107,6 +107,19 @@ quality gain at twists, but note the rig already has twist joints for exactly th
 W3/W4 weight them, classic linear is adequate and is the engine-friendly pick. Whichever is chosen
 goes into `Clothing Asset Authoring Spec.md`, or garments bind classic linear by default and deform
 differently against the body at the same joints.
+
+**Resolved 2026-09-03**: `skinningMethod` is now **0** in `MichaelC_rig_01.6.ma` (single edit at
+line 57100, `".skm" 2;` -> `".skm" 0;`). Deformation is bit-identical, because weighted blend with
+an unauthored `blendWeights` array already computed pure linear. Verified: file diff is that one
+line, byte count unchanged, `verify_016.py` reports the same clean result, and the weight
+distribution is untouched (5,253 verts at 1.0 / 19 partial / 8 near-zero).
+
+Two things this does **not** settle, both still on the rigger:
+
+* **The W1 rebind must specify it.** Detach-and-rebind creates a *new* skinCluster and this
+  attribute does not survive. Bind with `-skinMethod 0` (or set it again afterwards).
+* **`Clothing Asset Authoring Spec.md` still needs the line**, so garment authors bind linear
+  deliberately rather than by coincidence of Maya's default.
 
 ### Lane W - skin weights (6 items)
 
