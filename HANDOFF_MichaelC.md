@@ -6,11 +6,11 @@ Sibling to `HANDOFF.md` (the rig-agnostic tool work).
 
 ## Where things stand
 
-**Rig file: `MichaelC_rig_01.6.ma`** - written by text surgery on 01.5. All *structural*
-Outfitter-readiness work is done, and on 2026-09-03 it was **confirmed to open in Maya 2026**:
-3,526 nodes, no errors, `skinningMethod` reads back 0, mesh at bind pose. Nothing about the
-file itself is outstanding. `01.5` is kept as the pre-surgery source, `01.3` / `01.4` are the
-two earlier (unskinned) drops.
+**Rig file: `MichaelC_rig_01.7.ma`** - written by text surgery on 01.6, which was itself
+text surgery on 01.5. **Every item in the work order has now been applied and verified in
+Maya**: the structural work in 01.6, and R3/R4/W2/W3/W4/W6 in 01.7. See "01.7: the whole work
+order, applied" below. `01.6` is kept as the pre-weights source, `01.5` as the pre-surgery
+source, `01.3` / `01.4` are the two earlier (unskinned) drops.
 
 **Outfitter code: v1.2.1**, branch `fix/maya-boundary-nameerrors`, pushed to origin.
 Not merged into master. `git checkout master && git merge --ff-only
@@ -21,7 +21,7 @@ is a clean fast-forward. 354 tests passing.
 So the registered rig set becomes GenHuman (bundled) + MichaelC. Nothing about Daniel needs
 fixing - see "Daniel comparison" below for what was found and is deliberately being left.
 
-**Work order for the two artists** (rigging lane + skin-weights lane):
+**Work order** (now a record of what was applied, not a task list):
 https://claude.ai/code/artifact/0851a776-5c1e-48f7-9f9a-c75d460fe43d
 
 ## What the rig is
@@ -80,159 +80,127 @@ trailer intact; skin chain and 89 influences intact; node-type deltas exactly th
 ones (container -2, hyperLayout -2, mesh -1, groupId -2, groupParts -1, transform +3);
 display-layer connection accounting exact (3 -> 2, the dropped one being the deleted shape).
 
-**Not verified: that Maya loads it.** Do this before it goes in the shared rig repo.
+**Since confirmed in Maya**: 01.6 opens with 3,526 nodes and no errors, and 01.7 (below)
+opens with the same count.
 
-## Outstanding work
+## 01.7: the whole work order, applied
 
-Full detail, with vertex IDs and weight figures, is in the artifact linked above. Summary:
+Written 2026-09-03 by `tools/michaelc/weights_017.py` (computes) + `make_017.py` (splices).
+8.49 MB -> 8.37 MB. Reloaded in Maya and checked: **3,526 nodes** (unchanged), both unknown
+nodes still present and not duplicated, `skinningMethod` 0, `maxInfluences` 4,
+`maintainMaxInfluences` on, all 5,280 vertices sum to 1.0, **peak 4 influences**, mesh still
+at bind pose (4.8e-07 cm), 89 export joints, landmarks unique. The weights read back out of
+the `.ma` match Maya's computed array to **1.4e-20** - the splice is bit-exact.
+`verify_016.py MichaelC_rig_01.6.ma MichaelC_rig_01.7.ma` is clean: 18,107 connections
+unchanged, every parent and endpoint resolves, node delta exactly the five R4 renames.
 
-### Lane R - rigging (5 items, none are weights)
+| | What was done | Evidence |
+|---|---|---|
+| R3 | `maxInfluences` 3 -> **4**, `maintainMaxInfluences` **on** | 4 was measured, not chosen: pruning the original weights to 4 moved 57 verts by at most 0.31 cm. To 8 it is exactly free, to 6 it is 0.01 cm. 4 is the portable answer and it costs nothing |
+| R4 | The five duplicated `spine_m_0N_anim_spaceorientSpace` names resolved | The copy under `spine_m_world_in` renamed to `..._in`; 15 full-path `connectAttr` references rewritten. Both orient-constraint targets still resolve. Scene duplicate short names 90 -> 85 |
+| W2 | `ball_l` 0.000 -> **41.498 over 342 verts**, against `ball_r`'s 41.893 over 340 | Each left foot vertex's own `GM_foot_L + ball_l` total was re-split using the ratio its mirror partner uses on the right. The foot is mirror-exact: worst partner distance **0.087 cm**, median 0.000 |
+| W3 | All four `calf_twist_*` 0.000 -> **73-77** (twist_01) and **51** (twist_02) per side | See "the twist model" below |
+| W4 | `thigh_twist_01_*` 0.68 -> **55.6/58.2**, `thigh_twist_02_*` 0.20 -> **39.5/39.9** | same |
+| W6 | Pruned to 4 and renormalized: 2,469 verts trimmed, influence histogram now `1:752 2:114 3:960 4:3454` | Prune-only cost, measured against the post-twist weights in an aggressive FK leg pose: max 0.66 cm, p99 0.13 cm, 690 verts. Zero at bind pose |
+
+**Deformation change overall**, W2+W3+W4+W6 together, measured in a pose that twists both
+legs in FK and both arms: max 4.36 cm, p99 2.98 cm, 800 verts moved. **Zero at bind pose.**
+That 4.36 cm is the fix working - the leg used to twist rigidly and now interpolates.
+
+### The twist model, measured rather than assumed
+
+The twist joints were never dead; they were driven correctly and simply carried no weight.
+Rotating a control and reading each twist joint's rotation relative to its parent:
+
+* **Calf twists are distal** - they carry `u x (ankle twist)`. `calf_twist_02_l` sits at
+  u = 0.365 along knee -> ankle, `calf_twist_01_l` at u = 0.729. Rotating
+  `MichaelC_leg_l_foot_ik_anim` gave them 8.624 deg and 17.253 deg, a ratio of 2.000 against
+  the positional ratio of 1.997.
+* **Thigh twists are proximal** - they carry `(1-u) x (hip twist)`. `thigh_twist_01_l` at
+  u = 0.331, `thigh_twist_02_l` at u = 0.662. Rotating `MichaelC_leg_l_thigh_fk_anim` 50 deg
+  gave -16.966 deg and -8.483 deg: ratio exactly 2.000, and the joint nearer the hip counters
+  more. (The leg defaults to IK, so the FK controls do nothing until `.ikfk` is set to 1 -
+  that is why an earlier sweep found only IK controls driving anything.)
+
+So each vertex's parent-bone weight was split between the two twist nodes bracketing its own
+u, which is exactly linear twist interpolation and exactly what the rig computes. Bending is
+unaffected: the twist joints are children of the parent bone and inherit its bend.
+
+This is a procedural falloff, not a painted one. It is correct in the sense that it matches
+the rig's own twist math, and it is what a rigger would paint as a starting point, but the
+shape of the falloff near the knee and ankle is a taste call that a human should look at.
+
+### Not done: the arms have the same defect
+
+Not in the work order, so not fixed, but found while measuring. The arm twists are weighted
+too lightly by the same margin the legs were:
+
+| joint | total | against |
+|---|---|---|
+| `lowerarm_twist_01_l` (distal) | 4.207 | `lowerarm_l` 168.831 |
+| `lowerarm_twist_02_l` (proximal) | 0.044 | same |
+| `upperarm_twist_01_l` (proximal) | 0.810 | `upperarm_l` 227.943 |
+| `upperarm_twist_02_l` (distal) | 0.385 | same |
+
+A linear split would give each twist joint roughly a third of its parent's weight, the way
+the legs now have. They escaped the work order only because they are not *exactly* zero.
+`weights_017.py`'s `redistribute()` handles them unchanged - it takes the parent joint, the
+two ends of the bone, and the twist nodes with their u parameters.
+
+### Lane R - the rest
 
 | | Item | Kind |
 |---|---|---|
-| R1 | ~~Rig at bind pose~~ **CLOSED 2026-09-03**: user confirms current pose is bind pose, and all 213 controls verified at default. Nothing to zero | Done |
-| R2 | ~~Pick one skinning method~~ **DONE 2026-09-03**: `skinningMethod` set 2 -> 0 in 01.6. Rigger only needs to keep it at 0 when rebinding | Done |
-| R3 | Set the real influence budget (`maxInfluences` says 3, `maintainMaxInfluences` off; peak 12, 2,218 verts over 4, or 831 counting only weights above 0.0001) | Decision |
-| R4 | Five duplicate `spine_m_01..05_anim_spaceorientSpace` node names | Nuisance |
+| R1 | ~~Rig at bind pose~~ **CLOSED**: user confirms current pose is bind pose, all 213 controls verified at default. Nothing to zero | Done |
+| R2 | ~~Pick one skinning method~~ **DONE**: `skinningMethod` set 2 -> 0 in 01.6 | Done |
 | R5 | Known and deliberately left: empty `MichaelC_geo_hrc` / `MichaelC_Anatomical_Bone_Contour_GRP`, locked `UsdDefaultRenderSettings`, Hive body-guide viz | No action |
 
-### W5 withdrawn 2026-09-03 - a parser artifact, verified against Maya
+### W1 and W5 were withdrawn 2026-09-03 - neither was a real defect
 
-**Every one of the 5,280 vertices sums to exactly 1.0.** W5 claimed eight carried only trace
-weight and needed hand-repainting; they do not. v859, described as "a right-side vertex whose
-only trace weight is on the left thigh", is **91.9% `calf_r`** and sits at X = -18.81, the same
-side as `thigh_r` (X = -11.04). v4055, "a shoulder vertex with its only weight on the left
-forearm twist", is 86.5% `lowerarm_l`, 6.4 units away.
+**W1** claimed `skinCluster2` lacks a deformer `objectSet`, so Paint Skin Weights would not
+open. A **textbook `Skin > Bind Skin` in an empty scene** produces the identical signature:
+Maya 2026 does not build that plumbing for skinClusters any more. `deformer -q -g` returns
+`MichaelC_body_meshShape`, `deformerWeights -export` writes a 906 KB file, `skinPercent`
+reads and writes, `findRelatedSkinCluster` resolves. This also retroactively justifies
+removing `groupId1`/`groupId2`/`groupParts1` in 01.6 - those really were dead.
 
-Cause: `tools/michaelc/wt.py` mis-parsed the chunked `.wl` blocks. Maya writes them as
-`setAttr ".wl[a:b].w"` runs whose declared ranges *overlap* at the boundary - `[67:151]` is
-followed by `[151:237]` - and the parser reset its vertex counter at each chunk, truncating
-whichever vertex straddled the split. Per-joint **totals** were unaffected, because sums are
-order-independent. That is precisely why W2/W3/W4 were right and W5 was not, and why the error
-was invisible until Maya could be asked. `wt.py` is deleted; see `tools/michaelc/README.md`.
+**W5** claimed eight vertices carried only trace weight. **Every one of the 5,280 vertices
+sums to exactly 1.0.** The cause was `tools/michaelc/wt.py` mis-parsing the chunked `.wl`
+blocks, whose declared ranges overlap at the boundary (`[67:151]` then `[151:237]`); the
+parser reset its vertex counter at each chunk and truncated whichever vertex straddled the
+split. Per-joint *totals* were unaffected, because sums are order-independent - which is
+exactly why W2/W3/W4 were right and W5 was not. `wt.py` is deleted; see
+`tools/michaelc/README.md`.
 
-The "W6 last, always" rule goes with it - there is no under-weighting evidence left to erase.
+### R1 closed - the rig is already zeroed
 
-### What survives, all confirmed against `MFnSkinCluster` on 2026-09-03
+The user confirms the saved pose is the bind pose, and the earlier phrasing "only 2 controls
+off default" was wrong in a way worth recording:
 
-| | Finding | Status |
-|---|---|---|
-| W2 | `ball_l` 0.000 over 0 verts; `ball_r` 41.893 over 339, max 0.4961; 144 left verts above 0.99 on `GM_foot_L` | **real** |
-| W3 | All four `calf_twist_*` at exactly 0.000 over 0 verts, both sides, while `calf_l` drives 554 verts (y -0.4 to 69.6) and `calf_r` 516 | Blocking |
-| W4 | `thigh_twist_01_l` 0.678 over 13 verts vs `thigh_l` 136.636 over 575 | **real** |
-| W6 | prune only: peak 12 influences, 2,218 verts over 4 (831 above 0.0001) | **real, halved** |
-| R3 | `maxInfluences` 3, `maintainMaxInfluences` off, real peak 12 | **real** |
-| R4 | all five spine space-switch names resolve to 2 nodes each; the export group's 89 stay unique | **real** |
-| W1 | no deformer set | withdrawn |
-| W5 | eight under-weighted vertices | withdrawn |
+* **All 213 animation controls are at default.** Defining a control properly - a transform
+  carrying a `nurbsCurve` shape - **zero** of them deviate from `t=0, r=0, s=1`.
+* **`leg_[lr]_primaryLegIkDistanceEnd_anim` are not controls.** They are bare `transform`
+  nodes with *no shape*, whose `.worldMatrix` feeds `leg_[lr]_startEnd_dist` and
+  `leg_[lr]_endPv_dist`, both `distanceBetween` nodes. They are the measuring end of the leg
+  IK stretch and their offsets are the measured geometry. **Zeroing them would break leg IK
+  stretch and pole-vector behaviour.** Do not touch them.
+* The other 43 off-default transforms are all rig machinery, never poses: `*_ik_jnt`,
+  `*_ikhandle`, `*_in`, `*RoundAimTarget_target`, `*_srtTwistServer_jnt`, `SCALE_PROXY`,
+  `Head_Reference_Wire_GRP`. The `_srt` and `_spaceorientSpace` nodes are offset groups that
+  place the rig in space; zeroing those would collapse it to the origin.
 
-### W1 withdrawn 2026-09-03 - it was never a real defect
+### R2, restated - `skinningMethod` 2 was never dual quaternion
 
-**`skinCluster2` is fine. W1 has been deleted from the work order, not downgraded.**
+It is Maya's *weighted blend* mode, in which a per-vertex `blendWeights` array (0 = linear,
+1 = DQ) mixes the two. **That array was never authored** - absent from the `.ma` entirely -
+so every vertex sat at the default and the mesh deformed as classic linear inside a mode that
+claimed to blend. Weighted blend is wrong for this pipeline regardless of taste: a garment
+author can match a single setting, but not a per-vertex blend map, and FBX to UE5 does not
+carry it. Set to **0** in 01.6; deformation was bit-identical, because weighted blend with an
+unauthored `blendWeights` array already computed pure linear.
 
-The claim was that the cluster lacks a deformer `objectSet`, so Paint Skin Weights would not
-open and `deformer -q -g` would return nothing. Verified against a real Maya 2026 via
-`mayapy`, every part of that is wrong:
-
-* A **textbook `Skin > Bind Skin` in an empty scene** produces the identical signature -
-  no `objectSet` connection, no `.message` consumer, no `groupId`, no `groupParts`. Maya 2026
-  simply does not build that plumbing for skinClusters any more. The diagnosis was looking for
-  nodes modern Maya never creates.
-* `deformer -q -g` **returns** `MichaelC_body_meshShape`.
-* `deformerWeights -export` writes a 906 KB file. `skinPercent` reads *and writes*.
-  `skinCluster -e -forceNormalizeWeights` runs. `findRelatedSkinCluster` resolves to
-  `skinCluster2`, which is how Paint Skin Weights bootstraps.
-* An FBX round-trip carries all **89 influences** through with weights intact, so the engine
-  path was never at risk either.
-
-**Consequences:** the weights artist is unblocked immediately - W2-W5 need nothing first.
-The ordering constraints collapse to just "R3 before W6". `examples/rebind_michaelc.py`
-has been deleted rather than kept: it solved a non-problem, and leaving it invited a
-destructive rebind for no reason.
-
-This also retroactively justifies removing `groupId1`/`groupId2`/`groupParts1` in 01.6 - those
-genuinely were dead nodes, since modern binds do not use them.
-
-### 01.6 confirmed to load in Maya, 2026-09-03
-
-Opened headlessly in `mayapy` 2026: **3,526 nodes, no errors.** All four landmarks resolve,
-`skinningMethod` reads back 0, and the mesh is confirmed **at bind pose** - the live shape
-deviates from the intermediate original by 2.39e-07 at worst. Two nodes come in as `unknown`
-(`UsdDefaultRenderSettings`, `hyperShadePrimaryNodeEditorSavedTabsInfo`); both are cosmetic
-scene-state nodes and both resolve when their plugins load. **Do not save the scene from a
-session where they are unknown** - that is the one way to lose them.
-
-### R1 closed 2026-09-03 - the rig is already zeroed
-
-The user confirms the saved pose is the bind pose. Verified against the file, and the earlier
-phrasing "only 2 controls off default" was wrong in a way worth recording:
-
-* **All 213 animation controls are at default.** Defining a control properly - a transform carrying
-  a `nurbsCurve` shape - **zero** of them deviate from `t=0, r=0, s=1`.
-* **`leg_[lr]_primaryLegIkDistanceEnd_anim` are not controls.** They are bare `transform` nodes with
-  *no shape at all*, whose `.worldMatrix` feeds `leg_[lr]_startEnd_dist` and `leg_[lr]_endPv_dist`,
-  both `distanceBetween` nodes. They are the measuring end of the leg IK stretch, parented under
-  `MichaelC_leg_[lr]_ball_ik_anim`, and their offsets are the measured geometry.
-  **Zeroing them would break leg IK stretch and pole-vector behaviour.** Do not touch them.
-* The other 43 off-default transforms are all rig machinery, never poses: `*_ik_jnt` (bone lengths),
-  `*_ikhandle` (solver placement), `*_in` (rig input plugs), `*RoundAimTarget_target` (unit aim
-  vectors at exactly +/-1), `*_srtTwistServer_jnt` (twist bone lengths), `SCALE_PROXY`,
-  `Head_Reference_Wire_GRP`. The `_srt` and `_spaceorientSpace` nodes excluded above are offset
-  groups that place the rig in space; zeroing those would collapse it to the origin.
-
-**Limit of this check:** the export skeleton's joints carry *no* static `.t`/`.r` in the file - they
-are `parentConstraint`-driven off the deform layer - so "current world pose equals bind pose" cannot
-be evaluated headlessly. Every control sitting at default is the strongest available file-side
-evidence, and it agrees with the user's statement. Each joint's `.bps` bind matrix is intact and
-readable (`head` at Y = 169.43) if it ever needs checking in Maya.
-
-R2 needs restating, because `skinningMethod` 2 is not dual quaternion. It is Maya's
-*weighted blend* mode, in which a per-vertex `blendWeights` array (0 = linear, 1 = DQ) mixes the
-two. **That array was never authored - it is absent from the .ma entirely** - so every vertex sits
-at the default and the mesh deforms as classic linear inside a mode that claims to blend.
-
-Weighted blend is the wrong answer for this pipeline regardless of taste: a garment author can
-match a single setting, but not a per-vertex blend map that would have to be transferred onto every
-garment, and FBX to UE5 does not carry the map. So set `skinningMethod` explicitly to 0 or 1.
-Choosing 0 matches how the mesh already behaves and changes nothing visually. Choosing 1 is a real
-quality gain at twists, but note the rig already has twist joints for exactly that problem - once
-W3/W4 weight them, classic linear is adequate and is the engine-friendly pick. Whichever is chosen
-goes into `Clothing Asset Authoring Spec.md`, or garments bind classic linear by default and deform
-differently against the body at the same joints.
-
-**Resolved 2026-09-03**: `skinningMethod` is now **0** in `MichaelC_rig_01.6.ma` (single edit at
-line 57100, `".skm" 2;` -> `".skm" 0;`). Deformation is bit-identical, because weighted blend with
-an unauthored `blendWeights` array already computed pure linear. Verified: file diff is that one
-line, byte count unchanged, `verify_016.py` reports the same clean result, and the weight
-distribution is untouched (5,253 verts at 1.0 / 19 partial / 8 near-zero).
-
-Two things this does **not** settle, both still on the rigger:
-
-* **The W1 rebind must specify it.** Detach-and-rebind creates a *new* skinCluster and this
-  attribute does not survive. Bind with `-skinMethod 0` (or set it again afterwards).
-* **`Clothing Asset Authoring Spec.md` still needs the line**, so garment authors bind linear
-  deliberately rather than by coincidence of Maya's default.
-
-### Lane W - skin weights (6 items)
-
-| | Item | Kind |
-|---|---|---|
-| W2 | `ball_l` at 0.000 over 0 verts; 144 left-foot verts sit above 0.99 on `GM_foot_L`. `ball_r` holds 41.893 across 353 verts (119 above 0.05). Mesh is exactly mirror-symmetric (119/119), so mirror right -> left below the knee | Blocking |
-| W3 | All four `calf_twist_*` at exactly zero, both sides | Blocking |
-| W4 | `thigh_twist_*` negligible: 13 and 8 verts holding 0.678 / 0.204, against `thigh_l`'s 575 verts and 136.636 | Quality |
-| W6 | Prune to R3's budget. The `forceNormalizeWeights` half is a no-op - every vertex already sums to 1.0 | Quality |
-
-W2/W3/W4 matter to Outfitter specifically: those joints are in the recommended skin sets the
-tool hands a garment rigger, so a garment deforms correctly while the body under it does not,
-and it reads as an Outfitter bug.
-
-### Ordering constraints (the lanes are not independent)
-
-Only one constraint survives: **R3 before W6**, because W6 prunes to the budget R3 sets.
-W2, W3 and W4 can start immediately and in any order.
-
-Also: Outfitter captures the skeleton at the rig's **current scene pose**, so the rig must be
-at bind/rest when Register rig runs.
+Garments must therefore bind **classic linear at 4 influences**, and
+`Clothing Asset Authoring Spec.md` still needs that line.
 
 ## Tooling written this session
 
@@ -243,11 +211,13 @@ at bind/rest when Register rig runs.
 * `tests/test_maya_boundary_names.py` - AST undefined-name check over `core/maya_*.py` and
   `examples/*.py`, the modules CI can only `py_compile`. Both bugs fixed this session were of
   exactly that class. Verified non-vacuous against re-introduced copies of both.
-* `tools/michaelc/` - headless, already run, kept for provenance:
-  `make_016.py` (01.5 -> 01.6 transform, the authoritative recipe), `verify_016.py`
-  (referential-integrity check), `dag2.py` (full-DAG-path .ma parser - short names are not
-  unique in this rig), `wt.py` (vertex positions + skin weights out of a .ma), `wpos.py`
-  (world joint positions from local transforms).
+* `tools/michaelc/` - already run, kept for provenance. `make_016.py` (01.5 -> 01.6, the
+  authoritative recipe), `weights_017.py` (in `mayapy`: computes W2/W3/W4/W6, exports the new
+  skinCluster and a `weights.bin` reference dump), `make_017.py` (splices that in, plus R3 and
+  R4, to write 01.7), `verify_017.py` (in `mayapy`: reloads 01.7 and checks it against the
+  dump), `verify_016.py` (referential-integrity diff between two .ma files), `dag2.py`
+  (full-DAG-path .ma parser - short names are not unique in this rig), `wpos.py` (world joint
+  positions from local transforms). `wt.py` was deleted; see that directory's README.
 
 ## Bugs fixed in the tool (in `84e9b1f`)
 
@@ -307,14 +277,17 @@ registers on this machine only and reaches nobody. Fix both on the Setup tab fir
 
 1. Fix the local path and set a remote on the Setup tab (see above). **This is the real
    blocker** - without a remote, registering MichaelC reaches nobody.
-2. Hand the artifact to the two artists. **R3 is the only decision** and it only gates W6;
-   W2, W3 and W4 can start immediately, in any order.
+2. Have a rigger look at 01.7 in a GUI Maya. Nothing is known to be wrong with it, but the
+   twist falloff in W3/W4 is procedural (linear, matching how the rig drives the joints) and
+   a human should see it move before it becomes the published body.
 3. Add the skinning method to `Clothing Asset Authoring Spec.md`: garments must bind
-   **classic linear** to match the body. Nobody owns this yet and it is not an artist task.
-4. On completion: save as `MichaelC_rig_01.7.ma`, run `p.prep()` for a clean audit, then
-   Publish tab > **Register rig...** with export group `MichaelC_Joint_GRP` and the
-   body-variant switch left empty.
-5. Merge `fix/maya-boundary-nameerrors` into master (clean fast-forward).
+   **classic linear** to match the body, at **4 influences**. Nobody owns this yet.
+4. Decide on the arm twists (see "Not done" below). Same defect as W3/W4, not in the work
+   order, one flag away in `weights_017.py`.
+5. Register: run `p.prep()` against 01.7 for a clean audit, then Publish tab >
+   **Register rig...** with export group `MichaelC_Joint_GRP` and the body-variant switch
+   left empty.
+6. Merge `fix/maya-boundary-nameerrors` into master (clean fast-forward).
 
 ## Maya is reachable from this shell - use it
 
@@ -332,3 +305,14 @@ reach repo files by UNC:
 `UsdDefaultRenderSettings` arrives as an unknown node - and **never save the scene from a
 session where anything is unknown**. Baseline unfamiliar behaviour in an empty scene first;
 that is what exposed W1.
+
+**Never name a `mayapy` script after a stdlib module.** `mayapy` puts the script's own
+directory on `sys.path`, so a file called `inspect.py` shadows the stdlib `inspect`, and
+`maya.standalone.initialize()` dies inside `TrunTimeCommandManager::load` with a bare stack
+trace naming nothing relevant. That cost most of an hour and looked exactly like a broken
+Maya install.
+
+**Do not `cmds.file(save=True)` from batch.** No plugin on this machine registers
+`UsdDefaultSettings` or `nodeGraphEditorInfo`, so they load as `unknown` and a save writes
+them back twice: a save/reload round trip gives 3,528 nodes instead of 3,526, with "UUID
+already in use". Export just the node you changed and splice its block into the `.ma`.
