@@ -9,9 +9,9 @@ Sibling to `HANDOFF.md` (the rig-agnostic tool work).
 **Rig file: `MichaelC_rig_01.8.ma`** - written by text surgery on 01.7, which was itself
 text surgery on 01.6, itself text surgery on 01.5. **Every item in the work order has now
 been applied and verified in Maya**: the structural work in 01.6, and R3/R4/W2/W3/W4/W6 in
-01.7. See "01.7: the whole work order, applied" below. 01.8 changes exactly two lines - it
-hides the body-guide layer (see "01.8: the guide layer off the controls"). `01.7` is kept as
-the last guide-visible build, `01.6` as the pre-weights source, `01.5` as the pre-surgery
+01.7. See "01.7: the whole work order, applied" below. 01.8 changes ten lines - it hides the
+body-guide layer and the eight bendy splines (see "01.8: the clutter off the controls").
+`01.7` is kept as the last guide-visible build, `01.6` as the pre-weights source, `01.5` as the pre-surgery
 source, `01.3` / `01.4` are the two earlier (unskinned) drops.
 
 **Outfitter code: v1.2.1**, branch `fix/maya-boundary-nameerrors`, pushed to origin.
@@ -85,7 +85,7 @@ display-layer connection accounting exact (3 -> 2, the dropped one being the del
 **Since confirmed in Maya**: 01.6 opens with 3,526 nodes and no errors, and 01.7 (below)
 opens with the same count.
 
-## 01.8: the guide layer off the controls
+## 01.8: the clutter off the controls
 
 Reported from the viewport as "an extra clavicle control". There is no extra control. The
 clavicle component has exactly one control per side in every drop, and no node named
@@ -120,16 +120,45 @@ draws on top of the control. It is not one stray curve either - **all 31** joint
 the layer on in the Display Layer editor. This is item 4 of the animation next steps, now
 closed for the markers.
 
+**Do we need the guide at all? No.** Data flows one way and never returns:
+`clavicle_l.worldMatrix -> BONE_MARKER_clavicle_l_MMX -> _DCM -> JOINT_MARKER_CRV.translate`.
+The bind joints drive the guide; the guide drives nothing. Its only consumer beyond itself is
+`MichaelC_Body_Bone_Contour_META`, a network node bookkeeping a feature never built -
+`MichaelC_Anatomical_Bone_Contour_GRP` has zero children. No Outfitter code references
+`BODY_GUIDE`, `JOINT_MARKER`, `ANATOMY_` or `BONE_`. It is 34 joint lines, 31 markers and
+~124 matrix nodes, about 258 of 3,526. It is kept because hidden costs nothing and it is the
+rigger's proportion scaffolding; strip it, with the empty contour group and its META node, only
+once the rigger says they are done with it.
+
+### The eight bendy splines
+
+A second batch, different cause. `arm_l/arm_r/leg_l/leg_r` x `bendy00_crv`/`bendy01_crv` run
+down the limbs, visible, on no display layer, so they take clicks the same way. They are not
+scaffolding: each is read by a `curveInfo` for arc length and by two `motionPath` nodes that
+ride the bendy joints along it. So 01.8 hides them rather than removing them - `setAttr ".v"
+no;` on each transform, none of which had an incoming visibility connection.
+
+Visibility affects drawing only, and that was tested rather than asserted. Loading 01.7 and
+01.8 side by side, posing `arm_l_bendy01_bendy_anim.ty 6` and `leg_r_bendy01_bendy_anim.ty -4`,
+both files move the same 8 deform joints the same 4.000000 cm, and the **worst posed-position
+difference across all 87 joints is 0.000e+00 cm**. The bendy limbs behave identically; they are
+just no longer drawn.
+
 Still on: `MichaelC_god_m_godnode_anim.bodyJointLineVis` and `.toggleHeadWire`. Those are
 animator-facing toggles on the god node rather than layer state, so they were left for whoever
 sets the delivery default. There is no equivalent toggle for the markers, which is why the
 layer was the only lever.
 
 `verify_016.py MichaelC_rig_01.7.ma MichaelC_rig_01.8.ma`: 3,404 nodes and 18,107 connections
-unchanged, the only node delta the version stamp. Reloaded in Maya: 3,526 nodes, both unknown
-nodes present and not duplicated, `skm=0 mi=4 mmi=True`, 89 influences, guide layer `vis=False`
-with its 172 members intact, every control still visible and selectable. `diff` between the two
-files is two lines.
+unchanged, the only node delta the version stamp. Reloaded in Maya from a fresh session: 3,526
+nodes, both unknown nodes present and not duplicated, `skm=0 mi=4 mmi=True`, 89 influences,
+guide layer `vis=False` with its 172 members intact, every control still visible and selectable.
+`diff` between the two files is ten lines: one version stamp, one layer visibility, eight bendy
+transforms.
+
+(Opening both rigs in one `mayapy` session reports 3,528 nodes for the second - that is the
+unknown-node duplication described under "mayapy", a session artifact, not a difference between
+the files. Count nodes from a fresh session.)
 
 ## 01.7: the whole work order, applied
 

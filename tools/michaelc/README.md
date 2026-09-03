@@ -9,7 +9,7 @@ Written when Maya was not reachable from this shell. **It now is** - see
 | `weights_017.py` | runs in `mayapy`: computes W2/W3/W4/W6 and exports the new skinCluster | good - result verified back through Maya bit-exactly |
 | `make_017.py` | splices that skinCluster into 01.6, plus R3 and R4, to write 01.7 | good - text surgery, `verify_017.py` confirms the result |
 | `verify_017.py` | runs in `mayapy`: reloads 01.7 and checks it against `weights.bin` | good |
-| `make_018.py` | 01.7 -> 01.8: hides `MichaelC_BODY_GUIDE_LYR`, bumps the version stamp | good - two changed lines, `verify_016.py` shows no node or connection delta |
+| `make_018.py` | 01.7 -> 01.8: hides `MichaelC_BODY_GUIDE_LYR` and the eight bendy splines, bumps the version stamp | good - ten changed lines, `verify_016.py` shows no node or connection delta |
 | `verify_016.py` | referential-integrity diff between two `.ma` files | good - structural only |
 | `dag2.py` | full-DAG-path `.ma` parser (short names are not unique here) | good - structural only |
 | `wpos.py` | world joint positions from local transforms | limited - the export joints are `parentConstraint`-driven, so it cannot evaluate their live pose |
@@ -50,10 +50,12 @@ python3 tools/michaelc/make_018.py                                       # -> Mi
 python3 tools/michaelc/verify_016.py MichaelC_rig_01.7.ma MichaelC_rig_01.8.ma
 ```
 
-The body-guide layer shipped visible, and all 31 of its `JOINT_MARKER` curves sit at distance
-0.000 from an animation control - a viewport click at the clavicle is as likely to grab the
-marker as the control. `make_018.py` hides the layer. Nothing is deleted; turning the layer
-back on restores the guide.
+Two sets of curves took viewport clicks off the animation controls. The body-guide layer
+shipped visible, and all 31 of its `JOINT_MARKER` curves sit at distance 0.000 from a control.
+The eight Hive bendy splines run down the limbs on no display layer at all. `make_018.py` hides
+both. Nothing is deleted - turning the layer back on restores the guide, and the bendy splines
+still feed their `curveInfo` and `motionPath` readers, which was verified by posing 01.7 and
+01.8 identically: same 8 joints moved, same 4.000000 cm, worst difference 0.000e+00 cm.
 
 **Why text surgery rather than saving the scene.** Batch Maya cannot register
 `UsdDefaultSettings` or `nodeGraphEditorInfo`; no plugin on this machine provides them
