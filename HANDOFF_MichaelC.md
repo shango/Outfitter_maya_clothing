@@ -94,6 +94,36 @@ Full detail, with vertex IDs and weight figures, is in the artifact linked above
 | R4 | Five duplicate `spine_m_01..05_anim_spaceorientSpace` node names | Nuisance |
 | R5 | Known and deliberately left: empty `MichaelC_geo_hrc` / `MichaelC_Anatomical_Bone_Contour_GRP`, locked `UsdDefaultRenderSettings`, Hive body-guide viz | No action |
 
+### W5 withdrawn 2026-09-03 - a parser artifact, verified against Maya
+
+**Every one of the 5,280 vertices sums to exactly 1.0.** W5 claimed eight carried only trace
+weight and needed hand-repainting; they do not. v859, described as "a right-side vertex whose
+only trace weight is on the left thigh", is **91.9% `calf_r`** and sits at X = -18.81, the same
+side as `thigh_r` (X = -11.04). v4055, "a shoulder vertex with its only weight on the left
+forearm twist", is 86.5% `lowerarm_l`, 6.4 units away.
+
+Cause: `tools/michaelc/wt.py` mis-parsed the chunked `.wl` blocks. Maya writes them as
+`setAttr ".wl[a:b].w"` runs whose declared ranges *overlap* at the boundary - `[67:151]` is
+followed by `[151:237]` - and the parser reset its vertex counter at each chunk, truncating
+whichever vertex straddled the split. Per-joint **totals** were unaffected, because sums are
+order-independent. That is precisely why W2/W3/W4 were right and W5 was not, and why the error
+was invisible until Maya could be asked. `wt.py` is deleted; see `tools/michaelc/README.md`.
+
+The "W6 last, always" rule goes with it - there is no under-weighting evidence left to erase.
+
+### What survives, all confirmed against `MFnSkinCluster` on 2026-09-03
+
+| | Finding | Status |
+|---|---|---|
+| W2 | `ball_l` 0.000 over 0 verts; `ball_r` 41.893 over 339, max 0.4961; 144 left verts above 0.99 on `GM_foot_L` | **real** |
+| W3 | all four `calf_twist_*` exactly 0.000 over 0 verts | **real** |
+| W4 | `thigh_twist_01_l` 0.678 over 13 verts vs `thigh_l` 136.636 over 575 | **real** |
+| W6 | prune only: peak 12 influences, 2,218 verts over 4 (831 above 0.0001) | **real, halved** |
+| R3 | `maxInfluences` 3, `maintainMaxInfluences` off, real peak 12 | **real** |
+| R4 | all five spine space-switch names resolve to 2 nodes each; the export group's 89 stay unique | **real** |
+| W1 | no deformer set | withdrawn |
+| W5 | eight under-weighted vertices | withdrawn |
+
 ### W1 withdrawn 2026-09-03 - it was never a real defect
 
 **`skinCluster2` is fine. W1 has been deleted from the work order, not downgraded.**
@@ -188,26 +218,16 @@ Two things this does **not** settle, both still on the rigger:
 | W2 | `ball_l` at zero - the left toe is 99% ankle while the right is a proper ankle/ball blend across 286 verts. Mirror right -> left below the knee | Blocking |
 | W3 | All four `calf_twist_*` at exactly zero, both sides | Blocking |
 | W4 | `thigh_twist_*` negligible (9 and 4 verts against ~460 on the parent thigh) | Quality |
-| W5 | Eight vertices repainted by hand: `859, 1183, 1304, 2980, 3349, 3907, 4055, 4979` | Blocking |
-| W6 | Prune to R3's budget, then `skinCluster -e -forceNormalizeWeights` | Quality |
+| W6 | Prune to R3's budget. The `forceNormalizeWeights` half is a no-op - every vertex already sums to 1.0 | Quality |
 
 W2/W3/W4 matter to Outfitter specifically: those joints are in the recommended skin sets the
 tool hands a garment rigger, so a garment deforms correctly while the body under it does not,
 and it reads as an Outfitter bug.
 
-On W5: 859 and 2980 sum to zero (859 is a *right*-side vertex whose only trace weight is on
-the *left* thigh - corrupted, not thin). The other six carry only trace weight, and
-normalizing would hand each entirely to whatever holds the trace - 4055 sits at shoulder
-height with its only weight on the left forearm twist. **Normalizing is the wrong fix for
-all eight.**
-
 ### Ordering constraints (the lanes are not independent)
 
-1. **W2-W5 can start now.** There is no rebind, so nothing gates them.
-2. **R3 before W6** - pruning to an influence budget is a weight edit, so the number has to be
-   picked before the prune happens.
-3. **W6 last, always** - normalizing makes every vertex sum to 1 and erases the evidence for
-   everything above it.
+Only one constraint survives: **R3 before W6**, because W6 prunes to the budget R3 sets.
+W2, W3 and W4 can start immediately and in any order.
 
 Also: Outfitter captures the skeleton at the rig's **current scene pose**, so the rig must be
 at bind/rest when Register rig runs.
