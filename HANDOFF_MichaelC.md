@@ -88,11 +88,35 @@ Full detail, with vertex IDs and weight figures, is in the artifact linked above
 
 | | Item | Kind |
 |---|---|---|
-| R1 | Rig at bind pose; confirm `leg_[lr]_primaryLegIkDistanceEnd_anim` are by-design measure locators (only 2 controls off default) | Blocking |
+| R1 | ~~Rig at bind pose~~ **CLOSED 2026-09-03**: user confirms current pose is bind pose, and all 213 controls verified at default. Nothing to zero | Done |
 | R2 | ~~Pick one skinning method~~ **DONE 2026-09-03**: `skinningMethod` set 2 -> 0 in 01.6. Rigger only needs to keep it at 0 when rebinding | Done |
 | R3 | Set the real influence budget (`maxInfluences` says 3, peak is 8, 824 verts over 4) | Decision |
 | R4 | Five duplicate `spine_m_01..05_anim_spaceorientSpace` node names | Nuisance |
 | R5 | Known and deliberately left: empty `MichaelC_geo_hrc` / `MichaelC_Anatomical_Bone_Contour_GRP`, locked `UsdDefaultRenderSettings`, Hive body-guide viz | No action |
+
+### R1 closed 2026-09-03 - the rig is already zeroed
+
+The user confirms the saved pose is the bind pose. Verified against the file, and the earlier
+phrasing "only 2 controls off default" was wrong in a way worth recording:
+
+* **All 213 animation controls are at default.** Defining a control properly - a transform carrying
+  a `nurbsCurve` shape - **zero** of them deviate from `t=0, r=0, s=1`.
+* **`leg_[lr]_primaryLegIkDistanceEnd_anim` are not controls.** They are bare `transform` nodes with
+  *no shape at all*, whose `.worldMatrix` feeds `leg_[lr]_startEnd_dist` and `leg_[lr]_endPv_dist`,
+  both `distanceBetween` nodes. They are the measuring end of the leg IK stretch, parented under
+  `MichaelC_leg_[lr]_ball_ik_anim`, and their offsets are the measured geometry.
+  **Zeroing them would break leg IK stretch and pole-vector behaviour.** Do not touch them.
+* The other 43 off-default transforms are all rig machinery, never poses: `*_ik_jnt` (bone lengths),
+  `*_ikhandle` (solver placement), `*_in` (rig input plugs), `*RoundAimTarget_target` (unit aim
+  vectors at exactly +/-1), `*_srtTwistServer_jnt` (twist bone lengths), `SCALE_PROXY`,
+  `Head_Reference_Wire_GRP`. The `_srt` and `_spaceorientSpace` nodes excluded above are offset
+  groups that place the rig in space; zeroing those would collapse it to the origin.
+
+**Limit of this check:** the export skeleton's joints carry *no* static `.t`/`.r` in the file - they
+are `parentConstraint`-driven off the deform layer - so "current world pose equals bind pose" cannot
+be evaluated headlessly. Every control sitting at default is the strongest available file-side
+evidence, and it agrees with the user's statement. Each joint's `.bps` bind matrix is intact and
+readable (`head` at Y = 169.43) if it ever needs checking in Maya.
 
 R2 needs restating, because `skinningMethod` 2 is not dual quaternion. It is Maya's
 *weighted blend* mode, in which a per-vertex `blendWeights` array (0 = linear, 1 = DQ) mixes the
@@ -145,7 +169,7 @@ all eight.**
 ### Ordering constraints (the lanes are not independent)
 
 1. **R2 and R3 before W1** - the rebind sets the skinning method, and pruning is a weight edit.
-2. **R1 before W1** - the mesh has to be rebound at bind pose.
+2. **R1 before W1** - the mesh has to be rebound at bind pose. Closed: it already is.
 3. **W1 before W2-W5** - Maya's weight tools don't work on this mesh until the deformer set exists.
 4. **W6 last, always** - normalizing makes every vertex sum to 1 and erases the evidence for
    everything above it.
