@@ -90,7 +90,7 @@ Full detail, with vertex IDs and weight figures, is in the artifact linked above
 |---|---|---|
 | R1 | ~~Rig at bind pose~~ **CLOSED 2026-09-03**: user confirms current pose is bind pose, and all 213 controls verified at default. Nothing to zero | Done |
 | R2 | ~~Pick one skinning method~~ **DONE 2026-09-03**: `skinningMethod` set 2 -> 0 in 01.6. Rigger only needs to keep it at 0 when rebinding | Done |
-| R3 | Set the real influence budget (`maxInfluences` says 3, peak is 8, 824 verts over 4) | Decision |
+| R3 | Set the real influence budget (`maxInfluences` says 3, `maintainMaxInfluences` off; peak 12, 2,218 verts over 4, or 831 counting only weights above 0.0001) | Decision |
 | R4 | Five duplicate `spine_m_01..05_anim_spaceorientSpace` node names | Nuisance |
 | R5 | Known and deliberately left: empty `MichaelC_geo_hrc` / `MichaelC_Anatomical_Bone_Contour_GRP`, locked `UsdDefaultRenderSettings`, Hive body-guide viz | No action |
 
@@ -116,7 +116,7 @@ The "W6 last, always" rule goes with it - there is no under-weighting evidence l
 | | Finding | Status |
 |---|---|---|
 | W2 | `ball_l` 0.000 over 0 verts; `ball_r` 41.893 over 339, max 0.4961; 144 left verts above 0.99 on `GM_foot_L` | **real** |
-| W3 | all four `calf_twist_*` exactly 0.000 over 0 verts | **real** |
+| W3 | All four `calf_twist_*` at exactly 0.000 over 0 verts, both sides, while `calf_l` drives 554 verts (y -0.4 to 69.6) and `calf_r` 516 | Blocking |
 | W4 | `thigh_twist_01_l` 0.678 over 13 verts vs `thigh_l` 136.636 over 575 | **real** |
 | W6 | prune only: peak 12 influences, 2,218 verts over 4 (831 above 0.0001) | **real, halved** |
 | R3 | `maxInfluences` 3, `maintainMaxInfluences` off, real peak 12 | **real** |
@@ -144,7 +144,7 @@ open and `deformer -q -g` would return nothing. Verified against a real Maya 202
   path was never at risk either.
 
 **Consequences:** the weights artist is unblocked immediately - W2-W5 need nothing first.
-The ordering constraints collapse to just "R3 before W6, and W6 last". `examples/rebind_michaelc.py`
+The ordering constraints collapse to just "R3 before W6". `examples/rebind_michaelc.py`
 has been deleted rather than kept: it solved a non-problem, and leaving it invited a
 destructive rebind for no reason.
 
@@ -215,9 +215,9 @@ Two things this does **not** settle, both still on the rigger:
 
 | | Item | Kind |
 |---|---|---|
-| W2 | `ball_l` at zero - the left toe is 99% ankle while the right is a proper ankle/ball blend across 286 verts. Mirror right -> left below the knee | Blocking |
+| W2 | `ball_l` at 0.000 over 0 verts; 144 left-foot verts sit above 0.99 on `GM_foot_L`. `ball_r` holds 41.893 across 353 verts (119 above 0.05). Mesh is exactly mirror-symmetric (119/119), so mirror right -> left below the knee | Blocking |
 | W3 | All four `calf_twist_*` at exactly zero, both sides | Blocking |
-| W4 | `thigh_twist_*` negligible (9 and 4 verts against ~460 on the parent thigh) | Quality |
+| W4 | `thigh_twist_*` negligible: 13 and 8 verts holding 0.678 / 0.204, against `thigh_l`'s 575 verts and 136.636 | Quality |
 | W6 | Prune to R3's budget. The `forceNormalizeWeights` half is a no-op - every vertex already sums to 1.0 | Quality |
 
 W2/W3/W4 matter to Outfitter specifically: those joints are in the recommended skin sets the
