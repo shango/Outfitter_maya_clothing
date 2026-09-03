@@ -183,6 +183,14 @@ at bind/rest when Register rig runs.
   passes report "already done" and it does the weight audit + normalize. Dry run by default
   (`p.prep()`), `p.prep(apply=True)` to act. Run it against 01.5 and it performs the structural
   work too, so it is the fallback if 01.6 is ever mistrusted.
+* `examples/rebind_michaelc.py` - **W1 as a script.** Reads weights through
+  `MFnSkinCluster` (which does not consult the deformer set, hence works on the broken
+  cluster), guards that the mesh is at bind pose, deletes history, binds classic linear with
+  `removeUnusedInfluence=False`, restores weights matched by influence *name* with
+  normalization off, then verifies. Dry run by default (`r.run()`), `r.run(apply=True)` to act.
+  Prefer it over the menus - `Deform > Import Weights` normalizes, which would erase W5's
+  evidence, and Bind Skin's default `removeUnusedInfluence` would delete `ball_l` and the four
+  `calf_twist_*`, the very joints W2/W3 exist to paint.
 * `tests/test_maya_boundary_names.py` - AST undefined-name check over `core/maya_*.py` and
   `examples/*.py`, the modules CI can only `py_compile`. Both bugs fixed this session were of
   exactly that class. Verified non-vacuous against re-introduced copies of both.
