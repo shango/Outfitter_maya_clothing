@@ -94,6 +94,42 @@ Full detail, with vertex IDs and weight figures, is in the artifact linked above
 | R4 | Five duplicate `spine_m_01..05_anim_spaceorientSpace` node names | Nuisance |
 | R5 | Known and deliberately left: empty `MichaelC_geo_hrc` / `MichaelC_Anatomical_Bone_Contour_GRP`, locked `UsdDefaultRenderSettings`, Hive body-guide viz | No action |
 
+### W1 withdrawn 2026-09-03 - it was never a real defect
+
+**`skinCluster2` is fine. W1 has been deleted from the work order, not downgraded.**
+
+The claim was that the cluster lacks a deformer `objectSet`, so Paint Skin Weights would not
+open and `deformer -q -g` would return nothing. Verified against a real Maya 2026 via
+`mayapy`, every part of that is wrong:
+
+* A **textbook `Skin > Bind Skin` in an empty scene** produces the identical signature -
+  no `objectSet` connection, no `.message` consumer, no `groupId`, no `groupParts`. Maya 2026
+  simply does not build that plumbing for skinClusters any more. The diagnosis was looking for
+  nodes modern Maya never creates.
+* `deformer -q -g` **returns** `MichaelC_body_meshShape`.
+* `deformerWeights -export` writes a 906 KB file. `skinPercent` reads *and writes*.
+  `skinCluster -e -forceNormalizeWeights` runs. `findRelatedSkinCluster` resolves to
+  `skinCluster2`, which is how Paint Skin Weights bootstraps.
+* An FBX round-trip carries all **89 influences** through with weights intact, so the engine
+  path was never at risk either.
+
+**Consequences:** the weights artist is unblocked immediately - W2-W5 need nothing first.
+The ordering constraints collapse to just "R3 before W6, and W6 last". `examples/rebind_michaelc.py`
+has been deleted rather than kept: it solved a non-problem, and leaving it invited a
+destructive rebind for no reason.
+
+This also retroactively justifies removing `groupId1`/`groupId2`/`groupParts1` in 01.6 - those
+genuinely were dead nodes, since modern binds do not use them.
+
+### 01.6 confirmed to load in Maya, 2026-09-03
+
+Opened headlessly in `mayapy` 2026: **3,526 nodes, no errors.** All four landmarks resolve,
+`skinningMethod` reads back 0, and the mesh is confirmed **at bind pose** - the live shape
+deviates from the intermediate original by 2.39e-07 at worst. Two nodes come in as `unknown`
+(`UsdDefaultRenderSettings`, `hyperShadePrimaryNodeEditorSavedTabsInfo`); both are cosmetic
+scene-state nodes and both resolve when their plugins load. **Do not save the scene from a
+session where they are unknown** - that is the one way to lose them.
+
 ### R1 closed 2026-09-03 - the rig is already zeroed
 
 The user confirms the saved pose is the bind pose. Verified against the file, and the earlier
@@ -149,7 +185,6 @@ Two things this does **not** settle, both still on the rigger:
 
 | | Item | Kind |
 |---|---|---|
-| W1 | Rebind so the deformer set exists (`skinCluster2` has none - Paint Skin Weights won't open, `deformer -q -g` returns nothing). **Plumbing, not weights** | Blocking |
 | W2 | `ball_l` at zero - the left toe is 99% ankle while the right is a proper ankle/ball blend across 286 verts. Mirror right -> left below the knee | Blocking |
 | W3 | All four `calf_twist_*` at exactly zero, both sides | Blocking |
 | W4 | `thigh_twist_*` negligible (9 and 4 verts against ~460 on the parent thigh) | Quality |
@@ -168,10 +203,10 @@ all eight.**
 
 ### Ordering constraints (the lanes are not independent)
 
-1. **R2 and R3 before W1** - the rebind sets the skinning method, and pruning is a weight edit.
-2. **R1 before W1** - the mesh has to be rebound at bind pose. Closed: it already is.
-3. **W1 before W2-W5** - Maya's weight tools don't work on this mesh until the deformer set exists.
-4. **W6 last, always** - normalizing makes every vertex sum to 1 and erases the evidence for
+1. **W2-W5 can start now.** There is no rebind, so nothing gates them.
+2. **R3 before W6** - pruning to an influence budget is a weight edit, so the number has to be
+   picked before the prune happens.
+3. **W6 last, always** - normalizing makes every vertex sum to 1 and erases the evidence for
    everything above it.
 
 Also: Outfitter captures the skeleton at the rig's **current scene pose**, so the rig must be
@@ -183,14 +218,6 @@ at bind/rest when Register rig runs.
   passes report "already done" and it does the weight audit + normalize. Dry run by default
   (`p.prep()`), `p.prep(apply=True)` to act. Run it against 01.5 and it performs the structural
   work too, so it is the fallback if 01.6 is ever mistrusted.
-* `examples/rebind_michaelc.py` - **W1 as a script.** Reads weights through
-  `MFnSkinCluster` (which does not consult the deformer set, hence works on the broken
-  cluster), guards that the mesh is at bind pose, deletes history, binds classic linear with
-  `removeUnusedInfluence=False`, restores weights matched by influence *name* with
-  normalization off, then verifies. Dry run by default (`r.run()`), `r.run(apply=True)` to act.
-  Prefer it over the menus - `Deform > Import Weights` normalizes, which would erase W5's
-  evidence, and Bind Skin's default `removeUnusedInfluence` would delete `ball_l` and the four
-  `calf_twist_*`, the very joints W2/W3 exist to paint.
 * `tests/test_maya_boundary_names.py` - AST undefined-name check over `core/maya_*.py` and
   `examples/*.py`, the modules CI can only `py_compile`. Both bugs fixed this session were of
   exactly that class. Verified non-vacuous against re-introduced copies of both.

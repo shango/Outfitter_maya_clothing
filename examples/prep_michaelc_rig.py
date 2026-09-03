@@ -20,8 +20,8 @@ nouns like ``Skeleton`` / ``Geo`` / ``Body``. The asset containers matter for th
 reason: container contents are restricted, and Outfitter has to read and connect to the
 joints inside them.
 
-What this script does NOT do: repaint skin weights, or rebuild the skinCluster's missing
-deformer set. :func:`audit_weights` reports both; filling them in is an artist job.
+What this script does NOT do: repaint skin weights. :func:`audit_weights` reports which
+joints the body carries no weight on; filling them in is an artist job.
 
 Run it from Maya's Script Editor (Python), with the rig open::
 
@@ -202,14 +202,10 @@ def clean_skin_chain(apply: bool = False) -> list[str]:
         if apply:
             cmds.delete(node)
 
-    # The bind carries no deformer objectSet, which the paint-weights tool needs. That is
-    # a rebind, not a rewire, so it is reported rather than attempted.
-    sets = [s for s in (cmds.listConnections(f"{SKIN_CLUSTER}.message", type="objectSet") or [])]
-    if not sets:
-        out.append(f"  NOTE {SKIN_CLUSTER} has no deformer set - Paint Skin Weights and "
-                   "'deformer -q -g' will not see it. Fix by exporting weights "
-                   "(Deform > Export Weights), deleting the skinCluster, re-binding with "
-                   "Skin > Bind Skin, then importing the weights back.")
+    # NOTE: an earlier version reported "no deformer objectSet" here as a defect needing a
+    # rebind. That was wrong. Maya 2026 does not create an objectSet, groupId or groupParts
+    # for a skinCluster at all - a textbook Skin > Bind Skin in an empty scene produces the
+    # same signature this rig has. Verified against mayapy 2026 on 2026-09-03.
     return out
 
 

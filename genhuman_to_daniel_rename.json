@@ -1,0 +1,114 @@
+{
+ "_comment": "Lookup for retargeting content authored against the GenHuman rig onto the Daniel rig (derived from GenHuman and renamed 2026-07-30). tokenRules is the authoritative, lossless map: applying the rules in order reproduces every one of the 920 node renames, including the ~600 mechanical Daniel_rig_deformLayer_hrc_* utility nodes not listed individually below. The named maps are landmarks for humans and for code that needs specific nodes.",
+ "schema": "outfitter-rig-rename/1",
+
+ "from": {
+  "rigId": "genhuman",
+  "displayName": "GenHuman",
+  "file": "GenHuman_rig_v03.ma"
+ },
+ "to": {
+  "rigId": "daniel",
+  "displayName": "Daniel",
+  "file": "Daniel_rig_v03.ma"
+ },
+
+ "tokenRules": [
+  {"from": "GH_Daniel_Geo", "to": "Daniel_Geo",
+   "note": "Must run first. The layer already carried the character name, so a literal GH->Daniel swap would have produced Daniel_Daniel_Geo."},
+  {"from": "GH_JNT_LAYER", "to": "Daniel_JNT_LAYER"},
+  {"from": "GH_CTRL_LAYER", "to": "Daniel_CTRL_LAYER"},
+  {"from": "GH_Body_morph", "to": "Daniel_Body_morph"},
+  {"from": "hands_mwsh", "to": "hands_mesh",
+   "note": "Typo fix, not a rig rename. Also corrects hands_mwshShape / hands_mwshShapeOrig."},
+  {"from": "GenHuman", "to": "Daniel",
+   "note": "Run last. Covers the top node, all rig groups, meta/set nodes, the namespace and the Hive hName/zooHiveId string attrs."}
+ ],
+
+ "namespaces": {
+  "GenHuman_rig": "Daniel_rig"
+ },
+
+ "topNode": {
+  "GenHuman": "Daniel"
+ },
+
+ "groups": {
+  "GenHuman_rig_hrc": "Daniel_rig_hrc",
+  "GenHuman_rig_componentLayer_hrc": "Daniel_rig_componentLayer_hrc",
+  "GenHuman_rig_deformLayer_hrc": "Daniel_rig_deformLayer_hrc",
+  "GenHuman_rig_geo_hrc": "Daniel_rig_geo_hrc",
+  "GenHuman_Joint_GRP": "Daniel_Joint_GRP",
+  "GenHuman_info_GRP": "Daniel_info_GRP",
+  "GenHuman_rig_v03": "Daniel_rig_v03",
+  "GenHuman_rig_Maya2026": "Daniel_rig_Maya2026"
+ },
+
+ "sets": {
+  "GenHuman_rig_set": "Daniel_rig_set",
+  "GenHuman_rig_skeleton_set": "Daniel_rig_skeleton_set",
+  "GenHuman_rig_blendshape_set": "Daniel_rig_blendshape_set",
+  "GenHuman_rig_ctrls_set": "Daniel_rig_ctrls_set"
+ },
+
+ "metaNodes": {
+  "GenHuman_rig_meta": "Daniel_rig_meta",
+  "GenHuman_rig_componentLayer_meta": "Daniel_rig_componentLayer_meta",
+  "GenHuman_rig_deformLayer_meta": "Daniel_rig_deformLayer_meta",
+  "GenHuman_rig_geo_meta": "Daniel_rig_geo_meta"
+ },
+
+ "displayLayers": {
+  "GH_JNT_LAYER": "Daniel_JNT_LAYER",
+  "GH_CTRL_LAYER": "Daniel_CTRL_LAYER",
+  "GH_Daniel_Geo": "Daniel_Geo"
+ },
+
+ "attributes": {
+  "GH_Body_morph": "Daniel_Body_morph"
+ },
+
+ "meshes": {
+  "hands_mwsh": "hands_mesh"
+ },
+
+ "pathPrefixes": {
+  "_comment": "Longest-prefix-first. Outfitter stores joint plugs as DAG paths (core/registry.py: src). These two rules retarget any stored GenHuman path.",
+  "|GenHuman|GenHuman_Joint_GRP": "|Daniel|Daniel_Joint_GRP",
+  "GenHuman|GenHuman_Joint_GRP": "Daniel|Daniel_Joint_GRP",
+  "|GenHuman|Mesh_GRP|Mesh_GRP_mesh": "|Daniel|Mesh_GRP",
+  "|GenHuman": "|Daniel"
+ },
+
+ "unchanged": {
+  "_comment": "Verified against the source file - these need NO retargeting, which is what makes an old GenHuman asset reusable on Daniel.",
+  "exportSkeletonJoints": "All 369 export-skeleton joints keep their names (root, pelvis, spine_01 ... ). Only the 7 namespaced IK joints moved, and only by namespace: GenHuman_rig:ik_hand_l -> Daniel_rig:ik_hand_l.",
+  "controlNames": "Animation controls are unprefixed (god_m_godnode_anim, arm_l_*, leg_r_* ...) and are unchanged.",
+  "meshGroup": "Mesh_GRP keeps its name; only its internal nesting changed (see structuralChanges).",
+  "skinSetJointNames": "The cloth_* joint lists in data/rigs/genhuman.json apply unchanged to Daniel."
+ },
+
+ "structuralChanges": [
+  {"change": "flatten",
+   "detail": "The 6 garment meshes were parented directly under Mesh_GRP; the stray intermediate group Mesh_GRP_mesh was deleted. It had identity transforms (pivot values only), so geometry did not move.",
+   "affects": ["hair_mesh", "pants_mesh", "shirt_mesh", "head_mesh", "hands_mesh", "boots_mesh"]},
+  {"change": "layerMembership",
+   "detail": "Mesh_GRP_mesh was the sole member of the geo display layer. That connection moved to Mesh_GRP, which covers the identical subtree: connectAttr Daniel_Geo.di -> Mesh_GRP.do."},
+  {"change": "none",
+   "detail": "No GenHuman body mesh was present to delete; Mesh_GRP already contained only the 6 new meshes."}
+ ],
+
+ "outfitterNotes": {
+  "_comment": "Consequences for the Outfitter tool - see scripts/outfitter/config.py and data/rigs/genhuman.json.",
+  "rigDetection": "RIG_MARKERS / genhuman.json markers are ['god_m_godnode_anim', 'GenHuman_Joint_GRP', 'GenHuman']. Two of the three no longer match, so this scene will NOT be detected as genhuman. Register a Daniel profile via the Publish tab's 'Register rig' action.",
+  "newProfileValues": {
+   "rigId": "daniel",
+   "displayName": "Daniel",
+   "exportGroup": "Daniel_Joint_GRP",
+   "markers": ["god_m_godnode_anim", "Daniel_Joint_GRP", "Daniel"],
+   "bundledFile": "Daniel_rig_v03.ma",
+   "variants.attr": "Daniel_Body_morph"
+  },
+  "legacyAssets": "Assets published with no rigId still read as genhuman (core/asset.py). Use pathPrefixes above to retarget their stored joint plugs onto Daniel."
+ }
+}
