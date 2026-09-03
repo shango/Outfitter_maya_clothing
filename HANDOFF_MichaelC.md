@@ -289,6 +289,39 @@ Publish tab's 'Regenerate skeleton' button, on the same code path registration u
 **Install 1.2.1 before registering MichaelC**, or the register will look like it worked and
 then throw.
 
+## Outfitter: verified end to end, not just validated
+
+Run against 01.7 in Maya 2026 on 2026-09-03. Four stages, the whole authoring path a garment
+actually takes:
+
+| | Stage | Result |
+|---|---|---|
+| A | `capture_profile` + `validate_profile` | **CLEAN.** 89 joints, root `cloth_root`, group `Rig_GRP`, `root_group_rotate` (0,0,0), markers resolve, `scene_has_rig` true |
+| B | `build_cloth_skeleton` from the captured spec, in an empty scene | **89 joints rebuilt, worst world-position drift 0.000000 cm.** Nothing missing |
+| C | `plan_for_scene` + `apply_retarget`, bundled `trench_coat_A` onto MichaelC | **89 joints moved, 2 skinClusters, no warnings.** The retargeted joints land 0.0000 cm from MichaelC's rest pose, and the **garment mesh moves 0.000000 cm** - `moveJointsMode` preserved the weights exactly |
+| D | `preflight_scene` on the retargeted garment | `level='ok'`, *"Scene looks publish-ready."* |
+
+**The two unmatched joints are correct.** `cloth_coatTail_01` and `cloth_coatTail_02` are the
+coat's own custom joints; no body rig has a counterpart, and the retarget reports them rather
+than inventing one.
+
+**Console noise to expect, and to ignore.** The retarget prints a wall of
+`Error: Joint cloth_X is not in the pose.` That is the garment asset, not MichaelC: the trench
+coat's `bindPose1` holds **23 of its 91** cloth joints, because it only binds 23. Verified by
+opening the untouched asset and querying `dagPose -members` before any retarget. It will happen
+against any target rig. Cosmetic.
+
+**`mayapy` crashes on interpreter shutdown** (`PyThreadState_Get: the function must be called
+with the GIL held`) after all output is produced, while Arnold unloads its plugins. A
+standalone teardown artefact, not a pipeline failure - every stage above had already passed.
+
+**The version stamp does not reach Outfitter.** `maya_publish.detect_rig_version` looks for a
+version token in a rig *namespace*, then in the export group's namespace token, then falls back
+to the registered profile's version. It never reads `MichaelC_info_GRP`. MichaelC is imported
+with no namespace, so it will always take the profile fallback. The `MichaelC_rig_v01_7` node
+is a human-readable marker for whoever opens the scene, and nothing more - keep it honest, but
+do not expect it to drive anything.
+
 ## Animation readiness
 
 Audited against 01.7 on 2026-09-03. Most of this is already right, and is recorded so nobody
