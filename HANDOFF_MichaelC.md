@@ -260,34 +260,96 @@ contract:
   the rig. Moot while Daniel stays unregistered. If that ever changes, the fix is the same
   one-line rename applied to MichaelC, using `tools/michaelc/make_016.py` as the template.
 
-## Blocking on the Setup tab, before registering
+## Setup and install, before registering
 
-`scripts/path.txt` currently reads:
+**Correcting an earlier note in this file.** It said no remote was configured and called that
+"the real blocker". That was read off the repo's `scripts/path.txt`, which is **gitignored** -
+a per-machine dev file, not what the artists' tool reads. The installed copy at
+`~/Documents/maya/2026/scripts/path.txt` has both:
 
 ```
-local = \\wsl.localhost\Ubuntu-24.04\home\sgold\dev\repos\maya_clothing_rig\assets
+local  = C:\Users\shann\Documents\clothing_assets
+remote = G:\Shared drives\VFX_Assets_Artists_Library\...\clothing_asset_remote_closet
 ```
 
-Two problems: that path uses the repo's **old** name (this repo is
-`Outfitter_maya_clothing`), and **no remote is configured**. Registration writes the profile
-to the remote first - that is the copy other artists fetch - so with no remote set, MichaelC
-registers on this machine only and reaches nobody. Fix both on the Setup tab first.
+**Unverified:** a process spawned from WSL cannot see `G:` at all (Google Drive streaming
+mounts are per-session), so "does that remote resolve" has to be answered from the Setup tab
+in Maya. Do that before registering, but do not assume it is broken.
+
+The repo's own `scripts/path.txt` still points at the old repo name
+(`maya_clothing_rig\assets`). It only affects headless runs from the repo. Harmless to the
+artists; worth fixing for whoever runs `prep_michaelc_rig.py` outside Maya.
+
+### The installed Outfitter is a version behind
+
+`~/Documents/maya/2026/scripts/outfitter/__init__.py` reports **1.2.0**. The repo and the
+`fix/maya-boundary-nameerrors` branch are **1.2.1**. 1.2.1 is the build that fixes
+`capture_cloth_skeleton_from_rig` raising `NameError` after doing all its work - which is the
+Publish tab's 'Regenerate skeleton' button, on the same code path registration uses.
+**Install 1.2.1 before registering MichaelC**, or the register will look like it worked and
+then throw.
+
+## Animation readiness
+
+Audited against 01.7 on 2026-09-03. Most of this is already right, and is recorded so nobody
+re-does it.
+
+**Working, leave alone:** 145 `_anim` controls, 101 with every channel open. The 44 that are
+restricted are restricted correctly - 28 bendy/tangent controls are translate-only, and 16
+foot-roll and shoulder pivots are rotate-only. Selection sets are organised (`all_sSet`,
+`MichaelC_ctrls_set`, per-limb `*_sSet`). `MichaelC_GEO_LAYER` is display type 2, so the mesh
+is not selectable in the viewport; `MichaelC_JNT_LAYER` is hidden. `ikfk` and the space
+switches are proxied onto the animation controls, so nobody has to select a `network` node.
+Arms default to FK, legs to IK. The god node scales the whole rig (2x moves the mesh 187 cm).
+
+**No Zoo Tools or Hive dependency to animate.** Only `matrixNodes` and `quatNodes` are in
+use, and the only script nodes are Maya's own `sceneConfigurationScriptNode` /
+`uiConfigurationScriptNode`. The rig opens and evaluates on a clean Maya.
+
+**Open items, in priority order:**
+
+1. **Watch the legs twist.** The W3/W4 falloff is procedural. It matches the rig's own twist
+   math, but no human has seen it move.
+2. **The head has no space switch.** `head_m_controlPanel_settings` has zero keyable
+   attributes and no head or neck control carries a space attribute, while
+   `head_m_rigLayer_meta.zooSpaceSwitching` exists in the meta network. Hive knows about it;
+   nothing was built. The spine, clavicles and every finger have spaces. Head-follows-world is
+   the most used space switch there is, so this will be the first thing an animator asks for.
+3. **Decide the arm twists** (see "Not done" above).
+4. **Turn the body-guide viz off for delivery.** `MichaelC_BODY_GUIDE_LYR` is visible with 172
+   members, and `MichaelC_god_m_godnode_anim.bodyJointLineVis` and `.toggleHeadWire` are both
+   on. That is 34 anatomy curves and 31 joint markers drawn over the character. Flip them and
+   re-save.
+5. **IK/FK matching is not in the file.** The rig blends fine on the `ikfk` attribute, but
+   snapping a pose across the switch is a Zoo Tools command. Either the animators install Zoo,
+   or someone writes a small match script. A decision, not a defect.
+6. **12 expressions** drive IK stretch and twist volume preservation
+   (`*_ikStretch_expression`, `*TwistVolumePreservation_expression`). They evaluate without any
+   plugin, but expressions serialise evaluation, so check playback speed before committing to
+   this rig for shot work.
+7. **Channel-box clutter on the hands.** Hive proxies a whole component's attributes onto each
+   of its controls, so every finger control carries `fk00_space` through `fk03_space` whether
+   or not they apply, all of them `parent:world`. Cosmetic, but it makes the channel box hard
+   to use on a hand.
+8. **Nobody has animated on this rig.** A short test shot is the only real acceptance test.
 
 ## Next steps
 
-1. Fix the local path and set a remote on the Setup tab (see above). **This is the real
-   blocker** - without a remote, registering MichaelC reaches nobody.
-2. Have a rigger look at 01.7 in a GUI Maya. Nothing is known to be wrong with it, but the
-   twist falloff in W3/W4 is procedural (linear, matching how the rig drives the joints) and
-   a human should see it move before it becomes the published body.
-3. Add the skinning method to `Clothing Asset Authoring Spec.md`: garments must bind
-   **classic linear** to match the body, at **4 influences**. Nobody owns this yet.
-4. Decide on the arm twists (see "Not done" below). Same defect as W3/W4, not in the work
-   order, one flag away in `weights_017.py`.
-5. Register: run `p.prep()` against 01.7 for a clean audit, then Publish tab >
-   **Register rig...** with export group `MichaelC_Joint_GRP` and the body-variant switch
-   left empty.
-6. Merge `fix/maya-boundary-nameerrors` into master (clean fast-forward).
+**Outfitter compliance - the rig itself is done.** `capture_profile` + `validate_profile` run
+clean against 01.7 in a real Maya: 89 joints, markers `MichaelC_Joint_GRP` / `MichaelC`,
+variants `none`, skin sets 8/18/24/36/36/1, identical to 01.6. What is left is tooling:
+
+1. **Install Outfitter 1.2.1** over the machine's 1.2.0 (see above). Blocking.
+2. **Confirm the remote resolves** on the Setup tab in Maya. Cannot be checked from WSL.
+3. **Merge `fix/maya-boundary-nameerrors` into master** (clean fast-forward) - that is where
+   1.2.1 lives.
+4. **Add the line to `Clothing Asset Authoring Spec.md`**: garments bind **classic linear at
+   4 influences** to match the body. Still unowned.
+5. **Register**: `p.prep()` against 01.7 for a clean audit, then Publish tab >
+   **Register rig...**, export group `MichaelC_Joint_GRP`, body-variant switch left empty.
+
+**Animation** - see "Animation readiness" above. Items 1 (watch the legs), 2 (no head space
+switch) and 4 (guide viz on by default) are the ones that need a rigger.
 
 ## Maya is reachable from this shell - use it
 
