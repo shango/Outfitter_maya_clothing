@@ -1,18 +1,17 @@
 # MichaelC rig - Outfitter onboarding handoff
 
 Working record for bringing the MichaelC rig into the Outfitter rig repo.
-Sessions: 2026-09-02 (onboarding) and 2026-09-03 (verification against a real Maya).
+Sessions: 2026-09-02 (onboarding), 2026-09-03 (verification against a real Maya) and
+2026-09-14 (the v2.x rigger drop).
 Sibling to `HANDOFF.md` (the rig-agnostic tool work).
 
 ## Where things stand
 
-**Rig file: `MichaelC_rig_01.8.ma`** - written by text surgery on 01.7, which was itself
-text surgery on 01.6, itself text surgery on 01.5. **Every item in the work order has now
-been applied and verified in Maya**: the structural work in 01.6, and R3/R4/W2/W3/W4/W6 in
-01.7. See "01.7: the whole work order, applied" below. 01.8 changes ten lines - it hides the
-body-guide layer and the eight bendy splines (see "01.8: the clutter off the controls").
-`01.7` is kept as the last guide-visible build, `01.6` as the pre-weights source, `01.5` as the pre-surgery
-source, `01.3` / `01.4` are the two earlier (unskinned) drops.
+**Rig file: `MichaelC_rig_v2.3.ma`** (2026-09-14). The v2.x line is a *different branch* from
+01.x: `v2.1` came from the rigger branched off **01.7**, not 01.8, so it never had the 01.8
+viewport fixes and it replaced the whole skinCluster. See "The v2.x line" below for what
+arrived, what was wrong with it, and what was done. `01.8` is kept as the last build of the
+01.x line; `01.7`/`01.6`/`01.5` as before.
 
 **Outfitter code: v1.2.1**, branch `fix/maya-boundary-nameerrors`, pushed to origin.
 Not merged into master. `git checkout master && git merge --ff-only
@@ -23,7 +22,7 @@ is a clean fast-forward. 354 tests passing.
 So the registered rig set becomes GenHuman (bundled) + MichaelC. Nothing about Daniel needs
 fixing - see "Daniel comparison" below for what was found and is deliberately being left.
 
-**Work order** (now a record of what was applied, not a task list):
+**Work order** (a record of what was applied to the 01.x line, not a task list):
 https://claude.ai/code/artifact/0851a776-5c1e-48f7-9f9a-c75d460fe43d
 
 ## What the rig is
@@ -399,6 +398,85 @@ with no namespace, so it will always take the profile fallback. The `MichaelC_ri
 is a human-readable marker for whoever opens the scene, and nothing more - keep it honest, but
 do not expect it to drive anything.
 
+## The v2.x line
+
+### What arrived
+
+`MichaelC_rig_v2.1.ma` (2026-09-11), internal scene name
+`michaelc_god_follow_candidate_v001_20260911_1126.ma`, in-scene stamp still `MichaelC_rig_v01_7`.
+It is branched off **01.7**. All the 01.6 structural surgery survives (the landmark renames,
+the removed containers, no `Michael_Hive2_*`, no `BodyShapeOrig2`) and so does R4 and
+`skinningMethod 0`. What it added:
+
+* **A second export skeleton**, `MichaelC_GH_Skin_Joint_GRP` - 89 joints, hidden, a sibling of
+  `MichaelC_Joint_GRP` under `MichaelC`, driven in parallel off the same deform layer.
+* **A new skinCluster**, `MichaelC_GH_FullSkin_SKC`, replacing `skinCluster2`. The body mesh
+  was bound to the *new* skeleton, so the skeleton Outfitter registers was no longer the one
+  that deforms the body.
+* Turntable lights and cameras (`digital_double_michael_axilla_*`) from a comparison render.
+
+The two skeletons were **not** interchangeable. The new one renamed `GM_foot_L/R` to
+`foot_l/r` (the deform layer's own names - `GM_foot_*` only ever existed as a GenHuman alias
+on the export skeleton), which silently changes the derived shoe set from `cloth_GM_foot_L/R`
+to `cloth_foot_l/r` and breaks name-match retarget for every existing GenHuman shoe.
+
+**The registration default had flipped.** `candidate_export_groups()` ranks by
+`(-joint_count, path)`; with two 89-joint groups it fell through to path, where
+`..._GH_Skin_Joint_GRP` sorts before `..._Joint_GRP`. The top entry in the dropdown became the
+wrong skeleton, and it validated clean, so nothing warned.
+
+### What was *right* about it, and was kept
+
+Measured, not assumed:
+
+* **The IK marker bones are correctly placed** in the new skeleton and were stale in the old:
+  `ik_hand_gun`/`ik_hand_r` sit exactly on `hand_r` (old: 11.45 cm off), `ik_hand_l` on
+  `hand_l`, `ik_foot_l/r` on the feet (old: 5.63 cm off).
+* **The arm twists are finally weighted** - `lowerarm_twist_02_l` 0.0 -> 99.0,
+  `upperarm_twist_01_l` 0.8 -> 111.4. That was the open "Not done" item from the 01.7 work.
+* God-node scale still drives the mesh 187.6 cm at 2x, same as 01.8.
+
+### v2.2 - the two skeletons collapsed into one
+
+Done by the user in a GUI Maya on 2026-09-14, so Maya rewired every reference itself:
+
+1. `cmds.delete("|MichaelC|MichaelC_Joint_GRP")` - the old export skeleton, 266 nodes.
+   Nothing outside the subtree read it; its only consumers were its own children, its own
+   177 constraints and the dagPose.
+2. `foot_l` / `foot_r` renamed back to `GM_foot_L` / `GM_foot_R`, restoring the GenHuman alias.
+   `ball_l/r` follow as children.
+3. `MichaelC_GH_Skin_Joint_GRP` renamed to `MichaelC_Joint_GRP`.
+
+**Two things went with the old skeleton and are open questions for the rigger** (neither blocks
+registration): the `MichaelC_71_..._neck_02_SCALE_COMPOSE_MD` node that drove `neck_02.scaleXYZ`
+has no equivalent on the surviving skeleton, and 18 joints sit in slightly different places
+between the two builds (`neck_02` 2.13 cm, the calf/thigh/lowerarm twists 0.2-2.5 cm).
+
+### v2.3 - `make_023.py`, the finish
+
+| | What was done | Evidence |
+|---|---|---|
+| W | `ik_foot_r`'s 242.901 over 363 verts moved onto `GM_foot_R` | The right foot's weight had landed on the UE5 IK marker bone while the left correctly used `foot_l`. The transfer is **geometrically free**: the two joints' world matrices agree to 1e-14 at bind and under four poses (foot translate/rotate, god-node rotate), and the measured mesh delta is **0.0000 cm at bind and posed** |
+| R3 | `maxInfluences` 8 -> **4**, peak per-vertex influences 8 -> 4 | 1,428 verts pruned and renormalized. Cost measured in an aggressive FK/IK pose: **max 0.1999 cm, p99 0.0006, 121 verts**. Zero at bind. Histogram `1:953 2:1164 3:851 4:2312` |
+| V | `MichaelC_BODY_GUIDE_LYR` hidden, the eight bendy splines hidden | The 01.8 fixes, re-applied - they were never in this branch |
+| J | 16 turntable nodes + 12 connections removed | `digital_double_michael_axilla_*` lights and cameras, world-root, no set membership beyond `:lightList1` / `:defaultLightSet`. **`bindPose4` was NOT removed** - it is the only dagPose left and it belongs to the surviving skeleton |
+| S | Stamp `MichaelC_rig_v01_7` -> `MichaelC_rig_v2_3` | |
+
+Reloaded in Maya from a fresh session: **3,525 nodes**, no errors, weights read back out of the
+`.ma` match Maya's computed array to **4.2e-22**, peak 4 influences, all 5,280 vertices sum to
+1.0, `skm=0 mi=4 mmi=True`, 89 influences, guide layer hidden, no bendy curve visible, no
+turntable leftovers, god-node 2x still 187.555 cm.
+
+Outfitter: **one** 89-joint candidate (`MichaelC_Joint_GRP`), `validate_profile` returns no
+errors, markers `MichaelC_Joint_GRP` / `MichaelC` both unique, skin sets 8/18/24/36/36/1 with
+the shoe set back to `cloth_GM_foot_L` / `cloth_GM_foot_R`.
+
+**Residual, reported not fixed:** the rigger's new foot weights are not mirror-symmetric even
+though the foot mesh is (worst mirror-partner distance 0.0000 cm). Per-vertex
+`|GM_foot_L - GM_foot_R|` peaks at 0.24 and averages 0.021; `ball_l` 67.966 against `ball_r`
+73.650. The 01.7 W2 pass had made this pair mirror-exact. Mirroring it would overwrite the
+rigger's authoring, so it is left for them to decide.
+
 ## Animation readiness
 
 Audited against 01.7 on 2026-09-03. Most of this is already right, and is recorded so nobody
@@ -447,8 +525,9 @@ use, and the only script nodes are Maya's own `sceneConfigurationScriptNode` /
 ## Next steps
 
 **Outfitter compliance - the rig itself is done.** `capture_profile` + `validate_profile` run
-clean against 01.7 in a real Maya: 89 joints, markers `MichaelC_Joint_GRP` / `MichaelC`,
-variants `none`, skin sets 8/18/24/36/36/1, identical to 01.6. What is left is tooling:
+clean against **v2.3** in a real Maya: one 89-joint candidate, markers `MichaelC_Joint_GRP` /
+`MichaelC`, variants `none`, skin sets 8/18/24/36/36/1 with the shoe set on
+`cloth_GM_foot_L/R`. What is left is tooling:
 
 1. **Install Outfitter 1.2.1** over the machine's 1.2.0 (see above). Blocking.
 2. **Confirm the remote resolves** on the Setup tab in Maya. Cannot be checked from WSL.
@@ -456,11 +535,23 @@ variants `none`, skin sets 8/18/24/36/36/1, identical to 01.6. What is left is t
    1.2.1 lives.
 4. **Add the line to `Clothing Asset Authoring Spec.md`**: garments bind **classic linear at
    4 influences** to match the body. Still unowned.
-5. **Register**: `p.prep()` against 01.7 for a clean audit, then Publish tab >
+5. **Register**: `p.prep()` against **v2.3** for a clean audit, then Publish tab >
    **Register rig...**, export group `MichaelC_Joint_GRP`, body-variant switch left empty.
+   There is only one 89-joint candidate again, so the top entry is the right one - but the
+   v2.1 episode is the reason to read that dropdown rather than accept it.
+
+**For the rigger**, from the v2.x line and not blocking registration:
+
+* Was the `neck_02` scale-compose wiring dropped on purpose? It drove `neck_02.scaleXYZ` on
+  the old export skeleton and has no equivalent on the surviving one.
+* Are the repositioned joints intentional? 18 differ between the two builds - `neck_02`
+  2.13 cm, the calf/thigh/lowerarm twists 0.2-2.5 cm.
+* The new foot weights are not mirror-symmetric although the foot mesh is. Mirror them, or
+  say they are deliberate. See "v2.3" above for the numbers.
 
 **Animation** - see "Animation readiness" above. Items 1 (watch the legs), 2 (no head space
-switch) and 4 (guide viz on by default) are the ones that need a rigger.
+switch) and 4 (guide viz on by default) are the ones that need a rigger. Item 3 (the arm
+twists) is **closed**: the v2.1 rebind weighted them.
 
 ## Maya is reachable from this shell - use it
 

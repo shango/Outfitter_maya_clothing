@@ -118,15 +118,20 @@ def main() -> int:
         re.findall(r'^createNode \S+ (?:-s )?-n "([^"]*)"', text, re.M)).items() if c > 1]
     print(f"[info] duplicate short names: {len(dup)} {sorted(dup)[:8]}")
 
-    # 8) skin chain
-    m = [b for a, b in conns if a == "skinCluster2.og[0]"]
+    # 8) skin chain - the body skinCluster was renamed in the v2.x line, so find it
+    # by node type rather than by the 01.x name.
+    skins = re.findall(r'^createNode skinCluster -n "([^"]*)"', text, re.M)
+    print(f"[{'ok' if len(skins) == 1 else 'FAIL'}] one body skinCluster: {skins}")
+    bad += len(skins) != 1
+    sc = skins[0] if skins else "skinCluster2"
+    m = [b for a, b in conns if a == f"{sc}.og[0]"]
     print(f"[{'ok' if m == ['MichaelC_body_meshShape.i'] else 'FAIL'}] "
-          f"skinCluster2.og[0] -> {m}")
+          f"{sc}.og[0] -> {m}")
     bad += m != ["MichaelC_body_meshShape.i"]
-    infl = [a for a, b in conns if b.startswith("skinCluster2.ma[")]
+    infl = [a for a, b in conns if b.startswith(f"{sc}.ma[")]
     print(f"[{'ok' if len(infl) == 89 else 'FAIL'}] skinCluster influences: {len(infl)}")
     bad += len(infl) != 89
-    orig = [a for a, b in conns if b == "skinCluster2.ip[0].ig"]
+    orig = [a for a, b in conns if b == f"{sc}.ip[0].ig"]
     print(f"[{'ok' if orig else 'FAIL'}] skinCluster input geometry: {orig}")
     bad += not orig
 

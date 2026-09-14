@@ -10,7 +10,10 @@ Written when Maya was not reachable from this shell. **It now is** - see
 | `make_017.py` | splices that skinCluster into 01.6, plus R3 and R4, to write 01.7 | good - text surgery, `verify_017.py` confirms the result |
 | `verify_017.py` | runs in `mayapy`: reloads 01.7 and checks it against `weights.bin` | good |
 | `make_018.py` | 01.7 -> 01.8: hides `MichaelC_BODY_GUIDE_LYR` and the eight bendy splines, bumps the version stamp | good - ten changed lines, `verify_016.py` shows no node or connection delta |
-| `verify_016.py` | referential-integrity diff between two `.ma` files | good - structural only |
+| `verify_016.py` | referential-integrity diff between two `.ma` files | good - structural only. Finds the body skinCluster by node type (it was `skinCluster2` through 01.8, `MichaelC_GH_FullSkin_SKC` from v2.1) |
+| `weights_023.py` | runs in `mayapy`: v2.2 weights - moves `ik_foot_r` onto `GM_foot_R`, prunes to 4 | good - transfer proven free (the two joints agree to 1e-14 under four poses), result verified back bit-exactly |
+| `make_023.py` | splices that in, plus R3, the two 01.8 viewport fixes, the turntable cleanup and the stamp, to write v2.3 | good - `verify_016.py` clean, Maya reloads without error |
+| `verify_023.py` | runs in `mayapy`: reloads v2.3 and checks it against `weights_023.bin` | good |
 | `dag2.py` | full-DAG-path `.ma` parser (short names are not unique here) | good - structural only |
 | `wpos.py` | world joint positions from local transforms | limited - the export joints are `parentConstraint`-driven, so it cannot evaluate their live pose |
 
@@ -64,3 +67,25 @@ all tried). They load as `unknown`, and a `cmds.file(save=True)` writes them bac
 a round trip through save/reload gives 3,528 nodes instead of 3,526, with "UUID already in
 use" on the second read. Exporting only `skinCluster2` avoids them entirely, and splicing
 that node's `.wl` block leaves every other byte of the file untouched.
+
+
+## The v2.x line
+
+`v2.1` arrived from the rigger branched off **01.7**, not 01.8, carrying a second export
+skeleton (`MichaelC_GH_Skin_Joint_GRP`) and a new skinCluster. `v2.2` is the user's
+Maya-side collapse of the two skeletons into one; `v2.3` is `make_023.py`'s finish.
+
+```bash
+cp tools/michaelc/weights_023.py /mnt/c/Windows/Temp/mc_audit/
+cd /mnt/c/Windows/Temp/mc_audit
+"/mnt/c/Program Files/Autodesk/Maya2026/bin/mayapy.exe" weights_023.py  # -> skin_new_023.ma, weights_023.bin
+python3 tools/michaelc/make_023.py                                      # -> MichaelC_rig_v2.3.ma
+"/mnt/c/Program Files/Autodesk/Maya2026/bin/mayapy.exe" verify_023.py   # reload and check
+```
+
+**Text surgery must work on whole statements, not lines.** A `connectAttr` in this file can
+wrap onto a `\t\t -na;` continuation line, and a `createNode` block owns every indented
+statement that follows it. `make_023.py`'s first draft removed the turntable nodes
+line-by-line, left 12 orphaned `-na;` tails, and Maya rejected the file with syntax errors at
+load. `make_023.py` now parses statements and asserts no statement begins with a wrapped-flag
+fragment.
