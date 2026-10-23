@@ -64,6 +64,34 @@ def test_detach_breaks_only_recorded_and_removes_namespace(tmp_path):
     assert scene.exists(f"|{GROUP}|spine_01")
 
 
+def test_garment_attached_in_an_earlier_session_can_be_detached(tmp_path):
+    # The shelf button reloads the tool (and Maya restarts), so a fresh engine with an
+    # empty registry must still see and detach what is already in the scene.
+    scene = _scene()
+    AttachEngine(scene).attach(_coat(tmp_path), "coat")
+    fresh = AttachEngine(scene)
+
+    assert fresh.attached_namespaces() == ["coat"]
+    res = fresh.detach("coat")
+
+    assert res.ok, [str(i) for i in res.report.errors]
+    assert not scene.namespace_exists("coat") and scene.connections == set()
+    assert scene.exists(f"|{GROUP}|spine_01")
+    assert fresh.attached_namespaces() == []
+
+
+def test_detach_refuses_a_namespace_that_is_not_a_garment(tmp_path):
+    scene = _scene()
+    scene.namespaces.add("rig")
+    scene.add_node("rig:Rig_GRP")   # a rig's own Rig_GRP, but no cloth joints
+    scene.add_node("rig:Mesh_GRP")
+
+    res = AttachEngine(scene).detach("rig")
+
+    assert not res.ok and "not_attached" in {i.code for i in res.report.issues}
+    assert scene.namespace_exists("rig")
+
+
 def test_multi_asset_independent_detach(tmp_path):
     scene = _scene()
     eng = AttachEngine(scene)

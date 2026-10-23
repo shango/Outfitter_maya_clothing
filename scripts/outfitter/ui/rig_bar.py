@@ -85,6 +85,7 @@ def fetch_rig_file(parent: QtWidgets.QWidget, profile, variant: str = "",
     worker = _FetchWorker(profile, local, loc.remote, variant)
     worker.moveToThread(thread)
     thread.started.connect(worker.run)
+    cancelled = []  # set by Cancel; the copy can't be aborted, so its result is dropped
 
     def _on_progress(done: int, total: int) -> None:
         dialog.setValue(int(done * 100 / total) if total else 0)
@@ -93,6 +94,7 @@ def fetch_rig_file(parent: QtWidgets.QWidget, profile, variant: str = "",
             f"{done / _MB:.0f} of {total / _MB:.0f} MB")
 
     def _on_finished(path, error: str) -> None:
+        was_cancelled = bool(cancelled)  # read first: closing the dialog emits canceled
         dialog.close()
         thread.quit()
         thread.wait()
@@ -100,14 +102,19 @@ def fetch_rig_file(parent: QtWidgets.QWidget, profile, variant: str = "",
         worker.deleteLater()
         thread.deleteLater()
         if on_done is not None:
-            on_done(path, error)
+            on_done(*((None, "") if was_cancelled else (path, error)))
 
     worker.progressed.connect(_on_progress)
     worker.finished.connect(_on_finished)
     # Cancel is best-effort: the copy is a chunked loop with no abort hook, so the dialog
     # goes away and the (atomic) copy finishes in the background rather than leaving a
-    # half-written rig. Better a wasted copy than a truncated one.
-    dialog.canceled.connect(dialog.close)
+    # half-written rig. Better a wasted copy than a truncated one - but the caller is
+    # told it was cancelled (path None), so it doesn't go on to use the rig.
+    def _on_cancel() -> None:
+        cancelled.append(True)
+        dialog.close()
+
+    dialog.canceled.connect(_on_cancel)
     thread.start()
 
 

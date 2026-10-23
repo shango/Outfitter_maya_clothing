@@ -248,14 +248,33 @@ class AttachEngine:
             pass
 
     # --- detach ---------------------------------------------------------------
+    def attached_namespaces(self) -> list[str]:
+        """Every garment attached in the scene: this session's plus any found in it."""
+        return sorted(set(self.registry.namespaces()) | set(self.scene.garment_namespaces()))
+
     def detach(self, namespace: str) -> DetachResult:
         report = ValidationReport()
         namespace = sanitize_namespace(namespace)
         instance = self.registry.get(namespace)
         if instance is None:
-            report.error("not_attached", f"no attached instance for namespace '{namespace}'",
-                         node=namespace)
-            return DetachResult(False, report)
+            if namespace not in self.scene.garment_namespaces():
+                report.error("not_attached",
+                             f"no attached instance for namespace '{namespace}'",
+                             node=namespace)
+                return DetachResult(False, report)
+            # Attached before this session (tool reloaded, Maya restarted, scene
+            # reopened): no record of its edges, but they all end on the garment's own
+            # nodes, so removing its namespace takes them with it.
+            try:
+                self.scene.remove_namespace(namespace)
+            except Exception as exc:  # noqa: BLE001
+                report.error("ns_remove_failed",
+                             f"could not remove namespace '{namespace}': {exc}",
+                             node=namespace)
+                return DetachResult(False, report)
+            report.info("detached", f"detached '{namespace}' (attached in an earlier "
+                                    "session; its connections went with it)")
+            return DetachResult(True, report)
 
         broken = 0
         for conn in instance.connections:

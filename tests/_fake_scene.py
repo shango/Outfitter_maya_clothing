@@ -147,6 +147,13 @@ class FakeScene:
         }
         self.namespaces.discard(namespace)
 
+    def garment_namespaces(self) -> list[str]:
+        return sorted(
+            ns for ns in self.namespaces
+            if f"{ns}:Mesh_GRP" in self.nodes and f"{ns}:Rig_GRP" in self.nodes
+            and any(a.startswith(f"{ns}:cloth_") and n.node_type == "joint"
+                    for a, n in self.nodes.items()))
+
     def rig_version(self, markers: tuple[str, ...] = (),
                     export_group: str | None = None) -> str | None:
         if export_group is not None:

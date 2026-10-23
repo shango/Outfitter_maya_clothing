@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from .. import config
+
 
 @runtime_checkable
 class SceneGateway(Protocol):
@@ -54,6 +56,15 @@ class SceneGateway(Protocol):
 
     def remove_namespace(self, namespace: str) -> None:
         """Delete the namespace and everything in it (used by detach/rollback)."""
+        ...
+
+    def garment_namespaces(self) -> list[str]:
+        """Root namespaces holding an attached garment, whoever attached it.
+
+        A garment namespace has ``Mesh_GRP``, ``Rig_GRP`` and a ``cloth_*`` joint (a rig's
+        own ``Rig_GRP`` has no cloth joints). Lets detach work for garments attached
+        before the tool was reloaded, Maya restarted, or the scene reopened.
+        """
         ...
 
     # --- rig identification ---------------------------------------------------
@@ -164,6 +175,16 @@ class MayaScene:
     def remove_namespace(self, namespace: str) -> None:
         # delete the namespace AND its content (the imported asset nodes)
         self._cmds.namespace(removeNamespace=namespace, deleteNamespaceContent=True)
+
+    def garment_namespaces(self) -> list[str]:
+        found = []
+        for ns in self._cmds.namespaceInfo(":", listOnlyNamespaces=True) or []:
+            ns = ns.lstrip(":")
+            if (self._cmds.objExists(f"{ns}:{config.MESH_GROUP}")
+                    and self._cmds.objExists(f"{ns}:{config.RIG_GROUP}")
+                    and self._cmds.ls(f"{ns}:{config.CLOTH_PREFIX}*", type="joint")):
+                found.append(ns)
+        return sorted(found)
 
     def rig_version(self, markers: tuple[str, ...],
                     export_group: str | None = None) -> str | None:

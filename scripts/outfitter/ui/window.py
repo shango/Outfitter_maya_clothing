@@ -1230,9 +1230,15 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
                 "\n".join(str(i) for i in result.report.errors))
 
     def _refresh_attached(self, select: str | None = None) -> None:
-        """Repopulate the attached-instance dropdown from the live registry."""
+        """Repopulate the attached-instance dropdown: this session's plus the scene's.
+
+        Garments attached before a shelf reload, a Maya restart or a scene reopen are
+        found in the scene, so they can still be detached.
+        """
         engine = _existing_engine()
-        names = engine.registry.namespaces() if engine is not None else []
+        if engine is None and _maya_available():
+            engine = _ensure_engine(self)
+        names = engine.attached_namespaces() if engine is not None else []
         self._attached_combo.blockSignals(True)
         self._attached_combo.clear()
         self._attached_combo.addItems(names)
@@ -1246,8 +1252,9 @@ _window_singleton: OutfitterBrowser | None = None
 
 # The attach engine carries the in-session registry of what's currently attached
 # (which connections each instance made), so detach can break exactly those edges.
-# It lives at module scope, not on the window, so reopening the browser within the
-# same Maya session keeps the attached-instance list intact.
+# The shelf button purges every outfitter module, so this is rebuilt on each click;
+# garments attached before that are found in the scene instead
+# (AttachEngine.attached_namespaces), so they can always be detached.
 _engine_singleton = None  # type: ignore[var-annotated]  # core.attach.AttachEngine | None
 
 

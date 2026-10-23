@@ -379,9 +379,17 @@ def _delete_rig(cmds, profile: _rigs.RigProfile) -> int:
     A rig is ~thousands of DG 'guts' nodes plus DAG roots. Delete the DAG roots first
     (cascades to children), then sweep any leftover marker-named DG nodes, tolerating
     failures throughout (a stubborn node must never block the rest). Only the rig's own
-    markers are swept, so a rig registered with sloppy markers can't take the garment with
-    it.
+    markers are swept, and never the garment's own nodes
+    (:func:`core.maya_publish.garment_node_ids`), so a garment named after its rig
+    (``MichaelC_pants`` on MichaelC) survives.
     """
+    from . import maya_publish
+
+    garment = maya_publish.garment_node_ids(cmds, profile.markers)
+
+    def _is_garment(node: str) -> bool:
+        return bool(set(cmds.ls(node, uuid=True) or []) & garment)
+
     deleted = 0
     # DAG roots whose name marks the rig (its export group, godnode, top group...).
     roots: list[str] = []
@@ -389,7 +397,7 @@ def _delete_rig(cmds, profile: _rigs.RigProfile) -> int:
         roots += cmds.ls(marker, long=True) or []
         roots += cmds.ls(f"*{marker}*", long=True, type="transform", recursive=True) or []
     for node in sorted(set(roots), key=len, reverse=True):
-        if not cmds.objExists(node):
+        if not cmds.objExists(node) or _is_garment(node):
             continue
         try:
             cmds.delete(node)
@@ -399,7 +407,7 @@ def _delete_rig(cmds, profile: _rigs.RigProfile) -> int:
     # Sweep stray rig-named DG nodes left behind (materials/utility/etc.).
     for marker in profile.markers:
         for node in (cmds.ls(f"*{marker}*", recursive=True) or []):
-            if cmds.objExists(node):
+            if cmds.objExists(node) and not _is_garment(node):
                 try:
                     cmds.delete(node)
                 except Exception:  # noqa: BLE001

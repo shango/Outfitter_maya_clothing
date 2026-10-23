@@ -209,18 +209,22 @@ def _rename_joints(cmds, plan: _retarget.RetargetPlan, in_scene: dict[str, str])
     Two passes through a temporary prefix: renaming ``a->b`` while another joint still
     holds ``b`` would make Maya silently uniquify the name (``b1``), and attach matches by
     exact name - so the joint would quietly never connect.
+
+    Joints are tracked by UUID, not by the full paths in ``in_scene``: renaming a parent
+    changes every descendant's path, so a path captured beforehand would no longer exist
+    and the child would be skipped.
     """
-    staged: list[tuple[str, str]] = []
+    staged: list[tuple[str, str]] = []  # (uuid, final name)
     for match in plan.renames:
         node = in_scene.get(match.source)
         if node is None or not cmds.objExists(node):
             continue
-        staged.append((cmds.rename(node, _TEMP_PREFIX + match.target), match.target))
-    renamed = 0
-    for node, final in staged:
-        cmds.rename(node, final)
-        renamed += 1
-    return renamed
+        staged.append((cmds.ls(node, uuid=True)[0], match.target))
+    for uuid, final in staged:
+        cmds.rename(cmds.ls(uuid, long=True)[0], _TEMP_PREFIX + final)
+    for uuid, final in staged:
+        cmds.rename(cmds.ls(uuid, long=True)[0], final)
+    return len(staged)
 
 
 def _reset_bind_pose(cmds, result: RetargetResult) -> None:

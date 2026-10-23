@@ -93,6 +93,39 @@ def _markers(profile) -> tuple[str, ...]:
     return profile.markers if profile is not None else config.RIG_MARKERS
 
 
+def garment_node_ids(cmds, markers: tuple[str, ...] = ()) -> set[str]:
+    """UUIDs of the garment's own nodes - what rig-marker matching must never touch.
+
+    Rig markers are matched loosely (any name *containing* one), so a garment called
+    ``MichaelC_pants`` would otherwise read as part of the MichaelC rig. The garment is
+    the top-level group holding ``Mesh_GRP``/``Rig_GRP``/``Ctrl_GRP`` (or those groups at
+    the root), with everything under it, plus its meshes' deformers and shading networks
+    and ``cloth_info``. A candidate holding a node named exactly like a marker is the rig
+    itself, not a garment, and is left out. History stops at DAG nodes, so it never walks
+    from the skin through the joints into the rig.
+    """
+    exact = set(markers)
+    roots = set()
+    for grp in config.REQUIRED_GROUPS:
+        for node in cmds.ls(grp, long=True) or []:  # root namespace only
+            parts = node.split("|")                 # ['', top, ...]
+            if len(parts) <= 3:                     # |grp or |top|grp
+                roots.add("|" + parts[1])
+    nodes: list[str] = []
+    for root in roots:
+        subtree = [root] + (cmds.listRelatives(root, allDescendents=True, fullPath=True) or [])
+        if any(_short(n) in exact for n in subtree):
+            continue
+        nodes += subtree
+    for mesh in cmds.ls(nodes, type="mesh", long=True) or []:
+        nodes += cmds.listHistory(mesh, pruneDagObjects=True) or []
+        for sg in set(cmds.listConnections(mesh, type="shadingEngine") or []):
+            nodes += [sg] + (cmds.listHistory(sg, pruneDagObjects=True) or [])
+    if cmds.objExists(config.INFO_NODE):
+        nodes.append(config.INFO_NODE)
+    return set(cmds.ls(nodes, uuid=True) or []) if nodes else set()
+
+
 def scene_has_rig(markers: tuple[str, ...] | None = None) -> bool:
     """True if a body rig is still in the scene.
 
@@ -104,13 +137,15 @@ def scene_has_rig(markers: tuple[str, ...] | None = None) -> bool:
     ``markers`` are the rig's identifying node names - the active rig profile's by
     default. Matching is deliberately loose: any node whose name *contains* a marker, in
     any namespace (``ls -recursive`` searches them all, per the Maya command reference),
-    or a leftover namespace token - a hand-deleted import usually leaves one behind. A
-    false positive here costs a warning; a false negative ships a rig inside an asset.
+    or a leftover namespace token - a hand-deleted import usually leaves one behind. The
+    garment's own nodes (:func:`garment_node_ids`) never count, so a garment named after
+    its rig doesn't block its own publish. A false negative ships a rig inside an asset.
     """
     cmds = _cmds()
     markers = _markers(_active_profile()) if markers is None else markers
+    garment = garment_node_ids(cmds, markers)
     for marker in markers:
-        if cmds.ls(f"*{marker}*", recursive=True):
+        if set(cmds.ls(f"*{marker}*", recursive=True, uuid=True) or []) - garment:
             return True
     namespaces = cmds.namespaceInfo(":", listOnlyNamespaces=True, recurse=True) or []
     return any(marker in ns for ns in namespaces for marker in markers)
