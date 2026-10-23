@@ -7,11 +7,14 @@ remote into the local folder.
 
 Semantics (locked with the user, 2026-06-09):
 
-* **Additive / update-changed, never delete.** Every file under ``remote`` is
-  copied to the matching path under ``local`` when it is missing there, or when
-  it differs by a fast *size + modified-time* check (``rsync``-style quick scan).
-  Files that exist only locally - assets the artist authored locally - are always
-  left untouched. Nothing is ever deleted.
+* **Additive / update-changed, never delete - except a tombstoned asset.** Every
+  file under ``remote`` is copied to the matching path under ``local`` when it is
+  missing there, or when it differs by a fast *size + modified-time* check
+  (``rsync``-style quick scan). Files that exist only locally - assets the artist
+  authored locally - are left untouched. The one exception is an asset someone
+  deleted from the library (:mod:`core.delete`): its tombstone in the remote moves the
+  local copy to the local trash, provided the remote no longer has it and nothing in
+  the local copy was modified after the delete. Nothing is ever hard-deleted.
 * **Remote-newer wins.** An existing local file is overwritten only when the
   remote copy is a different size or is *newer* (beyond a small filesystem
   tolerance), so a file the artist just edited locally is not clobbered by an
@@ -36,6 +39,7 @@ from pathlib import Path
 from typing import Callable
 
 from .. import config
+from . import delete as _delete
 from . import rigs
 
 # Filesystem mtime resolution varies (FAT rounds to 2s); treat times within this
@@ -53,8 +57,11 @@ def is_syncable(rel: Path) -> bool:
 
     Everything outside ``_rigs`` is an asset file and syncs. Inside ``_rigs`` only the
     rig *profiles* sync; the rig bodies they point at are fetched on demand instead (see
-    the module docstring).
+    the module docstring). The trash and the tombstones never sync: tombstones are read
+    from the remote in place.
     """
+    if _delete.TRASH_DIRNAME in rel.parts or rel.parts[:1] == (_delete.DELETED_DIRNAME,):
+        return False
     if not _is_rigs_path(rel):
         return True
     return rel.suffix.lower() == rigs.PROFILE_EXT
@@ -88,6 +95,7 @@ class SyncResult:
 
     added: list[Path] = field(default_factory=list)      # newly copied files
     updated: list[Path] = field(default_factory=list)    # changed files overwritten
+    removed: list[Path] = field(default_factory=list)    # tombstoned assets (.ma) trashed
     skipped: int = 0                                       # up-to-date files, left alone
     errors: list[str] = field(default_factory=list)       # per-file copy failures
     ok: bool = True                                        # False if the run could not start
@@ -100,7 +108,7 @@ class SyncResult:
 
     @property
     def changed(self) -> bool:
-        return bool(self.added or self.updated)
+        return bool(self.added or self.updated or self.removed)
 
     def summary(self) -> str:
         """One-line human summary for the Setup tab status, counted in asset packages."""
@@ -108,6 +116,8 @@ class SyncResult:
             return self.errors[0] if self.errors else "Sync could not run."
         parts = [f"{self.assets_added} added", f"{self.assets_updated} updated",
                  f"{self.assets_current} up to date"]
+        if self.removed:
+            parts.append(f"{len(self.removed)} removed")
         if self.errors:
             parts.append(f"{len(self.errors)} file(s) failed")
         return "Sync complete - " + ", ".join(parts) + " (assets)."
@@ -128,7 +138,7 @@ def _needs_copy(src: Path, dst: Path) -> bool:
 def sync_remote_to_local(remote: Path | str, local: Path | str,
                          *, dry_run: bool = False,
                          progress: ProgressCallback | None = None) -> SyncResult:
-    """Pull new/changed files from ``remote`` into ``local``. Never deletes.
+    """Pull new/changed files from ``remote`` into ``local``; trash tombstoned assets.
 
     Returns a :class:`SyncResult`. When ``dry_run`` is True the result reports
     what *would* be copied without touching the local folder.
@@ -195,6 +205,8 @@ def sync_remote_to_local(remote: Path | str, local: Path | str,
         except OSError as exc:
             result.errors.append(f"{rel}: {exc}")
 
+    _apply_tombstones(remote, local, result, dry_run=dry_run)
+
     changed_assets = asset_folders & changed_folders
     result.assets_added = len(changed_assets - preexisting)
     result.assets_updated = len(changed_assets & preexisting)
@@ -202,3 +214,26 @@ def sync_remote_to_local(remote: Path | str, local: Path | str,
 
     _emit("done", done=total, total=total)
     return result
+
+
+def _apply_tombstones(remote: Path, local: Path, result: SyncResult,
+                      *, dry_run: bool) -> None:
+    """Move each asset deleted from the library into the local trash.
+
+    Skipped when the remote has the asset again (re-published, perhaps by an older
+    install that doesn't clear tombstones), or when any of the local copy's files was
+    modified after the delete - that is local work, and Sync never discards it.
+    """
+    for key, deleted in _delete.read_tombstones(remote).items():
+        local_ma = local / key
+        if (remote / key).exists() or not local_ma.is_file():
+            continue
+        try:
+            if any(f.stat().st_mtime - deleted > _MTIME_TOLERANCE_S
+                   for f in _delete.asset_files(local_ma)):
+                continue
+            if not dry_run:
+                _delete.trash_asset(local, local_ma)
+            result.removed.append(Path(key))
+        except OSError as exc:
+            result.errors.append(f"{key}: {exc}")

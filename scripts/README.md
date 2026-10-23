@@ -63,7 +63,7 @@ cd tests && python -m pytest -q
 - M2 done: validate → attach → detach (`core.scene`/`validate`/`attach`/`registry`), transactional + dual-skeleton safe.
 - M3 done: fit controls + placement + presets (`core.controls`/`placement`/`presets`, `ui.controls_panel`).
 - M4 done: multi-asset independence combos, Genie export-readiness audit (`core.export`), drag-and-drop installer (`install.py` + `installer/`).
-- M5 done: example compliant asset (`assets/trench_coat_A/`), tool-user docs (`../Outfitter — User Guide.md`), in-Maya `examples/` scripts (build the skinned asset + the GenHuman test scene). `tests/test_example_asset.py` re-validates the shipped asset every run.
+- M5 done: example compliant asset (`assets/trench_coat_A/`), tool-user docs (`../Outfitter Guide.md`), in-Maya `examples/` scripts (build the skinned asset + the GenHuman test scene). `tests/test_example_asset.py` re-validates the shipped asset every run.
 - Setup tab done: user points the browser at one+ library folders (external drive / server). The Setup tab **reads and writes `scripts/path.txt`** (one folder per line) — that plain-text file is the single store ("db"). When it holds any folder the tool scans exactly those, else falls back to built-in defaults. `path.txt.example` ships beside the package; `path.txt` is hand-editable and survives installer upgrades (installer overwrites the package dir, never `path.txt`).
 - **95 headless tests passing.** A handful of `[!]` in-Maya smoke checks remain (see `../todo.md`).
 
@@ -74,4 +74,4 @@ incl. `assets/trench_coat_A/`). **Exclude** (dev-only): `tests/`, `examples/`, t
 `GenHuman_rig_*.ma` files, `prd.md`, `todo.md`, `Outfitter Rig System.md`, the
 `rig_naming_*.csv` files, and every `__pycache__`. Optionally bundle the two artist docs
 (`Clothing Asset Authoring Spec.md`, `Clothing Asset Quick Guide.*`) and the tool-user
-`Outfitter — User Guide.md`.
+`Outfitter Guide.md`.

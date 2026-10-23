@@ -21,6 +21,7 @@ from typing import Callable
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from .. import config
+from ..core import delete as _delete
 from ..core import publish as _publish
 from ..core import rigs as _rigs
 from ..core import settings as _settings
@@ -1051,6 +1052,8 @@ class PublishPanel(QtWidgets.QWidget):
                 maya_publish.write_info_node(spec.to_sidecar())
                 maya_publish.save_ma(str(paths.ma))
                 _publish.write_sidecar(paths, spec)
+                # A name published again is no longer deleted - stop Syncs trashing it.
+                _delete.clear_tombstone(remote, _delete.asset_key(remote, paths.ma))
                 report = _publish.validate_published_ma(paths.ma)
         except Exception as exc:  # noqa: BLE001
             self._report(f"Publish failed: {exc}", "error")

@@ -40,6 +40,8 @@ version:
 - **Library tab:** pick the **rig** you're dressing, filter and search the grid, click an
   asset to spin its turntable preview, then **Attach** it (and **Detach** when done).
   Clothing built for other rigs is hidden, with a count - tick *Show other rigs* to see it.
+  Right-click a thumbnail to **Rename…** or **Delete…** it; the change reaches everyone on
+  their next Sync, and old files go to the library's `_rigs/_trash/` folder.
 - **Publish tab:** pick the rig you're authoring for (or **Register rig…** a new one), then
   follow the five numbered steps to build the cloth rig, skin the mesh, capture a turntable,
   and publish.
@@ -88,6 +90,5 @@ and the turntable geometry. The Maya-only modules are compile-checked rather tha
 
 ## Docs
 
-- [Outfitter Guide.md](Outfitter%20Guide.md) - the user walkthrough
-- [Clothing Asset Prep.md](Clothing%20Asset%20Prep.md) - how to prepare a garment for publishing
+- [Outfitter Guide.md](Outfitter%20Guide.md) - the user guide: install, dressing a rig, making and fixing garments, error reference
 - [Clothing Asset Authoring Spec.md](Clothing%20Asset%20Authoring%20Spec.md) - the full asset contract

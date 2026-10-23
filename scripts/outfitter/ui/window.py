@@ -13,6 +13,7 @@ require a running Maya (they report this clearly if invoked standalone).
 """
 from __future__ import annotations
 
+import getpass
 import shutil
 import sys
 from pathlib import Path
@@ -20,7 +21,9 @@ from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from .. import __version__, config
+from ..core import delete as _delete
 from ..core import library
+from ..core import rename as _rename
 from ..core import rigs as _rigs
 from ..core import settings as _settings
 from ..core import sync as _sync
@@ -303,7 +306,8 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         v.addStretch(1)
         note = QtWidgets.QLabel(
             "Sync copies new and changed assets from the remote into the local "
-            "folder. It never deletes - assets you authored locally are always kept. "
+            "folder. Assets you authored locally are always kept; the only thing it "
+            "removes is an asset deleted from the library, and that goes to the trash. "
             "Leave the local folder unset to fall back to the default library."
         )
         note.setWordWrap(True)
@@ -820,6 +824,9 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         profile = self._rig.profile()
         if profile is not None:
             menu.addAction(f"Retarget to {profile.label}…", self._retarget_selected)
+        menu.addSeparator()
+        menu.addAction("Rename…", self._rename_selected)
+        menu.addAction("Delete…", self._delete_selected)
         menu.exec(self._grid.viewport().mapToGlobal(pos))
 
     def _retarget_selected(self) -> None:
@@ -1010,6 +1017,81 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         except OSError:
             return " (local - remote copy failed)"
         return " (local + remote)"
+
+    def _local_asset_or_warn(self, action: str) -> ClothingAsset | None:
+        """The selected asset if it lives in the user's local folder, else explain why not."""
+        asset = self._current_asset
+        if asset is None:
+            return None
+        local = _settings.read_locations().local
+        if local is None or not asset.ma_path.resolve().is_relative_to(Path(local).resolve()):
+            QtWidgets.QMessageBox.information(
+                self, f"Can't {action}",
+                f"'{asset.display_name}' isn't in your local library folder, so it can't "
+                f"be {action}d from here.")
+            return None
+        return asset
+
+    def _rename_selected(self) -> None:
+        """Rename the selected asset in the local library and, when set, the remote.
+
+        The new name goes into the asset's metadata and its file/folder names; the old
+        name is deleted (to the trash, with a tombstone), so everyone else's next Sync
+        swaps the old name for the new one.
+        """
+        asset = self._local_asset_or_warn("rename")
+        if asset is None:
+            return
+        new_name, ok = QtWidgets.QInputDialog.getText(
+            self, "Rename asset", f"New name for '{asset.display_name}':",
+            text=asset.display_name)
+        if not ok:
+            return
+        loc = _settings.read_locations()
+        try:
+            result = _rename.rename_asset(asset.ma_path, new_name, loc.local, loc.remote,
+                                          by=getpass.getuser())
+        except (ValueError, OSError) as exc:
+            self._status.setText(f"Rename failed: {exc}")
+            QtWidgets.QMessageBox.warning(self, "Rename failed", str(exc))
+            return
+        scope = " (local + remote)" if result.remote_ma else " (local)"
+        self.refresh()
+        self._select_by_path(result.local_ma)
+        self._status.setText(
+            f"Renamed {asset.display_name} to {new_name.strip()}{scope}.")
+
+    def _delete_selected(self) -> None:
+        """Delete the selected asset from the local library and, when set, the remote.
+
+        Both copies go to their library's trash (never a hard delete), and the remote
+        gets a tombstone so everyone else's next Sync trashes their copy too. Only an
+        asset in the user's own local folder can be deleted - not the built-in library.
+        """
+        asset = self._local_asset_or_warn("delete")
+        if asset is None:
+            return
+        loc = _settings.read_locations()
+        where = ("your local library and the shared remote library. Everyone else's "
+                 "copy is removed on their next Sync" if loc.remote is not None
+                 else "your local library")
+        if QtWidgets.QMessageBox.question(
+                self, "Delete asset",
+                f"Delete '{asset.display_name}' from {where}.\n\nThe files are moved to "
+                f"the library's {_delete.trash_dir('').as_posix()} folder, so this can "
+                "be undone by hand. Scenes already wearing it are not changed."
+                ) != QtWidgets.QMessageBox.Yes:
+            return
+        try:
+            result = _delete.delete_asset(asset.ma_path, loc.local, loc.remote,
+                                          by=getpass.getuser())
+        except OSError as exc:
+            self._status.setText(f"Delete failed: {exc}")
+            QtWidgets.QMessageBox.critical(self, "Delete failed", str(exc))
+            return
+        scope = " (local + remote)" if result.remote_trash else " (local)"
+        self.refresh()
+        self._status.setText(f"Deleted {asset.display_name}{scope}.")
 
     def _select_by_path(self, ma_path: Path) -> None:
         """Reselect the grid item whose asset matches ``ma_path`` (after a refresh)."""

@@ -8,7 +8,8 @@
 #   local  = your working library. The tool scans ONLY this folder.
 #   remote = a shared master library (studio server / drive). It is never scanned;
 #            the Setup tab's "Sync from remote" button pulls new and changed
-#            assets down from here into your local folder (it never deletes).
+#            assets down from here into your local folder. It only ever removes an
+#            asset someone deleted from the library, and moves it to the trash.
 #
 # When "local" is unset, the tool falls back to its built-in default library.
 #
