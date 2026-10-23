@@ -171,3 +171,48 @@ def test_other_artist_sync_follows_the_rename(tmp_path):
     names = [a.display_name for a in library.scan_library([other]).assets]
     assert names == ["parka"]
     assert result.removed == [Path("trench_coat_A/trench_coat_A.ma")]
+
+
+def test_lone_asset_in_category_folder_renamed_in_place(tmp_path):
+    local = tmp_path / "local"
+    _write(local / "hats" / "beanie.ma")
+    _write(local / "hats" / "notes.txt")
+
+    result = rename.rename_asset(local / "hats" / "beanie.ma", "wool_beanie", local)
+
+    assert result.local_ma == local / "hats" / "wool_beanie.ma"
+    assert sorted(p.name for p in (local / "hats").iterdir()) == [
+        "notes.txt", "wool_beanie.ma"]
+
+
+def test_failed_remote_copy_leaves_nothing_behind(tmp_path, monkeypatch):
+    local, remote = tmp_path / "local", tmp_path / "remote"
+    ma = _starter(local)
+    _starter(remote)
+    real_copy = rename._copy_renamed
+
+    def copy_then_fail_on_remote(root, ma_path, new_name):
+        if root == remote:
+            real_copy(root, ma_path, new_name)  # partly written, then the share fails
+            raise OSError("share went away")
+        return real_copy(root, ma_path, new_name)
+
+    monkeypatch.setattr(rename, "_copy_renamed", copy_then_fail_on_remote)
+    with pytest.raises(OSError):
+        rename.rename_asset(ma, "parka", local, remote)
+
+    for root in (local, remote):
+        assert sorted(p.name for p in root.iterdir()) == [STARTER.name]
+    assert delete.read_tombstones(remote) == {}
+
+
+def test_corrupt_sidecar_rolls_back_loose_rename(tmp_path):
+    local = tmp_path / "local"
+    _write(local / "coat.ma")
+    _write(local / "coat.json", "{not json")
+    _write(local / "hat.ma")
+
+    with pytest.raises(ValueError):
+        rename.rename_asset(local / "coat.ma", "parka", local)
+
+    assert sorted(p.name for p in local.iterdir()) == ["coat.json", "coat.ma", "hat.ma"]

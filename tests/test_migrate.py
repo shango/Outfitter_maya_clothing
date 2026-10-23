@@ -6,6 +6,8 @@ preserves whatever else was in the sidecar. A migration that quietly edits the w
 is worse than no migration.
 """
 import json
+
+import pytest
 import os
 import sys
 
@@ -51,7 +53,7 @@ def test_stamping_never_reassigns_an_asset_to_another_rig(tmp_path):
     # between rigs is a retarget, not a metadata edit.
     path = _sidecar(tmp_path, "acme_coat", rigId="acme_biped", rigVersions="v01")
 
-    migrate.apply_stamp(migrate.plan_stamp([path], rig_id="genhuman"))
+    migrate.apply_stamp(migrate.plan_stamp([path]))
 
     assert json.loads(path.read_text())["rigId"] == "acme_biped"
 
@@ -106,3 +108,43 @@ def test_the_result_always_says_the_ma_files_were_not_touched(tmp_path):
     result = migrate.apply_stamp(migrate.plan_stamp([path]))
 
     assert any("Sidecars only" in w for w in result.warnings)
+
+
+def test_legacy_assets_are_stamped_genhuman_whatever_rig_is_selected(tmp_path):
+    # 1.3.0 passed the UI's selected rig in here; there is no longer a way to.
+    path = _sidecar(tmp_path, "old_coat", genHumanCompat="v03")
+
+    with pytest.raises(TypeError):
+        migrate.plan_stamp([path], rig_id="eric")
+    migrate.apply_stamp(migrate.plan_stamp([path]))
+
+    assert json.loads(path.read_text())["rigId"] == "genhuman"
+
+
+def test_find_misstamped_matches_only_the_old_stamp_fingerprint(tmp_path):
+    wrong = _sidecar(tmp_path, "old_coat", genHumanCompat="v03, v04",
+                     rigId="eric", rigVersions="v03, v04")
+    wrong_no_versions = _sidecar(tmp_path, "old_hat", genHumanCompat="",
+                                 rigId="eric", rigVersions="")
+    published_eric = _sidecar(tmp_path, "eric_coat", rigId="eric", rigVersions="v08")
+    genhuman = _sidecar(tmp_path, "gh_coat", genHumanCompat="v03",
+                        rigId="genhuman", rigVersions="v03")
+    hand_edited = _sidecar(tmp_path, "edited", genHumanCompat="v03",
+                           rigId="eric", rigVersions="v08")
+    legacy = _sidecar(tmp_path, "legacy", genHumanCompat="v03")
+
+    found = migrate.find_misstamped(
+        [wrong, wrong_no_versions, published_eric, genhuman, hand_edited, legacy])
+
+    assert found == [wrong, wrong_no_versions]
+
+
+def test_repair_misstamped_restores_genhuman_and_keeps_fields(tmp_path):
+    path = _sidecar(tmp_path, "old_coat", genHumanCompat="v03", rigId="eric",
+                    rigVersions="v03", author="someone")
+
+    migrate.repair_misstamped(path)
+
+    data = json.loads(path.read_text())
+    assert data["rigId"] == "genhuman" and data["rigVersions"] == "v03"
+    assert data["author"] == "someone" and migrate.find_misstamped([path]) == []

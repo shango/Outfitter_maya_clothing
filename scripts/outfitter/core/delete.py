@@ -10,8 +10,9 @@ Re-publishing the asset clears its tombstone.
 Backwards compatibility with existing libraries and older Outfitter installs:
 
 * An asset is keyed by its ``.ma`` path relative to the library root
-  (``coat/coat.ma``, or ``coat.ma`` for a loose file), so any layout works. An asset
-  alone in its folder moves as the whole folder; a loose one moves only its own files.
+  (``coat/coat.ma``, or ``coat.ma`` for a loose file), so any layout works. An asset in
+  its own folder (named after it, as Publish lays it out) moves as the whole folder; any
+  other asset moves only its own files, so a shared or category folder is never taken.
 * The trash lives at ``<library>/_rigs/_trash/``. Older installs already skip ``_rigs``
   when scanning and pull only ``.json`` from it when syncing (rig profiles, read from
   the top level only), so a trashed garment can never reappear in their browser.
@@ -51,9 +52,13 @@ def asset_files(ma_path: Path | str) -> list[Path]:
 
 
 def owns_folder(root: Path, ma_path: Path) -> bool:
-    """True if ``ma_path``'s folder is a per-asset folder holding no other asset."""
+    """True if ``ma_path`` is in its own folder: ``<name>/<name>.ma``, no other asset.
+
+    Requiring the folder to be named after the asset keeps a category folder that
+    happens to hold one asset (``hats/beanie.ma``) from being moved or renamed with it.
+    """
     folder = ma_path.parent
-    if folder.resolve() == root.resolve():
+    if folder.resolve() == root.resolve() or folder.name != ma_path.stem:
         return False
     return all(p.resolve() == ma_path.resolve()
                for p in folder.rglob(f"*{config.ASSET_EXT}"))

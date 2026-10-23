@@ -106,13 +106,24 @@ def _copy_renamed(root: Path, ma_path: Path, new_name: str) -> Path:
     return new_ma
 
 
+def _remove_copy(root: Path, ma_path: Path, new_name: str) -> None:
+    """Undo :func:`_copy_renamed`: remove whatever it wrote under the new name."""
+    new_ma = renamed_path(root, ma_path, new_name)
+    if _delete.owns_folder(root, ma_path):
+        shutil.rmtree(new_ma.parent, ignore_errors=True)
+        return
+    for f in _delete.asset_files(ma_path):
+        new_ma.with_name(new_ma.stem + f.name[len(ma_path.stem):]).unlink(missing_ok=True)
+
+
 def rename_asset(ma_path: Path | str, new_name: str, local: Path | str,
                  remote: Path | str | None = None, *, by: str = "") -> RenameResult:
     """Rename the asset at ``ma_path`` (inside ``local``) to ``new_name`` everywhere.
 
     Raises ``ValueError`` for a blank name or one that sanitizes to the current file
     name, and ``FileExistsError`` if the new name is already taken in either library -
-    a rename never overwrites another asset.
+    a rename never overwrites another asset. If making any new copy fails, the copies
+    already made are removed and the original is untouched before the error is raised.
     """
     ma_path, local = Path(ma_path), Path(local)
     new_name = new_name.strip()
@@ -133,7 +144,14 @@ def rename_asset(ma_path: Path | str, new_name: str, local: Path | str,
         if taken.exists():
             raise FileExistsError(f"'{target.stem}' already exists in {root}.")
 
-    new_mas = [_copy_renamed(root, ma, new_name) for root, ma in copies]
+    new_mas: list[Path] = []
+    try:
+        for root, ma in copies:
+            new_mas.append(_copy_renamed(root, ma, new_name))
+    except Exception:
+        for root, ma in copies:  # only paths checked free above, so nothing else is lost
+            _remove_copy(root, ma, new_name)
+        raise
     deleted = _delete.delete_asset(ma_path, local, remote, by=by)
     if len(new_mas) > 1:
         # The new name may itself have been deleted once; it is live again now.

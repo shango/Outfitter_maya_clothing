@@ -211,3 +211,15 @@ def test_sync_without_tombstones_is_unchanged(tmp_path):
     assert not result.removed and result.assets_added == 1
     assert (local / "mine" / "mine.ma").is_file()
     assert "removed" not in result.summary()
+
+
+def test_lone_asset_in_category_folder_moves_only_its_files(tmp_path):
+    # hats/ holds one asset but is not named after it: it is a category, not its folder.
+    local = tmp_path / "local"
+    _write(local / "hats" / "beanie.ma")
+    _write(local / "hats" / "beanie.json")
+    _write(local / "hats" / "notes.txt")
+
+    delete.delete_asset(local / "hats" / "beanie.ma", local)
+
+    assert sorted(p.name for p in (local / "hats").iterdir()) == ["notes.txt"]

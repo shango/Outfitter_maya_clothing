@@ -77,13 +77,17 @@ def _versions_from(raw: dict) -> tuple[str, ...]:
     return tuple(v.strip() for v in text.replace(";", ",").split(",") if v.strip())
 
 
-def plan_stamp(sidecars, rig_id: str = _rigs.DEFAULT_RIG_ID) -> StampPlan:
+def plan_stamp(sidecars) -> StampPlan:
     """Work out which sidecars are missing a rig identity, without writing anything.
 
     ``sidecars`` is any iterable of sidecar paths (the library scan's
     ``asset.sidecar``). A sidecar that already names a rig is left alone even if it names
     a *different* one - this migration records what was always implied, it never
     reassigns an asset to another rig (that is what retargeting is for).
+
+    There is deliberately no rig parameter: an asset with no ``rigId`` *is* a GenHuman
+    asset (:class:`core.asset.AssetMetadata`), so that is the only identity this can write -
+    whichever rig happens to be selected in the UI.
     """
     candidates: list[StampCandidate] = []
     already = 0
@@ -108,7 +112,7 @@ def plan_stamp(sidecars, rig_id: str = _rigs.DEFAULT_RIG_ID) -> StampPlan:
             versions=_versions_from(raw),
         ))
 
-    return StampPlan(rig_id=rig_id, candidates=tuple(candidates),
+    return StampPlan(rig_id=_rigs.DEFAULT_RIG_ID, candidates=tuple(candidates),
                      already_stamped=already, unreadable=tuple(unreadable))
 
 
@@ -142,3 +146,35 @@ def apply_stamp(plan: StampPlan) -> StampResult:
             f"Sidecars only: the {config.INFO_NODE} node inside each .ma still says what "
             "it said before, and is refreshed the next time that asset is published.")
     return result
+
+
+def find_misstamped(sidecars) -> list[Path]:
+    """Sidecars an older build's *Stamp rig metadata* assigned to the wrong rig.
+
+    Before 1.3.1 the stamp used whichever rig was selected in the UI, not GenHuman. Its
+    fingerprint is unique: a non-GenHuman ``rigId`` beside a ``genHumanCompat`` key whose
+    versions were copied verbatim into ``rigVersions``. Publish never writes
+    ``genHumanCompat`` for another rig, so a genuinely published asset cannot match.
+    """
+    found: list[Path] = []
+    for path in sidecars:
+        path = Path(path)
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(raw, dict) or "genHumanCompat" not in raw:
+            continue
+        rig_id = str(raw.get("rigId", "")).strip()
+        if rig_id and rig_id != _rigs.DEFAULT_RIG_ID and \
+                str(raw.get("rigVersions", "")) == ", ".join(_versions_from(raw)):
+            found.append(path)
+    return found
+
+
+def repair_misstamped(path: Path | str) -> None:
+    """Point a :func:`find_misstamped` sidecar back at GenHuman, keeping every other key."""
+    path = Path(path)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["rigId"] = _rigs.DEFAULT_RIG_ID
+    path.write_text(json.dumps(raw, indent=1) + "\n", encoding="utf-8")

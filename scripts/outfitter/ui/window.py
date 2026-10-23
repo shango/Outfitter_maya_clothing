@@ -335,8 +335,8 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
                 "No sidecar files found in the library, so there is nothing to stamp.")
             return
 
-        rig_id = self._rig.rig_id() or _rigs.DEFAULT_RIG_ID
-        plan = migrate.plan_stamp(sidecars, rig_id)
+        plan = migrate.plan_stamp(sidecars)
+        rig_id = plan.rig_id
         if plan.is_empty:
             QtWidgets.QMessageBox.information(self, "Stamp rig metadata", plan.summary())
             return
