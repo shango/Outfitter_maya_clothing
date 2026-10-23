@@ -173,8 +173,23 @@ class MayaScene:
         )
 
     def remove_namespace(self, namespace: str) -> None:
-        # delete the namespace AND its content (the imported asset nodes)
-        self._cmds.namespace(removeNamespace=namespace, deleteNamespaceContent=True)
+        # delete the namespace AND its content (the imported asset nodes).
+        #
+        # Every saved .ma carries a poseInterpolatorManager and a shapeEditorManager. A
+        # scene without its own adopts the imported copies as its managers, and Maya
+        # then refuses to delete (or rename) them, so a plain removal fails. In that
+        # case delete everything else, move the managers to the root namespace - the
+        # scene keeps the managers it now relies on - and remove the empty namespace.
+        keep = self._cmds.ls(f"{namespace}:*", recursive=True, undeletable=True) or []
+        if not keep:
+            self._cmds.namespace(removeNamespace=namespace, deleteNamespaceContent=True)
+            return
+        others = [n for n in self._cmds.ls(f"{namespace}:*", recursive=True) or []
+                  if n not in keep]
+        if others:
+            self._cmds.delete(others)
+        self._cmds.namespace(moveNamespace=(namespace, ":"), force=True)
+        self._cmds.namespace(removeNamespace=namespace)
 
     def garment_namespaces(self) -> list[str]:
         found = []

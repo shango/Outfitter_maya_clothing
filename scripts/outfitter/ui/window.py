@@ -1238,7 +1238,10 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         engine = _existing_engine()
         if engine is None and _maya_available():
             engine = _ensure_engine(self)
-        names = engine.attached_namespaces() if engine is not None else []
+        try:
+            names = engine.attached_namespaces() if engine is not None else []
+        except Exception:  # noqa: BLE001 - a scene query must never stop the window opening
+            names = engine.registry.namespaces()
         self._attached_combo.blockSignals(True)
         self._attached_combo.clear()
         self._attached_combo.addItems(names)

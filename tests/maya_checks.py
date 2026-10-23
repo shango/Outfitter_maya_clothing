@@ -113,6 +113,34 @@ def check_retarget_renames_parents_and_children():
     assert cmds.listRelatives("cloth_spine_02", parent=True) == ["cloth_spine_01"]
 
 
+def check_attach_then_detach_with_the_real_rig_and_asset():
+    """Same session (registry) and a fresh engine (after a reload) must both detach.
+
+    A scene with no poseInterpolatorManager/shapeEditorManager of its own adopts the
+    garment's copies, which Maya won't delete - that used to fail every detach.
+    """
+    from outfitter.core import library
+    from outfitter.core.attach import AttachEngine
+    from outfitter.core.scene import MayaScene
+
+    repo = Path(__file__).resolve().parents[1]
+    asset = library.load_asset(repo / "assets" / "trench_coat_A" / "trench_coat_A.ma")
+    profile = rigs.find_profile("genhuman")
+    for fresh_engine in (False, True):
+        cmds.file(new=True, force=True)
+        cmds.file(str(repo / "scripts" / "outfitter" / "lib" / "GenHuman_rig_v03.ma"), i=True)
+        engine = AttachEngine(MayaScene())
+        res = engine.attach(asset, "coat", profile=profile)
+        assert res.ok, [str(i) for i in res.report.errors]
+        if fresh_engine:
+            engine = AttachEngine(MayaScene())
+        assert engine.attached_namespaces() == ["coat"]
+        res = engine.detach("coat")
+        assert res.ok, [str(i) for i in res.report.errors]
+        assert not cmds.namespace(exists="coat") and not cmds.ls("coat:*", recursive=True)
+        assert cmds.objExists(profile.export_group), "detach touched the rig"
+
+
 def check_root_joint_for_registered_rigs():
     assert rigs.root_joint(rigs.find_profile("genhuman")) == config.ROOT_JOINT
 
@@ -120,6 +148,7 @@ def check_root_joint_for_registered_rigs():
 CHECKS = [check_rig_markers_spare_the_garment,
           check_rig_top_named_like_a_garment_group_is_still_a_rig,
           check_retarget_renames_parents_and_children,
+          check_attach_then_detach_with_the_real_rig_and_asset,
           check_root_joint_for_registered_rigs]
 
 if __name__ == "__main__":
