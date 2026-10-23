@@ -138,6 +138,37 @@ def test_no_cloth_joints_error(tmp_path):
     assert "no_root_joint" in _codes(report)
 
 
+
+def test_rig_rooted_elsewhere_validates_against_its_own_root(tmp_path):
+    # A rig whose root joint is 'Hips' gives garments a cloth_Hips root, not cloth_root.
+    p = _assets.write_asset_ma(tmp_path / "a.ma", joints=["cloth_Hips", "cloth_Spine"])
+    summary = ma_parse.summarize_file(p)
+    meta = _assets.load(p).metadata
+
+    assert V.validate_asset_summary(summary, meta, "cloth_Hips").ok
+    assert "no_root_joint" in _codes(V.validate_asset_summary(summary, meta))
+
+
+def test_root_joint_comes_from_the_profile():
+    from outfitter.core import rigs, skeleton as sk
+    spec = sk.SkeletonSpec(root_group="Rig_GRP", root_group_rotate=(0.0, 0.0, 0.0),
+                           root_joint="cloth_Hips",
+                           joints=(sk.JointSpec(name="cloth_Hips", parent="Rig_GRP"),))
+    profile = rigs.RigProfile(rig_id="acme", display_name="Acme", version="v01",
+                              export_group="Acme_GRP", skeleton=spec, markers=("Acme_GRP",))
+
+    assert rigs.root_joint(profile) == "cloth_Hips"
+    assert rigs.root_joint(None) == "cloth_root"
+    assert rigs.root_joint(rigs.find_profile("genhuman")) == "cloth_root"
+
+
+def test_published_ma_check_uses_the_given_root(tmp_path):
+    from outfitter.core import publish
+    p = _assets.write_asset_ma(tmp_path / "a.ma", joints=["cloth_Hips", "cloth_Spine"])
+
+    assert "no_root_joint" not in _codes(publish.validate_published_ma(p, "cloth_Hips"))
+    assert "no_root_joint" in _codes(publish.validate_published_ma(p, "cloth_root"))
+
 # --- scene preconditions ------------------------------------------------------
 def _meta(compat="v03"):
     m, _ = AssetMetadata.from_mapping({
@@ -164,6 +195,19 @@ def test_version_incompat_errors():
     report = V.validate_scene_preconditions(scene, "coat", _meta("v03"))
     assert "version_incompat" in _codes(report)
     assert not report.ok
+
+
+def test_version_check_reads_the_targeted_rig():
+    scene = FakeScene()
+    scene.build_genhuman(["root"])
+    scene.add_node("B:GenHuman_Joint_GRP")
+    scene.version = "v03"           # the root-level rig
+    scene.versions["B"] = "v04"     # the namespaced rig the user selected
+
+    report = V.validate_scene_preconditions(
+        scene, "coat", _meta("v04"), export_group="B:GenHuman_Joint_GRP")
+
+    assert "version_incompat" not in _codes(report) and report.ok
 
 
 def test_version_unknown_warns_not_blocks():

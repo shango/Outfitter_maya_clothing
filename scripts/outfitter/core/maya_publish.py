@@ -192,7 +192,8 @@ def _cleanliness_facts(cmds) -> tuple[tuple[str, ...], ...]:
     return unknown, anim_curves, display_layers, renderer_mats
 
 
-def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
+def gather_scene_facts(mesh_group: str = "Mesh_GRP",
+                       root_joint: str = config.ROOT_JOINT) -> "_publish.SceneFacts":
     """Collect the facts the pure preflight needs from the open scene.
 
     Presence is tested by *short* name (namespace-insensitive) so a namespaced asset
@@ -226,7 +227,7 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
         has_rig=scene_has_rig(),
         namespaces=tuple(namespaces),
         present_groups=tuple(g for g in config.REQUIRED_GROUPS if g in shorts),
-        has_cloth_root=config.ROOT_JOINT in shorts,
+        has_cloth_root=root_joint in shorts,
         has_skincluster=has_skin,
         skin_influences=tuple(influences),
         cloth_joint_names=cloth_joint_names,
@@ -240,7 +241,11 @@ def gather_scene_facts(mesh_group: str = "Mesh_GRP") -> "_publish.SceneFacts":
 
 def preflight_scene(mesh_group: str = "Mesh_GRP") -> list:
     """Run the pre-publish sanity check on the open scene. List of ``PreflightIssue``."""
-    return _publish.assemble_preflight(gather_scene_facts(mesh_group))
+    from . import rigs as _rigs
+
+    root_joint = _rigs.root_joint(_active_profile())
+    return _publish.assemble_preflight(gather_scene_facts(mesh_group, root_joint),
+                                       root_joint=root_joint)
 
 
 # --------------------------------------------------------------------------- #

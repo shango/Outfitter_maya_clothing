@@ -390,7 +390,9 @@ def plan_prune_unskinned(mesh_group: str = "Mesh_GRP") -> _skeleton.PrunePlan:
             "joints before pruning - otherwise every joint would count as unused and be "
             "deleted.")
 
-    return _skeleton.plan_prune(parents, influences)
+    # Never prune the rig's own root, whatever it is called (cloth_ + its root's name).
+    return _skeleton.plan_prune(parents, influences,
+                                _rigs.root_joint(_rigs.resolve_profile()))
 
 
 def apply_prune(plan: _skeleton.PrunePlan) -> PruneResult:

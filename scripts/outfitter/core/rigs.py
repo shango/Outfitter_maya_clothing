@@ -424,6 +424,17 @@ def load_profile(rig_id: str, roots: list[Path] | None = None) -> RigProfile:
     raise LookupError(f"no registered rig {rig_id!r}; known rigs: {known}")
 
 
+def root_joint(profile: RigProfile | None) -> str:
+    """The ``cloth_*`` root joint a garment for ``profile`` has (``cloth_root`` without one).
+
+    A rig's cloth skeleton is rooted at ``cloth_`` + its own root joint's name, so a rig
+    whose root isn't called ``root`` has a different one - checks must ask the profile.
+    """
+    if profile is not None and profile.skeleton.root_joint:
+        return profile.skeleton.root_joint
+    return config.ROOT_JOINT
+
+
 def find_profile(rig_id: str, roots: list[Path] | None = None) -> RigProfile | None:
     """:func:`load_profile` that returns ``None`` instead of raising."""
     try:

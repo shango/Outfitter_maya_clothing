@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 from .. import config
 from . import ma_parse
+from . import rigs as _rigs
 from .asset import ClothingAsset
 from .registry import AttachedInstance, Connection, InstanceRegistry
 from .scene import SceneGateway
@@ -153,7 +154,8 @@ class AttachEngine:
 
         # 1) pre-scene validation - failure here means the scene is untouched
         summary = ma_parse.summarize_file(asset.ma_path)
-        report.extend(validate_asset_summary(summary, asset.metadata))
+        root_joint = _rigs.root_joint(profile)
+        report.extend(validate_asset_summary(summary, asset.metadata, root_joint))
         report.extend(validate_scene_preconditions(
             self.scene, namespace, asset.metadata,
             registered_namespaces=tuple(self.registry.namespaces()),
@@ -197,7 +199,7 @@ class AttachEngine:
             asset_name=meta.asset_name if meta else asset.display_name,
             asset_type=meta.asset_type if meta else "unknown",
             ma_path=str(asset.ma_path),
-            cloth_root=f"{namespace}:{config.ROOT_JOINT}",
+            cloth_root=f"{namespace}:{root_joint}",
             connections=[Connection(pc.src, pc.dst) for pc in applied],
         )
         self.registry.add(instance)

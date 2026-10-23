@@ -57,8 +57,12 @@ class SceneGateway(Protocol):
         ...
 
     # --- rig identification ---------------------------------------------------
-    def rig_version(self, markers: tuple[str, ...]) -> str | None:
+    def rig_version(self, markers: tuple[str, ...],
+                    export_group: str | None = None) -> str | None:
         """Detected version string of the rig in the scene, or ``None`` if undetectable.
+
+        ``export_group`` is the rig being dressed, as resolved in the scene; when given,
+        only markers in that rig's namespace count, so another rig can't answer for it.
 
         ``markers`` are the node names that identify the rig, from its profile
         (:attr:`core.rigs.RigProfile.markers`) - so this works for any registered rig,
@@ -161,7 +165,8 @@ class MayaScene:
         # delete the namespace AND its content (the imported asset nodes)
         self._cmds.namespace(removeNamespace=namespace, deleteNamespaceContent=True)
 
-    def rig_version(self, markers: tuple[str, ...]) -> str | None:
+    def rig_version(self, markers: tuple[str, ...],
+                    export_group: str | None = None) -> str | None:
         # PRD §9 open task: version-id method undefined. Best-effort: look for a
         # version string attr on any of the rig's marker nodes. Returns None when not
         # found so callers degrade to a warning rather than hard-failing.
@@ -169,9 +174,21 @@ class MayaScene:
         # Two attribute names are accepted: 'rigVersion' (what a rig registered with this
         # tool should carry) and 'genHumanVersion' (what GenHuman rigs in the wild already
         # carry). Namespaced rigs are matched too, so an imported rig is still identified.
+        #
+        # With ``export_group``, only markers in that rig's own namespace (or a parent of
+        # it, up to the top one - a rig can carry a stray nested namespace) are read.
+        # Nodes are taken as full paths: a short marker name shared by two nodes would
+        # make attributeQuery raise.
+        if export_group is not None:
+            parts = export_group.rsplit("|", 1)[-1].split(":")[:-1]
+            patterns = [":".join(parts[:i]) + ":{}" for i in range(len(parts), 0, -1)]
+            patterns = patterns or ["{}"]
+        else:
+            patterns = ["{}", "*:{}"]
         for marker in markers:
-            for node in ([marker] if self._cmds.objExists(marker) else
-                         (self._cmds.ls(f"*:{marker}") or [])):
+            nodes = [n for pattern in patterns
+                     for n in (self._cmds.ls(pattern.format(marker), long=True) or [])]
+            for node in nodes:
                 for attr in ("rigVersion", "genHumanVersion"):
                     if self._cmds.attributeQuery(attr, node=node, exists=True):
                         val = self._cmds.getAttr(f"{node}.{attr}")

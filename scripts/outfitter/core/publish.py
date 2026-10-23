@@ -375,13 +375,17 @@ def assemble_scene_precheck(facts: ScenePrecheckFacts) -> list[PreflightIssue]:
     return issues
 
 
-def validate_published_ma(ma_path: Path | str) -> ValidationReport:
+def validate_published_ma(ma_path: Path | str,
+                          root_joint: str | None = None) -> ValidationReport:
     """Re-validate a saved asset ``.ma`` with the same file checks the browser uses.
 
     Run after the scene is saved so publish enforces the structure contract
     (info node, required groups, cloth_root, clean of refs/namespaces/forbidden
     nodes). Reuses :func:`validate_asset_summary` - no publish-specific rules.
+    ``root_joint`` defaults to the root of the rig the asset says it is for.
     """
     summary = ma_parse.summarize_file(ma_path)
     meta, _ = AssetMetadata.from_mapping(summary.info_attrs)
-    return validate_asset_summary(summary, meta)
+    if root_joint is None:
+        root_joint = rigs.root_joint(rigs.find_profile(meta.rig_id) if meta else None)
+    return validate_asset_summary(summary, meta, root_joint)

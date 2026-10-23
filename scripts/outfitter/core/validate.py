@@ -87,7 +87,8 @@ class ValidationReport:
 # --------------------------------------------------------------------------- #
 # File-only validation (no Maya)
 # --------------------------------------------------------------------------- #
-def validate_asset_summary(summary: MaSummary, metadata: AssetMetadata | None) -> ValidationReport:
+def validate_asset_summary(summary: MaSummary, metadata: AssetMetadata | None,
+                           root_joint: str = config.ROOT_JOINT) -> ValidationReport:
     """Validate an asset's on-disk structure from a parsed ``MaSummary``."""
     report = ValidationReport()
 
@@ -110,10 +111,11 @@ def validate_asset_summary(summary: MaSummary, metadata: AssetMetadata | None) -
                          fix=f"create {grp} under the asset top group")
 
     # --- connection skeleton (Authoring Spec §4) ---
-    if not summary.has_node(config.ROOT_JOINT):
-        report.error("no_root_joint", f"missing root joint '{config.ROOT_JOINT}'",
-                     node=config.ROOT_JOINT,
-                     fix=f"duplicate body 'root', rename to '{config.ROOT_JOINT}', parent under Rig_GRP")
+    # ``root_joint`` is the rig's own (``rigs.root_joint``): cloth_ + its root's name.
+    if not summary.has_node(root_joint):
+        report.error("no_root_joint", f"missing root joint '{root_joint}'",
+                     node=root_joint,
+                     fix=f"rebuild the cloth skeleton so it has '{root_joint}' under Rig_GRP")
 
     cloth_joints = summary.cloth_joints()
     if not cloth_joints:
@@ -228,7 +230,7 @@ def validate_scene_preconditions(
 
         # --- version compatibility (FR-2; detection is best-effort, PRD §9) ---
         markers = profile.markers if profile is not None else config.RIG_MARKERS
-        scene_version = scene.rig_version(markers)
+        scene_version = scene.rig_version(markers, export_group)
         if scene_version is None:
             report.warn("version_unknown",
                         f"could not detect the scene's {rig_label} version; skipping "

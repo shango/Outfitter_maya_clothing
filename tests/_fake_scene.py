@@ -37,6 +37,8 @@ class FakeScene:
         self.namespaces: set[str] = set()
         self.connections: set[tuple[str, str]] = set()
         self.version: str | None = None
+        # Per-namespace rig versions ("" = root level); fall back to ``version``.
+        self.versions: dict[str, str] = {}
         self.selection: list[str] = []
         self.matrices: dict[str, list[float]] = {}
 
@@ -145,7 +147,12 @@ class FakeScene:
         }
         self.namespaces.discard(namespace)
 
-    def rig_version(self, markers: tuple[str, ...] = ()) -> str | None:
+    def rig_version(self, markers: tuple[str, ...] = (),
+                    export_group: str | None = None) -> str | None:
+        if export_group is not None:
+            ns = export_group.rsplit("|", 1)[-1].rpartition(":")[0]
+            if ns in self.versions:
+                return self.versions[ns]
         return self.version
 
     def selected_nodes(self) -> list[str]:
