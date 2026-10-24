@@ -296,10 +296,10 @@ thumbnail and turntable are regenerated. Two things to know afterwards:
 
 Older assets keep whatever thumbnail they shipped with. To give one the shaded still and
 spinnable turntable without a full re-publish, **right-click its thumbnail** and choose
-**↻ Refresh thumbnails**. It opens the asset in Maya, recaptures, and overwrites only the
-two image files - the `.ma` and its details are untouched. The images go to your local copy
-and, when a remote library is set and already holds the asset, to the shared copy too. It
-replaces the current Maya scene, so save your work first.
+**↻ Refresh thumbnails**. It brings the asset into your scene, recaptures, removes it
+again, and overwrites only the two image files - the `.ma` and its details are untouched.
+Your open scene is left as it was. The images go to your local copy and, when a remote
+library is set and already holds the asset, to the shared copy too.
 
 ### Rename a garment
 

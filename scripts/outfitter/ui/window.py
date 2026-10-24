@@ -945,9 +945,10 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
     def _refresh_thumbnails(self) -> None:
         """Recapture the selected asset's still + turntable in place (images only).
 
-        Opens the asset's ``.ma`` in Maya, bakes a fresh shaded turntable (and the still
-        cropped from it), and overwrites just the two PNGs beside the file - the ``.ma``
-        and sidecar are left untouched. When a remote library is configured and holds the
+        Imports the asset's ``.ma`` into the current scene under a scratch namespace, bakes
+        a fresh shaded turntable (and the still cropped from it), removes everything it
+        imported, and overwrites just the two PNGs beside the file - the ``.ma`` and
+        sidecar are left untouched. When a remote library is configured and holds the
         same asset, the new images are mirrored there too, so the shared copy stays current
         without a full re-publish. The remedy for older assets still carrying a flat
         wireframe thumbnail.
@@ -963,26 +964,21 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
             return
         if QtWidgets.QMessageBox.question(
                 self, "Refresh thumbnails",
-                f"Open '{asset.ma_path.name}' in Maya and recapture its shaded "
-                "thumbnail + turntable?\n\nThis replaces the current Maya scene - save "
-                "any unsaved work first. Only the images are overwritten (local, and the "
-                "remote copy when configured); the .ma and metadata are left as-is."
+                f"Recapture the shaded thumbnail + turntable for '{asset.ma_path.name}'?"
+                "\n\nThe asset is brought into your scene just for the capture and "
+                "removed again afterwards. Only the images are overwritten (local, and "
+                "the remote copy when configured); the .ma and metadata are left as-is."
                 ) != QtWidgets.QMessageBox.Yes:
             return
 
         from ..core import maya_publish
-        import maya.cmds as cmds  # type: ignore
 
         # Write the canonical names publish uses, beside the asset's own .ma.
         still = asset.ma_path.with_suffix(config.THUMB_EXTS[0])           # <name>.png
         sheet = asset.ma_path.with_name(asset.ma_path.stem + config.TURNTABLE_SUFFIX)
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         try:
-            cmds.file(str(asset.ma_path), open=True, force=True)
-            meshes = maya_publish.find_garment_meshes()
-            if not meshes:
-                raise RuntimeError("no garment meshes found under Mesh_GRP")
-            maya_publish.capture_turntable(meshes, str(sheet), still_png=str(still))
+            maya_publish.recapture_asset_images(str(asset.ma_path), str(sheet), str(still))
         except Exception as exc:  # noqa: BLE001 - surface the Maya error in the UI
             QtWidgets.QApplication.restoreOverrideCursor()
             self._status.setText(f"Thumbnail refresh failed: {exc}")

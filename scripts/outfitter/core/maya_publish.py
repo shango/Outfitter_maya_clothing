@@ -553,6 +553,39 @@ def capture_turntable(
     return out_png
 
 
+def recapture_asset_images(ma_path: str, sheet_png: str, still_png: str) -> None:
+    """Recapture a published asset's turntable + still without disturbing the open scene.
+
+    Imports the asset under a scratch namespace, captures it isolated (the rest of the
+    scene is hidden by :func:`capture_turntable`), then removes the namespace and every
+    node it brought in. The scene's unsaved-changes flag is put back as it was.
+    """
+    from .scene import MayaScene
+
+    cmds = _cmds()
+    scene = MayaScene()
+    was_modified = cmds.file(query=True, modified=True)
+    ns, n = "outfitter_thumb", 1
+    while cmds.namespace(exists=ns):
+        n += 1
+        ns = f"outfitter_thumb{n}"
+    try:
+        scene.import_asset(ma_path, ns)
+        group = f"{ns}:{config.MESH_GROUP}"
+        shapes = (cmds.listRelatives(group, allDescendents=True, type="mesh", fullPath=True)
+                  or []) if cmds.objExists(group) else []
+        meshes = sorted({p for s in shapes
+                         for p in cmds.listRelatives(s, parent=True, fullPath=True) or []})
+        if not meshes:
+            raise RuntimeError("no garment meshes found under Mesh_GRP")
+        capture_turntable(meshes, sheet_png, still_png=still_png)
+    finally:
+        if cmds.namespace(exists=ns):
+            scene.remove_namespace(ns)
+        if not was_modified:
+            cmds.file(modified=False)
+
+
 # --------------------------------------------------------------------------- #
 # Embed metadata + save
 # --------------------------------------------------------------------------- #

@@ -141,6 +141,48 @@ def check_attach_then_detach_with_the_real_rig_and_asset():
         assert cmds.objExists(profile.export_group), "detach touched the rig"
 
 
+def check_refresh_thumbnails_leaves_the_scene_as_it_was():
+    """The asset is imported for the capture only; the user's scene keeps just its own nodes.
+
+    No viewport in batch mode, so the playblast is stubbed; it still sees the real meshes.
+    Run with and without a rig loaded (no rig = the scene adopts the asset's managers).
+    """
+    repo = Path(__file__).resolve().parents[1]
+    asset = repo / "assets" / "trench_coat_A" / "trench_coat_A.ma"
+    real_capture = maya_publish.capture_turntable
+    seen = []
+
+    def fake_capture(meshes, out_png, still_png=None):
+        seen.append(meshes)
+        if len(seen) == 3:
+            raise RuntimeError("capture failed")
+
+    maya_publish.capture_turntable = fake_capture
+    try:
+        for with_rig in (True, False, True):
+            cmds.file(new=True, force=True)
+            if with_rig:
+                cmds.file(str(repo / "scripts" / "outfitter" / "lib" / "GenHuman_rig_v03.ma"),
+                          i=True)
+            cmds.file(modified=False)
+            before = set(cmds.ls(long=True))
+            try:
+                maya_publish.recapture_asset_images(str(asset), "unused.png", "unused.png")
+            except RuntimeError as exc:
+                assert len(seen) == 3 and "capture failed" in str(exc), exc
+            meshes = seen[-1]
+            assert meshes and all("|outfitter_thumb:" in m for m in meshes), meshes
+            after = set(cmds.ls(long=True))
+            assert after - before <= {"|poseInterpolatorManager", "|shapeEditorManager",
+                                      "poseInterpolatorManager", "shapeEditorManager"}, \
+                sorted(after - before)[:10]
+            assert before <= after, sorted(before - after)[:10]
+            assert not cmds.namespace(exists="outfitter_thumb")
+            assert not cmds.file(query=True, modified=True), "scene left marked modified"
+    finally:
+        maya_publish.capture_turntable = real_capture
+
+
 def check_root_joint_for_registered_rigs():
     assert rigs.root_joint(rigs.find_profile("genhuman")) == config.ROOT_JOINT
 
@@ -149,6 +191,7 @@ CHECKS = [check_rig_markers_spare_the_garment,
           check_rig_top_named_like_a_garment_group_is_still_a_rig,
           check_retarget_renames_parents_and_children,
           check_attach_then_detach_with_the_real_rig_and_asset,
+          check_refresh_thumbnails_leaves_the_scene_as_it_was,
           check_root_joint_for_registered_rigs]
 
 if __name__ == "__main__":
