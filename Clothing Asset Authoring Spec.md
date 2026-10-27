@@ -137,7 +137,11 @@ Authoritative source is the GenHuman rig (`GenHuman_rig_v03.ma`) — duplicate f
 
 - **Smooth bind only.** No rigid bind, no alternative skinning.
 - Garment meshes bind to the `cloth_*` joints (connection joints and/or helper joints).
-- SkinClusters must be valid and evaluate in realtime (keep influence counts reasonable).
+- SkinClusters must be valid and evaluate in realtime.
+- **Classic linear, max 4 influences per vertex:** `skinningMethod` 0, `maxInfluences` 4,
+  `maintainMaxInfluences` on, weights normalized. No dual quaternion or weighted blend: a
+  per-vertex blend map can't be matched across assets and doesn't survive FBX export. Registered
+  body rigs follow the same rule, so garment and body deform alike.
 - No blendshapes / corrective morphs anywhere (see §10).
 
 ---
