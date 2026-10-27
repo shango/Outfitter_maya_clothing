@@ -100,9 +100,11 @@ def garment_node_ids(cmds, markers: tuple[str, ...] = ()) -> set[str]:
     ``MichaelC_pants`` would otherwise read as part of the MichaelC rig. The garment is
     the top-level group holding ``Mesh_GRP``/``Rig_GRP``/``Ctrl_GRP`` (or those groups at
     the root), with everything under it, plus its meshes' deformers and shading networks
-    and ``cloth_info``. A candidate holding a node named exactly like a marker is the rig
-    itself, not a garment, and is left out. History stops at DAG nodes, so it never walks
-    from the skin through the joints into the rig.
+    and ``cloth_info``. Before those groups exist (the cloth skeleton isn't built yet) the
+    garment is the loose mesh geo at the scene root, as ``Eric_baseballTee`` was. A
+    candidate holding a node named exactly like a marker is the rig itself, not a garment,
+    and is left out. History stops at DAG nodes, so it never walks from the skin through
+    the joints into the rig.
     """
     exact = set(markers)
     roots = set()
@@ -111,6 +113,11 @@ def garment_node_ids(cmds, markers: tuple[str, ...] = ()) -> set[str]:
             parts = node.split("|")                 # ['', top, ...]
             if len(parts) <= 3:                     # |grp or |top|grp
                 roots.add("|" + parts[1])
+    if not roots:
+        for mesh in cmds.ls(type="mesh", long=True) or []:
+            top = mesh.split("|")[1]
+            if ":" not in top and not cmds.getAttr(f"{mesh}.intermediateObject"):
+                roots.add("|" + top)
     nodes: list[str] = []
     for root in roots:
         subtree = [root] + (cmds.listRelatives(root, allDescendents=True, fullPath=True) or [])

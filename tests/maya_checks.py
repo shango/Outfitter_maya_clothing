@@ -91,6 +91,25 @@ def check_rig_top_named_like_a_garment_group_is_still_a_rig():
     assert set(cmds.ls(list(cmds.ls(garment, long=True)), uuid=True)) == garment
 
 
+def check_loose_garment_named_after_rig_is_not_a_rig():
+    """Before the cloth skeleton builds the asset groups the garment is loose geo at the
+    scene root (Eric_BBall_Tee's ``Eric_baseballTee`` read as the Eric rig)."""
+    cmds.file(new=True, force=True)
+    geo = cmds.polyCube(name="MichaelC_tee")[0]
+    sg = cmds.sets(renderable=True, noSurfaceShader=True, empty=True, name="MichaelC_teeSG")
+    cmds.sets(geo, edit=True, forceElement=sg)
+    assert not maya_publish.scene_has_rig(MARKERS), "loose garment read as a rig"
+
+    top = _rig()
+    cmds.parent(cmds.polyCube(name="MichaelC_body")[0], top)  # rig top holding a mesh
+    assert maya_publish.scene_has_rig(MARKERS), "rig beside a loose garment missed"
+    maya_testfit._delete_rig(cmds, SimpleNamespace(markers=MARKERS))
+
+    assert not cmds.objExists("MichaelC_body"), "rig body mesh survived"
+    assert cmds.objExists(geo) and cmds.objExists(sg), "loose garment deleted with the rig"
+    assert not maya_publish.scene_has_rig(MARKERS)
+
+
 def check_retarget_renames_parents_and_children():
     cmds.file(new=True, force=True)
     rig_grp = cmds.group(empty=True, name=config.RIG_GROUP)
@@ -189,6 +208,7 @@ def check_root_joint_for_registered_rigs():
 
 CHECKS = [check_rig_markers_spare_the_garment,
           check_rig_top_named_like_a_garment_group_is_still_a_rig,
+          check_loose_garment_named_after_rig_is_not_a_rig,
           check_retarget_renames_parents_and_children,
           check_attach_then_detach_with_the_real_rig_and_asset,
           check_refresh_thumbnails_leaves_the_scene_as_it_was,
