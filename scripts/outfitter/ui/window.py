@@ -1161,20 +1161,23 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
                 "'Retarget to rig…' on the right-click menu.")
             return
 
-        # Multi-rig: the user selects any node of the target rig; we resolve that
-        # rig's export-skeleton group from the selection's namespace. With nothing
-        # selected we fall back to a root-level rig (single-rig / no-namespace case).
-        export_group = profile.export_group
-        rig_label = f"{profile.label} (root-level)"
-        selection = engine.scene.selected_nodes()
-        if selection:
-            resolved = engine.scene.resolve_export_group(
-                selection[0], profile.export_group)
-            if resolved is not None:
-                export_group = resolved
-                rig_label = f"{profile.label} - {_rig_label(resolved)}"
+        # Multi-rig: a selected node of the target rig picks that rig. With nothing
+        # selected, a root-level rig or the only namespaced copy in the scene is used.
+        from ..core.attach import sanitize_namespace, target_export_groups
+        targets = target_export_groups(engine.scene, profile.export_group)
+        if len(targets) > 1:
+            QtWidgets.QMessageBox.warning(
+                self, WINDOW_TITLE,
+                f"The scene has {len(targets)} {profile.label} rigs:\n\n"
+                + "\n".join(_rig_label(t) for t in targets)
+                + "\n\nSelect any node of the one to dress, then Attach again.")
+            return
+        export_group = targets[0] if targets else profile.export_group
+        rig_label = (f"{profile.label} - {_rig_label(export_group)}"
+                     if ":" in export_group
+                     else f"{profile.label} (root-level)")
 
-        from ..core.attach import sanitize_namespace
+
         suggested = sanitize_namespace(asset.asset_type or asset.display_name)
         namespace, ok = QtWidgets.QInputDialog.getText(
             self, "Attach clothing",

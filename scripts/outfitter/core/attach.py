@@ -68,6 +68,22 @@ def sanitize_namespace(name: str) -> str:
     return cleaned or "clothing"
 
 
+def target_export_groups(scene: SceneGateway, export_group: str) -> list[str]:
+    """Export-group paths attach could bind to, given the current selection.
+
+    A selected node of a rig wins (multi-rig, PRD §4). Otherwise a root-level group,
+    otherwise every namespaced instance in the scene. One result is the target; none
+    means the rig isn't in the scene; several means the user must select one.
+    """
+    for node in scene.selected_nodes()[:1]:
+        resolved = scene.resolve_export_group(node, export_group)
+        if resolved is not None:
+            return [resolved]
+    if scene.exists(export_group):
+        return [export_group]
+    return scene.find_export_groups(export_group)
+
+
 class _Abort(Exception):
     """Internal: signal a post-import validation failure to trigger rollback."""
 

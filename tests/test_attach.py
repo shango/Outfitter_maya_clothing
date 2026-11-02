@@ -328,3 +328,19 @@ def test_attach_without_a_profile_still_works(tmp_path):
     engine = AttachEngine(_scene())
     result = engine.attach(_coat(tmp_path), "coat")
     assert result.ok, [str(i) for i in result.report.errors]
+
+
+def test_target_export_groups_finds_lone_namespaced_rig():
+    # The Seth report: rig referenced under a namespace, nothing selected. Attach
+    # used to look only for a root-level group and reject.
+    from outfitter.core.attach import target_export_groups
+    scene = FakeScene()
+    a = scene.build_genhuman(BODY, namespace="charA")
+    assert target_export_groups(scene, "GenHuman_Joint_GRP") == [a]
+
+    b = scene.build_genhuman(BODY, namespace="charB")
+    assert sorted(target_export_groups(scene, "GenHuman_Joint_GRP")) == sorted([a, b])
+    scene.select("charB:god_m_godnode_anim")
+    assert target_export_groups(scene, "GenHuman_Joint_GRP") == [b]
+
+    assert target_export_groups(FakeScene(), "GenHuman_Joint_GRP") == []

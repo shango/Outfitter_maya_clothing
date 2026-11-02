@@ -186,3 +186,7 @@ class FakeScene:
             if addr_ns == top_ns:
                 return addr
         return None
+
+    def find_export_groups(self, export_group: str) -> list[str]:
+        return [addr for addr, node in self.nodes.items()
+                if node.node_type == "transform" and _short(addr) == export_group]

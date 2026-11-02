@@ -97,6 +97,14 @@ class SceneGateway(Protocol):
         """
         ...
 
+    def find_export_groups(self, export_group: str) -> list[str]:
+        """Full DAG paths of every transform named ``export_group`` in any namespace.
+
+        Lets attach find a rig that sits under a namespace (referenced or imported)
+        when nothing of it is selected.
+        """
+        ...
+
     # --- world placement ------------------------------------------------------
     def world_matrix(self, node: str) -> list[float]:
         """The node's world transform as a flat 16-float row-major matrix."""
@@ -258,3 +266,7 @@ class MayaScene:
             if path.rsplit("|", 1)[-1].rsplit(":", 1)[-1] == marker:
                 return path
         return None
+
+    def find_export_groups(self, export_group: str) -> list[str]:
+        return list(self._cmds.ls(export_group, recursive=True, type="transform",
+                                  long=True) or [])
