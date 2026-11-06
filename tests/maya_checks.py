@@ -25,7 +25,8 @@ for _name in [n for n in sys.modules if n == "outfitter" or n.startswith("outfit
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from outfitter import config  # noqa: E402
-from outfitter.core import maya_publish, maya_retarget, maya_testfit, rigs  # noqa: E402
+from outfitter.core import (maya_publish, maya_retarget, maya_rig_check,  # noqa: E402
+                            maya_testfit, rigs)
 
 MARKERS = ("MichaelC_Joint_GRP", "MichaelC")
 
@@ -206,13 +207,65 @@ def check_root_joint_for_registered_rigs():
     assert rigs.root_joint(rigs.find_profile("genhuman")) == config.ROOT_JOINT
 
 
+def _skinned_rig():
+    """A generically named rig whose body is over the influence budget."""
+    cmds.file(new=True, force=True)
+    top = cmds.group(empty=True, name="Acme")
+    skeleton = cmds.group(empty=True, name="Skeleton", parent=top)
+    geo = cmds.group(empty=True, name="Geo", parent=top)
+    joints = [_joint("root", skeleton)]
+    for i in range(5):
+        joints.append(_joint(f"spine_0{i + 1}", joints[-1]))
+        cmds.setAttr(joints[-1] + ".ty", 2)
+    body = cmds.polyCylinder(name="body", height=10, subdivisionsHeight=10)[0]
+    body = cmds.parent(body, geo)[0]
+    cmds.setAttr(body + ".ty", 5)
+    skin = cmds.skinCluster(joints, body, toSelectedBones=True, maximumInfluences=6,
+                            obeyMaxInfluences=False, name="body_SKC")[0]
+    cmds.skinPercent(skin, body + ".vtx[0]",
+                     transformValue=[(j, 1.0 / len(joints)) for j in joints])
+    return skin
+
+
+def check_rig_check_fixes_undo_in_one_step():
+    skin = _skinned_rig()
+    names = sorted(cmds.ls(long=True))
+    plug = f"{skin}.weightList[0].weights"
+    weights = cmds.getAttr(plug)[0]
+
+    keys = {issue.key for issue in maya_rig_check.scan().issues}
+    assert {"rename", f"skin_weights:{skin}", f"skin_settings:{skin}"} <= keys, keys
+
+    maya_rig_check.apply_fix("rename", "Acme")
+    assert cmds.objExists("Acme_Joint_GRP") and cmds.objExists("Acme_body_mesh")
+    cmds.undo()
+    assert sorted(cmds.ls(long=True)) == names, "rename left something behind"
+
+    maya_rig_check.apply_fix(f"skin_weights:{skin}")
+    pruned = [w for w in cmds.getAttr(plug)[0] if w > 0]
+    assert len(pruned) == 4 and abs(sum(pruned) - 1.0) < 1e-6, pruned
+    cmds.undo()
+    assert cmds.getAttr(plug)[0] == weights, "prune undo did not restore the weights"
+
+
+def check_rig_check_refuses_a_stale_fix():
+    _skinned_rig()
+    try:
+        maya_rig_check.apply_fix("orphans")
+    except ValueError:
+        return
+    raise AssertionError("fixed an issue the scene does not have")
+
+
 CHECKS = [check_rig_markers_spare_the_garment,
           check_rig_top_named_like_a_garment_group_is_still_a_rig,
           check_loose_garment_named_after_rig_is_not_a_rig,
           check_retarget_renames_parents_and_children,
           check_attach_then_detach_with_the_real_rig_and_asset,
           check_refresh_thumbnails_leaves_the_scene_as_it_was,
-          check_root_joint_for_registered_rigs]
+          check_root_joint_for_registered_rigs,
+          check_rig_check_fixes_undo_in_one_step,
+          check_rig_check_refuses_a_stale_fix]
 
 if __name__ == "__main__":
     failed = 0

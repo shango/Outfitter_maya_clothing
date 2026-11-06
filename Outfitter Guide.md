@@ -5,8 +5,9 @@ clothing, snap a garment onto your animated character in one click, and take it 
 cleanly. Made something new? The tool walks you through publishing it back to the library
 so everyone can use it.
 
-It runs as a single window with three tabs: **Library** (browse and attach), **Publish**
-(turn a garment you built into a library asset), and **Setup** (where your library lives).
+It runs as a single window with four tabs: **Library** (browse and attach), **Publish**
+(turn a garment you built into a library asset), **Rig Check** (find and fix what stops a rig
+working in Outfitter), and **Setup** (where your library lives).
 
 **GenHuman v03** comes registered out of the box. Working with a different rig? Register it
 once (see *Working with rigs*) and everything else behaves the same.
@@ -99,6 +100,38 @@ At the top of the **Library** and **Publish** tabs is a **Rig** dropdown. It ans
 character am I working with?", and everything follows from it: the Library shows clothing
 for that rig, and Publish tags what you make with it. Your choice is remembered between
 sessions.
+
+### Check a rig before registering (Rig Check tab)
+
+Run this on every new rig. It finds what would stop the rig working in Outfitter and fixes
+what it safely can.
+
+![The Rig Check tab](docs/images/rig_check.png)
+
+1. Open the rig file itself: not referenced, and not imported into a namespace.
+2. On the **Rig Check** tab, press **Scan scene**. Nothing changes until you press a fix.
+3. Work down the list from the top. Red must be fixed before registering, yellow is worth
+   reviewing, and blue is a note. Click an issue to see its cause and exactly what to do.
+   **Select in scene** selects the nodes involved.
+4. Save with **File > Save As** as a new version. Rig Check never saves for you.
+
+Each issue says how it is resolved:
+
+| Label | What happens |
+|---|---|
+| **safe fix** | Can't change how the rig deforms. **Fix all safe** applies all of these at once. |
+| **fix after review** | Real changes with a cost, such as pruning weights. Read what it does, press **Apply fix**, and check a pose afterwards. |
+| **needs a name** | Type the rig's name and press **Rename**. It is prefilled from the file name. |
+| **by hand** | A decision for you or the rigger. The tool says what to do and leaves the rig alone. |
+
+Each fix is one **Ctrl+Z**, and so is **Fix all safe**. After undoing, press **Scan scene** to
+refresh the list.
+
+Rename before registering: a rig registered under the old names breaks if it is renamed later.
+A rig built from GenHuman shows *Already registered as GenHuman* until it has its own names.
+
+The export group list picks the skeleton the body is skinned to. Change it if the scan
+checked the wrong one.
 
 ### Register a new rig
 

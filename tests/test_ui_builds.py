@@ -132,12 +132,13 @@ def _build_all() -> int:
     _install_qt_stub()
     sys.path.insert(0, str(REPO / "scripts"))
 
-    from outfitter.ui import publish_panel, rig_bar, window
+    from outfitter.ui import publish_panel, rig_bar, rig_check_panel, window
 
     failures = []
     for label, build in (
         ("RigSelector", lambda: rig_bar.RigSelector(show_register=True)),
         ("PublishPanel", lambda: publish_panel.PublishPanel()),
+        ("RigCheckPanel", lambda: rig_check_panel.RigCheckPanel()),
         ("OutfitterBrowser", lambda: window.OutfitterBrowser()),
     ):
         try:

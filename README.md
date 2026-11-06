@@ -9,9 +9,10 @@ tool learns its skeleton, its body variants and which joints each garment type s
 to. Every published asset records which rig it belongs to, and the browser only offers you
 clothing that fits the rig you're dressing.
 
-It runs as a single window inside Maya with three tabs: **Library** (browse and attach),
-**Publish** (turn a hand-authored garment into a library asset), and **Setup** (point it at
-your local and remote folders).
+It runs as a single window inside Maya with four tabs: **Library** (browse and attach),
+**Publish** (turn a hand-authored garment into a library asset), **Rig Check** (find and fix
+what stops a rig working in Outfitter), and **Setup** (point it at your local and remote
+folders).
 
 ## Requirements
 

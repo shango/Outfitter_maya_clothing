@@ -31,6 +31,7 @@ from ..core.asset import ClothingAsset
 from . import style
 from .publish_panel import PublishPanel
 from .rig_bar import RigSelector
+from .rig_check_panel import RigCheckPanel
 from .turntable import TurntableView
 
 WINDOW_OBJECT_NAME = "outfitterBrowser"
@@ -145,6 +146,7 @@ class OutfitterBrowser(QtWidgets.QMainWindow):
         tabs = QtWidgets.QTabWidget()
         tabs.addTab(self._build_library_tab(), "Library")
         tabs.addTab(PublishPanel(on_published=self.refresh), "Publish")
+        tabs.addTab(RigCheckPanel(), "Rig Check")
         tabs.addTab(self._build_setup_tab(), "Setup")
         root.addWidget(tabs, 1)
         self.setCentralWidget(central)
